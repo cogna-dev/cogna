@@ -1,0 +1,51 @@
+---
+import Base from "@/layouts/base.astro"
+import { Header } from "@/components/primitive/header"
+import { Footer } from "@/components/primitive/footer"
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const { title, description } = Astro.props
+---
+
+<Base title={title} description={description}>
+	<Header client:load header={{
+		title: "CodeIQ",
+		description: "云、端一体的代码理解平台",
+		menus: [
+			{ title: "文档概览", href: "/docs/introduction" },
+			{ title: "快速开始", href: "/docs/quickstart" },
+			{ title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
+		],
+		homeHref: "/",
+	}} />
+	<main>
+		<slot />
+	</main>
+	<Footer client:load footer={{
+		title: "CodeIQ",
+		description: "把代码仓库转换为 AI 可查询、可追溯的结构化上下文。",
+		menus: [
+			{
+				title: "文档",
+				children: [
+					{ title: "概览", href: "/docs/introduction" },
+					{ title: "快速开始", href: "/docs/quickstart" },
+					{ title: "CLI 参考", href: "/docs/cli" },
+				],
+			},
+			{
+				title: "资源",
+				children: [
+					{ title: "MCP 工作流", href: "/docs/mcp" },
+					{ title: "功能成熟度", href: "/docs/roadmap" },
+					{ title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
+				],
+			},
+		],
+		copyright: "CodeIQ",
+	}} socials={{}} />
+</Base>

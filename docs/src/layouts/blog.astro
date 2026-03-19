@@ -1,0 +1,40 @@
+---
+import Base from "@/layouts/base.astro"
+import { Header } from "@/components/primitive/header"
+import { Footer } from "@/components/primitive/footer"
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const { title, description } = Astro.props
+---
+
+<Base title={title} description={description}>
+	<Header client:load header={{
+		title: "XACLABS.DEV",
+		description: "Open Source Organization",
+		menus: [
+			{ title: "Components", href: "/docs" },
+			{ title: "Blog", href: "/articles" },
+		],
+	}} />
+	<main>
+		<slot />
+	</main>
+	<Footer client:load footer={{
+		title: "XaC Labs UI",
+		description: "A modern, open source component library.",
+		menus: [
+			{
+				title: "Documentation",
+				children: [
+					{ title: "Introduction", href: "/docs" },
+					{ title: "Components", href: "/docs" },
+				],
+			},
+		],
+		copyright: "XaC Labs",
+	}} socials={{}} />
+</Base>

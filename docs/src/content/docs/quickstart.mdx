@@ -1,0 +1,110 @@
+---
+title: 快速开始
+description: 用最短路径理解 CodeIQ 的初始化、bundle 构建、差异检查、本地查询与发布流程。
+order: 2
+---
+
+# 5 分钟了解 CodeIQ 的基本工作流
+
+如果你想判断 CodeIQ 是否适合自己的仓库，最直接的方式是完成下面这条主线：
+
+1. 初始化本地环境。
+2. 构建 bundle。
+3. 对版本差异执行检查。
+4. 按需做一次性查询或启动 MCP。
+5. 如果需要团队共享，再发布到 Registry。
+
+> 下面的命令与行为来自当前项目计划，适合作为最终用户文档预览。命令名已经明确，参数与输出格式可能会在实现阶段继续收敛。
+
+## 1. 初始化
+
+```bash
+codeiq init
+```
+
+初始化步骤的目标是为后续工作准备基础配置，例如本地配置文件、缓存目录，以及与 CLI / MCP 工作流相关的运行状态。
+
+## 2. 构建 bundle
+
+```bash
+codeiq build ./sdk
+```
+
+这一步会把仓库构建成标准化的 `CIQ Bundle`。如果输入的是策略仓库，则会生成 `CIQ OPA Bundle`。
+
+CodeIQ 当前重点关注以下类型的信息：
+
+- 公开接口
+- 函数、类型、模块、常量等声明
+- Terraform Module 输入输出契约
+- OpenAPI path、operation、schema 等结构
+
+## 3. 生成差异并执行检查
+
+```bash
+codeiq diff ./sdk
+codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+```
+
+这两步的目标是：
+
+- 先把当前版本与基线版本的声明差异抽取成 `CIQ Diff`
+- 再结合本地 `CIQ OPA Bundle` 执行策略检查，并输出 `SARIF`
+
+这条路径特别适合 SDK 发版、OpenAPI 演进或 Terraform Module 变更前的兼容性门禁。
+
+## 4. 查询：CLI 或 MCP 二选一
+
+### 一次性查询
+
+```bash
+codeiq query ./query.json
+```
+
+适合脚本、CI 或临时定位某个接口。
+
+### 交互式查询
+
+```bash
+codeiq mcp start
+```
+
+适合需要让 AI Agent 反复查询的场景。推荐顺序是：
+
+1. 先调用 `codeiq.query.outlines` 获取公开接口大纲。
+2. 再调用 `codeiq.query.symbol` 对具体 path 做精确查询。
+
+常见配套命令包括：
+
+```bash
+codeiq mcp status
+codeiq mcp stop
+```
+
+## 5. 发布到 Registry
+
+```bash
+codeiq publish ./dist/tokio@1.43.0.ciq.tgz
+```
+
+如果你希望同一份 bundle 被多人、多个工具或多台机器复用，那么可以把它发布到 `CodeIQ Registry`。
+
+## 推荐的第一条验证路径
+
+对于第一次接触 CodeIQ 的团队，建议先用一个熟悉的仓库完成以下验证：
+
+```bash
+codeiq init
+codeiq build ./sdk
+codeiq diff ./sdk
+codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+codeiq query ./query.json
+```
+
+完成这条路径后，再决定是否需要进一步纳入 MCP 或团队共享流程。
+
+## 接下来读什么？
+
+- 想理解 bundle 中到底包含什么，请看 [索引与紧凑上下文](/docs/indexing)。
+- 想确认 MCP 在整个工作流中的角色，请看 [MCP 工作流](/docs/mcp)。
+- 想快速浏览所有命令，请看 [CLI 参考](/docs/cli)。

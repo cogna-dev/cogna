@@ -1,0 +1,72 @@
+---
+import Layout from "@/layouts/home.astro"
+import { HomeCta } from "@/components/home/home-cta"
+import { HomeFeature } from "@/components/home/home-feature"
+import { HomeHero } from "@/components/home/home-hero"
+
+const homeHero = {
+  title: "CodeIQ：面向大规模代码库的上下文工程",
+  description:
+    "用符号级索引、CLI 与 MCP，把代码仓库转换为 AI 可查询、可复用、可追溯的上下文。",
+  actions: [
+    {
+      title: "阅读文档",
+      href: "/docs/introduction",
+      variant: "default" as const,
+    },
+    {
+      title: "查看 GitHub",
+      href: "https://github.com/yufeiminds/codeiq",
+      variant: "outline" as const,
+    },
+  ],
+}
+
+const homeFeature = {
+  variant: "default" as const,
+  layout: "bento" as const,
+  title: "为什么使用 CodeIQ",
+  description: "在确定性与效率之间做平衡，让 AI 在大型仓库中获得更可靠的证据。",
+  items: [
+    {
+      title: "符号级索引",
+      description:
+        "提取接口、类、常量等公开行为，减少只靠文本检索带来的歧义与漏召回。",
+      cover: "/images/feature-accessible.svg",
+      action: { title: "了解更多", href: "/docs/indexing" },
+      span: 1 as const,
+    },
+    {
+      title: "CLI + MCP 工作流",
+      description:
+        "适合终端、Agent 与 IDE 协同：本地分析、启动上下文服务、按需发布索引。",
+      cover: "/images/feature-themeable.svg",
+      action: { title: "了解更多", href: "/docs/mcp" },
+      span: 1 as const,
+    },
+    {
+      title: "面向高风险变更的路线图",
+      description:
+        "从代码大纲起步，逐步扩展到变更分析、跨仓库分析与门禁场景。",
+      cover: "/images/feature-composable.svg",
+      action: { title: "了解更多", href: "/docs/roadmap" },
+      span: 1 as const,
+    },
+  ],
+}
+
+const homeCta = {
+  title: "先从一个仓库开始",
+  description:
+    "按照文档完成初始化、分析与 MCP 启动流程，快速验证 CodeIQ 是否适合你的代码库。",
+  variant: "primary" as const,
+  action: { title: "查看快速开始", href: "/docs/quickstart" },
+}
+---
+
+
+<Layout title="CodeIQ" description="云、端一体的代码理解平台">
+	<HomeHero client:load hero={homeHero} />
+	<HomeFeature client:load feature={homeFeature} />
+	<HomeCta client:load cta={homeCta} />
+</Layout>

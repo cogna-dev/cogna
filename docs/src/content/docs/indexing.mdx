@@ -1,0 +1,81 @@
+---
+title: 索引与紧凑上下文
+description: 了解 CodeIQ 如何从代码与规格文件提取公开接口事实，并把它们整理成更适合 AI 使用的上下文。
+order: 3
+---
+
+# 为什么 CodeIQ 要先做 bundle？
+
+大型仓库对 AI 来说最大的问题，往往不是“完全看不懂”，而是“上下文太多、证据太散、代价太高”。
+
+CodeIQ 的策略是先从代码与规格文件中提取 **公开接口与结构化契约**，再把这些结果组织成一份可发布、可比较、可查询的 `CIQ Bundle`。
+
+## 索引的重点是什么？
+
+当前计划中的核心对象包括：
+
+- Go / Rust 的公开函数、类型、模块、接口、常量
+- Terraform Module 的变量、输出、provider 约束
+- OpenAPI 的 path、operation、schema、parameter、response
+
+这些信息不会直接变成“更长的文档”，而是会进入标准化的 bundle 结构中。
+
+## Bundle 中最重要的部分是什么？
+
+典型 `CIQ Bundle` 会包含：
+
+- `manifest.json`
+- `declarations.ndjson.zst`
+- `symbols.ndjson.zst`
+- `metadata.json`
+- `checksums.txt`
+
+它既能支撑版本间比较，也能支撑本地查询和 Registry 分发。
+
+## 什么是 outlines？
+
+`outlines` 可以理解为“公开接口大纲”。它不是精确声明本身，而是一个更轻的入口，帮助 AI 先快速了解：
+
+- 这个包公开了哪些模块、类型、函数、路径
+- 哪些符号最可能与当前任务相关
+- 接下来应该精查哪个 path
+
+## 推荐查询流：先 outlines，再 symbol
+
+在 AI 使用 CodeIQ 时，推荐这样查询：
+
+1. 先通过 `codeiq.query.outlines` 获取指定 PURL 的公开接口大纲。
+2. 从 outlines 中选出候选 path。
+3. 再通过 `codeiq.query.symbol` 获取精确声明、签名、注释、位置与契约详情。
+
+这种两段式查询，比直接在大包里盲目检索更稳定，也更节省上下文窗口。
+
+## 它解决了什么问题？
+
+### 文档与实现不一致
+
+如果 AI 主要依赖外部文档，而文档过时、错误或不完整，那么结论很容易偏离真实实现。CodeIQ 直接从代码与规格文件建立 bundle，就是为了降低这种偏差。
+
+### 大仓库难以整体装入上下文
+
+就算有索引，如果索引仍然只是庞大的文本摘要，AI 依然会遇到同样的问题。CodeIQ 的目标是把“检索入口”压缩成结构化内容，并通过 outlines→symbol 的顺序逐步缩小范围。
+
+### 变更治理需要可比较的事实
+
+当你需要知道“这个版本删掉了哪些公开 API”“这个 OpenAPI schema 是否产生了破坏性变化”时，bundle 与 diff 会比零散搜索更可靠。
+
+## 需要注意的边界
+
+CodeIQ 会提升“找到正确上下文”的效率，但它并不承诺完整语义等价分析。
+
+对于高风险任务，推荐这样组合使用：
+
+| 目标 | 推荐做法 |
+| --- | --- |
+| 快速让 AI 进入仓库上下文 | 先用 `codeiq.query.outlines` 获取大纲，再精查 symbol |
+| 做高风险门禁 | 用 `diff + check` 输出 `SARIF`，再与现有流程集成 |
+| 做长期团队治理 | 结合 Registry 管理 bundle 版本与分发 |
+
+## 下一步
+
+如果你已经理解了 bundle 和 outlines 的定位，下一步建议阅读 [MCP 工作流](/docs/mcp)，了解这些结果如何被 AI 客户端实际消费。

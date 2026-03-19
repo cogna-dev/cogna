@@ -1,0 +1,132 @@
+---
+title: CLI 参考
+description: 快速查阅 CodeIQ 当前规划中的核心命令、输入输出产物，以及它们在工作流中的位置。
+order: 5
+---
+
+# 命令总览
+
+CodeIQ 的 CLI 围绕一条稳定工作流展开：先初始化配置，再构建 bundle，随后根据需要执行差异比较、策略检查、查询与发布。
+
+| 命令 | 输入 | 输出 | 作用 |
+| --- | --- | --- | --- |
+| `codeiq init` | 无 | `CIQ Config` | 初始化本地配置与缓存 |
+| `codeiq build <repo>` | 代码仓库或策略仓库 | `CIQ Bundle` 或 `CIQ OPA Bundle` | 构建声明快照或策略 bundle |
+| `codeiq diff <repo>` | 代码仓库 | `CIQ Diff` | 生成声明层差异 |
+| `codeiq check <diff-file> --policy <policy-bundle>` | `CIQ Diff` + 本地 `CIQ OPA Bundle` | `SARIF` | 检查此次变更是否符合 policy |
+| `codeiq query <query-file>` | 本地 `CIQ Bundle` + `CIQ Query` | `CIQ Result` | 执行一次性本地查询 |
+| `codeiq publish <bundle-file>` | 本地 bundle 文件 | publish result | 上传 bundle 到 Registry |
+| `codeiq mcp <start\|stop\|status>` | 无 | 本地 MCP 服务状态 | 管理本地查询代理 |
+
+## `codeiq init`
+
+```bash
+codeiq init
+```
+
+用于准备本地运行所需的基础状态，例如配置文件、缓存目录，以及后续 CLI 工作流的初始环境。
+
+## `codeiq build <repo>`
+
+```bash
+codeiq build ./sdk
+codeiq build ./policy
+```
+
+`build` 是 CodeIQ 的起点。它把代码仓库或策略仓库构建成标准化产物：
+
+- 代码仓库 -> `CIQ Bundle`
+- 策略仓库 -> `CIQ OPA Bundle`
+
+这一步输出的是可发布、可比较、可查询的 bundle，而不是单纯的“索引文件”。
+
+## `codeiq diff <repo>`
+
+```bash
+codeiq diff ./sdk
+```
+
+`diff` 用来比较当前仓库与基线版本，输出 `CIQ Diff`。它关注的是声明层的变化，例如新增、删除、变更、弃用，以及对应的兼容性影响。
+
+## `codeiq check <diff-file> --policy <policy-bundle>`
+
+```bash
+codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+```
+
+`check` 的输入是 `CIQ Diff` 与本地 `CIQ OPA Bundle`，目标是确认这次变更是否符合组织 policy。输出统一为 `SARIF`，便于接入 CI、代码审查与质量平台。
+
+## `codeiq query <query-file>`
+
+```bash
+codeiq query ./query.json
+```
+
+如果你只需要做一次性查询，那么直接使用 CLI 即可。查询文件中会包含 PURL 和 selector，CodeIQ 会从本地 bundle 中返回对应的 `CIQ Result`。
+
+## `codeiq publish <bundle-file>`
+
+```bash
+codeiq publish ./dist/tokio@1.43.0.ciq.tgz
+```
+
+`publish` 会把本地构建好的 bundle 上传到 `CodeIQ Registry`。返回结果通常包含 `bundleId`、`purl`、`tags` 与 `downloadUrl`。
+
+## `codeiq mcp <start|stop|status>`
+
+```bash
+codeiq mcp start
+codeiq mcp status
+codeiq mcp stop
+```
+
+MCP 是本地常驻查询代理，只负责高频、内存中的查询能力：
+
+- `start`：启动本地 MCP 服务
+- `status`：检查当前服务状态
+- `stop`：停止本地 MCP 服务
+
+它不负责 `build`、`diff`、`check`、`publish`。这些操作仍应通过 CLI 完成。
+
+## MCP 查询工具
+
+MCP 当前保留两个工具：
+
+- `codeiq.query.outlines`：根据 PURL 获取包的公开接口大纲，适合先浏览有哪些公开内容可供查询。
+- `codeiq.query.symbol`：对某个具体 path 执行精确查询，返回声明、签名、注释、位置与契约摘要。
+
+推荐顺序是：先调用 `codeiq.query.outlines` 获取大纲，再调用 `codeiq.query.symbol` 获取精确信息。
+
+## 推荐组合
+
+### 本地验证
+
+```bash
+codeiq init
+codeiq build ./sdk
+codeiq mcp start
+```
+
+### 发布前门禁
+
+```bash
+codeiq build ./sdk
+codeiq diff ./sdk
+codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+```
+
+### 团队共享
+
+```bash
+codeiq build ./sdk
+codeiq publish ./dist/tokio@1.43.0.ciq.tgz
+```
+
+## 说明
+
+当前文档聚焦已经明确的命令与产物约定。后续实现推进时，这一页适合继续补充：
+
+- 参数细节
+- JSON 示例
+- 错误码
+- 自动化脚本示例

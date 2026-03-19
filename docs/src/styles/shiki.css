@@ -1,0 +1,11 @@
+.dark pre.shiki,
+.dark .shiki {
+  color: var(--shiki-dark, var(--card-foreground)) !important;
+  background-color: var(--shiki-dark-bg, var(--card)) !important;
+}
+
+.dark pre.shiki span,
+.dark .shiki span {
+  color: var(--shiki-dark, inherit) !important;
+  background-color: transparent !important;
+}

@@ -1,0 +1,47 @@
+---
+import "@/styles/global.css"
+import "@/styles/shiki.css"
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const {
+  title = "CodeIQ",
+  description = "云、端一体的代码理解平台",
+} = Astro.props
+---
+
+<!doctype html>
+<html lang="zh-CN" class="dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&family=Noto+Sans+SC:wght@100..900&family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Space+Grotesk:wght@300..700&display=swap"
+			rel="stylesheet"
+		/>
+		<script is:inline>
+			;(function () {
+				try {
+					var theme = localStorage.getItem('theme')
+					if (theme === 'light') {
+						document.documentElement.classList.remove('dark')
+					} else {
+						document.documentElement.classList.add('dark')
+					}
+				} catch (e) {}
+			})()
+		</script>
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>

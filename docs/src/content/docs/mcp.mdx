@@ -1,0 +1,101 @@
+---
+title: MCP 工作流
+description: 了解 CodeIQ 如何通过本地 MCP Agent 把 bundle 中的公开接口与契约提供给 AI 客户端与自动化工具。
+order: 4
+---
+
+# MCP 在 CodeIQ 中扮演什么角色？
+
+CodeIQ 的 MCP Agent 是一个本地常驻内存查询代理。它的作用不是构建 bundle，也不是执行差异比较或策略检查，而是在 bundle 已经准备好的前提下，为 AI 客户端提供高频查询能力。
+
+在这个模型里：
+
+- `build` 负责生成 `CIQ Bundle` 或 `CIQ OPA Bundle`
+- `mcp start` 负责把本地 bundle 装载到内存并暴露查询能力
+- `publish` 负责把稳定 bundle 发布到 Registry，供更多团队下载和复用
+
+## 一个典型的本地流程
+
+```bash
+codeiq init
+codeiq build ./sdk
+codeiq mcp start
+```
+
+这个流程适合以下情况：
+
+- 你在本机验证一个仓库
+- 你希望 IDE、终端 Agent 或本地工具直接查询上下文
+- 你暂时不需要团队级共享
+
+## MCP 为什么重要？
+
+因为它把“产物构建”和“上下文消费”拆成了两个阶段：
+
+1. **先构建**：把仓库整理成标准化 bundle。
+2. **再查询**：把这些 bundle 以低延迟方式提供给 AI 客户端。
+
+这样做的好处是：
+
+- 同一个 bundle 可以被多个客户端复用。
+- AI 不必每次都重新解析仓库。
+- 查询入口更可控，也更容易做缓存和版本绑定。
+
+## MCP 当前提供哪些工具？
+
+CodeIQ 当前保留两个 MCP 工具：
+
+### `codeiq.query.outlines`
+
+根据 PURL 返回指定包的公开接口大纲索引。适合让 AI 先了解“这个包大概有哪些公开内容”。
+
+典型用途：
+
+- 先列出候选模块、类型、函数、路径
+- 再决定下一步应查询哪个具体 symbol
+
+### `codeiq.query.symbol`
+
+在已有 path 的前提下，对具体声明做精确查询，返回：
+
+- 声明 ID
+- 签名
+- 注释
+- 位置
+- Terraform / OpenAPI 契约摘要
+
+## 推荐查询顺序：先 outlines，后 symbol
+
+推荐 AI Agent 使用如下顺序：
+
+1. 调用 `codeiq.query.outlines` 获取公开接口大纲。
+2. 从返回的大纲里选择目标 path。
+3. 再调用 `codeiq.query.symbol` 获取精确声明与契约细节。
+
+这样比直接盲查单个 symbol 更稳定，也更适合 AI 在大包中逐步缩小范围。
+
+## 什么时候需要 `status` 与 `stop`？
+
+```bash
+codeiq mcp status
+codeiq mcp stop
+```
+
+- `status`：检查当前服务是否可用，适合排查连接问题或自动化探活。
+- `stop`：在本地开发或脚本收尾阶段关闭服务。
+
+## 本地 MCP 与 CLI 的边界
+
+| 能力 | 应该通过什么入口 |
+| --- | --- |
+| 构建 bundle | CLI |
+| 生成 diff | CLI |
+| 执行 check 并输出 SARIF | CLI |
+| 发布到 Registry | CLI |
+| 查询 outlines / symbol | MCP 或一次性 CLI query |
+
+简而言之：MCP 只负责查询，不负责构建和治理。
+
+## 下一步
+
+如果你需要命令级别的快速查阅，请继续阅读 [CLI 参考](/docs/cli)。
