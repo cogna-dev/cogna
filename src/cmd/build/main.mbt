@@ -110,7 +110,16 @@ fn write_bundle_skeleton(
   config : @config.Config,
   dist_dir : String,
 ) -> Result[Unit, @cli.CliError] {
-  let manifest = manifest_json(config).stringify(indent=2)
+  let manifest_object = manifest_json(config)
+  let manifest_valid = @schema.validate_ciq_bundle_v1(manifest_object)
+  guard manifest_valid is Ok(_) else {
+    return Err(
+      build_error(
+        "manifest does not satisfy ciq-bundle/v1 schema: \{manifest_valid.unwrap_err().to_string()}",
+      ),
+    )
+  }
+  let manifest = manifest_object.stringify(indent=2)
   let metadata = metadata_json(config).stringify(indent=2)
   let declarations = ""
   let symbols = ""

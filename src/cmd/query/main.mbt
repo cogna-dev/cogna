@@ -37,21 +37,13 @@ fn ensure_query_shape(
   query : Json,
   query_file : String,
 ) -> Result[Unit, @cli.CliError] {
-  guard query is Object(query_object) else {
-    return Err(query_error("query file \{query_file} must be a JSON object"))
-  }
-  guard query_object.get("schemaVersion") is Some(String("ciq-query/v1")) else {
+  let out = @schema.validate_ciq_query_v1(query)
+  guard out is Ok(_) else {
     return Err(
       query_error(
-        "query file \{query_file} must use schemaVersion ciq-query/v1",
+        "query file \{query_file} does not satisfy ciq-query/v1 schema: \{out.unwrap_err().to_string()}",
       ),
     )
-  }
-  guard query_object.get("purl") is Some(String(_)) else {
-    return Err(query_error("query file \{query_file} missing purl"))
-  }
-  guard query_object.get("selector") is Some(Object(_)) else {
-    return Err(query_error("query file \{query_file} missing selector object"))
   }
   Ok(())
 }
@@ -136,6 +128,15 @@ pub fn run(params : QueryParams) -> @cli.CliResult[QueryResult, @cli.CliError] {
 
   let output_path = result_path(params.query_file)
   let result_json = ciq_result(query)
+  let result_shape_out = @schema.validate_ciq_result_v1(result_json)
+  guard result_shape_out is Ok(_) else {
+    return Err(
+      query_error(
+        "generated result does not satisfy ciq-result/v1 schema: \{result_shape_out.unwrap_err().to_string()}",
+      ),
+    )
+  }
+
   let write_out = write_result(output_path, result_json)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 

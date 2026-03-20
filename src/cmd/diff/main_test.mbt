@@ -29,6 +29,23 @@ fn write_manifest(path : String, purl : String, profile : String) -> Unit {
     "schemaVersion": "ciq-bundle/v1",
     "purl": purl,
     "profile": profile,
+    "declarationSchema": {
+      "version": "ciq-declarations/v1",
+      "format": "ndjson.zst",
+      "model": "signature + shape + language_specific tagged union",
+    },
+    "source": {
+      "repo": "https://github.com/acme/payment-api",
+      "ref": "main",
+      "commit": "unknown",
+    },
+    "artifacts": [
+      {
+        "path": "declarations.ndjson.zst",
+        "sha256": "placeholder",
+        "compression": "zstd",
+      },
+    ],
   }
   @fs.write_string_to_file(path, content.stringify(indent=2)) catch {
     _ => abort("failed to write manifest fixture")

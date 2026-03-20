@@ -68,16 +68,13 @@ fn ensure_diff_shape(
   diff : Json,
   diff_path : String,
 ) -> Result[Unit, @cli.CliError] {
-  guard diff is Object(diff_object) else {
-    return Err(check_error("diff \{diff_path} must be a JSON object"))
-  }
-  guard diff_object.get("schemaVersion") is Some(String("ciq-diff/v1")) else {
+  let out = @schema.validate_ciq_diff_v1(diff)
+  guard out is Ok(_) else {
     return Err(
-      check_error("diff \{diff_path} must use schemaVersion ciq-diff/v1"),
+      check_error(
+        "diff \{diff_path} does not satisfy ciq-diff/v1 schema: \{out.unwrap_err().to_string()}",
+      ),
     )
-  }
-  guard diff_object.get("changes") is Some(Array(_)) else {
-    return Err(check_error("diff \{diff_path} missing changes array"))
   }
   Ok(())
 }
@@ -178,6 +175,15 @@ pub fn run(params : CheckParams) -> @cli.CliResult[CheckResult, @cli.CliError] {
 
   let sarif_path = "\{parent_dir(params.diff_file)}/check.sarif.json"
   let sarif = sarif_from_diff(diff, params.policy_bundle)
+  let sarif_shape_out = @schema.validate_sarif_v2_1_0_min(sarif)
+  guard sarif_shape_out is Ok(_) else {
+    return Err(
+      check_error(
+        "generated sarif does not satisfy minimal SARIF schema: \{sarif_shape_out.unwrap_err().to_string()}",
+      ),
+    )
+  }
+
   let write_out = write_sarif(sarif_path, sarif)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 

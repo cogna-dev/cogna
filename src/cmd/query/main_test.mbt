@@ -94,7 +94,7 @@ test "query fails when schemaVersion is invalid" {
 
   let text = error.to_string()
   assert_true(text.contains("query failed:"))
-  assert_true(text.contains("schemaVersion ciq-query/v1"))
+  assert_true(text.contains("ciq-query/v1 schema"))
 
   cleanup_tmp_repo(repo)
 }

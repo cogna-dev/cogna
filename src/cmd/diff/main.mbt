@@ -33,6 +33,22 @@ fn read_manifest(path : String) -> Result[Json, @cli.CliError] {
 }
 
 ///|
+fn validate_manifest_shape(
+  manifest : Json,
+  path : String,
+) -> Result[Unit, @cli.CliError] {
+  let out = @schema.validate_ciq_bundle_v1(manifest)
+  guard out is Ok(_) else {
+    return Err(
+      diff_error(
+        "manifest \{path} does not satisfy ciq-bundle/v1 schema: \{out.unwrap_err().to_string()}",
+      ),
+    )
+  }
+  Ok(())
+}
+
+///|
 fn get_field_string(
   manifest : Json,
   field_name : String,
@@ -140,12 +156,34 @@ pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
   guard base_manifest_out is Ok(base_manifest) else {
     return Err(base_manifest_out.unwrap_err())
   }
+  let base_schema_out = validate_manifest_shape(
+    base_manifest, base_manifest_path,
+  )
+  guard base_schema_out is Ok(_) else {
+    return Err(base_schema_out.unwrap_err())
+  }
+
   let target_manifest_out = read_manifest(target_manifest_path)
   guard target_manifest_out is Ok(target_manifest) else {
     return Err(target_manifest_out.unwrap_err())
   }
+  let target_schema_out = validate_manifest_shape(
+    target_manifest, target_manifest_path,
+  )
+  guard target_schema_out is Ok(_) else {
+    return Err(target_schema_out.unwrap_err())
+  }
 
   let diff = diff_json(base_manifest, target_manifest)
+  let diff_schema_out = @schema.validate_ciq_diff_v1(diff)
+  guard diff_schema_out is Ok(_) else {
+    return Err(
+      diff_error(
+        "generated diff does not satisfy ciq-diff/v1 schema: \{diff_schema_out.unwrap_err().to_string()}",
+      ),
+    )
+  }
+
   let write_out = write_diff(output_path, diff)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 
