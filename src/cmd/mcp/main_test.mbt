@@ -107,6 +107,31 @@ test "mcp tools list includes outlines and symbol" {
 }
 
 ///|
+test "mcp tools list response matches schema" {
+  let request = parse_json_or_fail(
+    (
+      #|{
+      #|  "jsonrpc": "2.0",
+      #|  "id": 20,
+      #|  "method": "tools/list",
+      #|  "params": {}
+      #|}
+    ),
+  )
+  let response = handle_request(request)
+  guard response is Object(response_object) else {
+    fail("response should be object")
+  }
+  guard response_object.get("result") is Some(Object(result_object)) else {
+    fail("tools/list response should contain result object")
+  }
+  guard result_object.get("tools") is Some(Array(tools)) else {
+    fail("tools/list response should contain tools array")
+  }
+  assert_true(tools.length() == 2)
+}
+
+///|
 test "mcp tools call returns structured content" {
   let request = parse_json_or_fail(
     (
@@ -129,6 +154,52 @@ test "mcp tools call returns structured content" {
   assert_true(response.contains("\"isError\": false"))
   assert_true(response.contains("\"schemaVersion\": \"ciq-result/v1\""))
   assert_true(response.contains("\"decl:skeleton:payment::create\""))
+}
+
+///|
+test "mcp tools call outlines accepts limit and cursor" {
+  let request = parse_json_or_fail(
+    (
+      #|{
+      #|  "jsonrpc": "2.0",
+      #|  "id": 21,
+      #|  "method": "tools/call",
+      #|  "params": {
+      #|    "name": "codeiq.query.outlines",
+      #|    "arguments": {
+      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+      #|      "limit": 1,
+      #|      "cursor": "cursor:1"
+      #|    }
+      #|  }
+      #|}
+    ),
+  )
+  let response = handle_request(request).stringify(indent=2)
+  assert_true(response.contains("\"Returned 1 outline"))
+  assert_true(response.contains("\"limit\": 1"))
+}
+
+///|
+test "mcp tools call reports missing required argument" {
+  let request = parse_json_or_fail(
+    (
+      #|{
+      #|  "jsonrpc": "2.0",
+      #|  "id": 22,
+      #|  "method": "tools/call",
+      #|  "params": {
+      #|    "name": "codeiq.query.symbol",
+      #|    "arguments": {
+      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01"
+      #|    }
+      #|  }
+      #|}
+    ),
+  )
+  let response = handle_request(request).stringify(indent=2)
+  assert_true(response.contains("\"code\": -32602"))
+  assert_true(response.contains("missing required string argument selector"))
 }
 
 ///|

@@ -137,6 +137,59 @@ fn get_required_string(
 }
 
 ///|
+fn get_optional_string(args : Map[String, Json], key : String) -> String? {
+  match args.get(key) {
+    Some(String(value)) => Some(value)
+    _ => None
+  }
+}
+
+///|
+fn get_optional_int(args : Map[String, Json], key : String) -> Int? {
+  match args.get(key) {
+    Some(Number(value, ..)) => Some(value.to_int())
+    _ => None
+  }
+}
+
+///|
+fn outlines_payload(
+  purl : String,
+  limit : Int,
+  cursor : String?,
+) -> Array[Json] {
+  let source : Array[Json] = [
+    {
+      "path": "\{purl}::example::module::symbol",
+      "kind": "function",
+      "summary": "Placeholder outline from local CIQ bundle cache",
+    },
+    {
+      "path": "\{purl}::example::module::contract",
+      "kind": "schema",
+      "summary": "Placeholder contract outline from local CIQ bundle cache",
+    },
+  ]
+
+  let start = match cursor {
+    Some("cursor:1") => 1
+    _ => 0
+  }
+  let max_limit = if limit <= 0 { 20 } else { limit }
+  let end = if start + max_limit > source.length() {
+    source.length()
+  } else {
+    start + max_limit
+  }
+
+  let result : Array[Json] = []
+  for i in start..<end {
+    result.push(source[i])
+  }
+  result
+}
+
+///|
 fn call_result(text : String, structured : Json, is_error : Bool) -> Json {
   {
     "content": [{ "type": "text", "text": text }],
@@ -150,17 +203,32 @@ fn run_outlines_tool(args : Map[String, Json]) -> Result[Json, String] {
   let purl_out = get_required_string(args, "purl")
   guard purl_out is Ok(purl) else { return Err(purl_out.unwrap_err()) }
 
-  let outlines : Array[Json] = [
-    {
-      "path": "example::module::symbol",
-      "kind": "function",
-      "summary": "Placeholder outline from local CIQ bundle cache",
-    },
-  ]
+  let limit = match get_optional_int(args, "limit") {
+    Some(value) => value
+    None => 20
+  }
+  let cursor = get_optional_string(args, "cursor")
+  let outlines = outlines_payload(purl, limit, cursor)
+  let next_cursor : Json = if outlines.length() < 2 {
+    Json::null()
+  } else {
+    Json::string("cursor:1")
+  }
+  let cursor_text = match cursor {
+    Some(value) => value
+    None => ""
+  }
+
   Ok(
     call_result(
       "Returned \{outlines.length()} outline(s) for \{purl}",
-      { "purl": purl, "outlines": outlines, "nextCursor": Json::null() },
+      {
+        "purl": purl,
+        "limit": limit,
+        "cursor": cursor_text,
+        "outlines": outlines,
+        "nextCursor": next_cursor,
+      },
       false,
     ),
   )
@@ -179,6 +247,10 @@ fn run_symbol_tool(args : Map[String, Json]) -> Result[Json, String] {
     Some(String(value)) => value
     _ => "symbol"
   }
+  let intent = match args.get("intent") {
+    Some(String(value)) => value
+    _ => "lookup"
+  }
 
   Ok(
     call_result(
@@ -186,6 +258,7 @@ fn run_symbol_tool(args : Map[String, Json]) -> Result[Json, String] {
       {
         "schemaVersion": "ciq-result/v1",
         "purl": purl,
+        "intent": intent,
         "matches": [
           {
             "id": "decl:skeleton:\{selector}",
