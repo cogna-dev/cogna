@@ -52,9 +52,36 @@ fn parse_invocation(
       ]),
       @argparse.Command::new("build", about="Build CIQ bundle"),
       @argparse.Command::new("diff", about="Compute CIQ diff"),
-      @argparse.Command::new("check", about="Run policy checks"),
-      @argparse.Command::new("query", about="Query CIQ bundle"),
-      @argparse.Command::new("publish", about="Publish CIQ bundle"),
+      @argparse.Command::new(
+        "check",
+        about="Run policy checks",
+        positionals=[
+          @argparse.PositionArg::new(
+            "diff_file",
+            num_args=@argparse.ValueRange::single(),
+          ),
+        ],
+        options=[
+          @argparse.OptionArg::new(
+            "policy",
+            long="policy",
+            action=@argparse.OptionAction::Set,
+            default_values=["./dist/policy.ciq.tgz"],
+          ),
+        ],
+      ),
+      @argparse.Command::new("query", about="Query CIQ bundle", positionals=[
+        @argparse.PositionArg::new(
+          "query_file",
+          num_args=@argparse.ValueRange::single(),
+        ),
+      ]),
+      @argparse.Command::new("publish", about="Publish CIQ bundle", positionals=[
+        @argparse.PositionArg::new(
+          "bundle_file",
+          num_args=@argparse.ValueRange::single(),
+        ),
+      ]),
       @argparse.Command::new(
         "mcp",
         about="Run local MCP agent",
@@ -85,21 +112,23 @@ fn parse_invocation(
     }
     Some(("build", _)) => Ok(Build(@build_cmd.BuildParams::{ repo: "./" }))
     Some(("diff", _)) => Ok(Diff(@diff_cmd.DiffParams::{ repo: "./" }))
-    Some(("check", _)) =>
-      Ok(
-        Check(@check_cmd.CheckParams::{
-          diff_file: "./dist/diff.json",
-          policy_bundle: "./dist/policy.ciq.tgz",
-        }),
-      )
-    Some(("query", _)) =>
-      Ok(Query(@query_cmd.QueryParams::{ query_file: "./dist/query.json" }))
-    Some(("publish", _)) =>
-      Ok(
-        Publish(@publish_cmd.PublishParams::{
-          bundle_file: "./dist/bundle.ciq.tgz",
-        }),
-      )
+    Some(("check", check_matches)) => {
+      let diff_values = check_matches.values["diff_file"]
+      let policy_values = check_matches.values["policy"]
+      let diff_file = diff_values[0]
+      let policy_bundle = policy_values[0]
+      Ok(Check(@check_cmd.CheckParams::{ diff_file, policy_bundle }))
+    }
+    Some(("query", query_matches)) => {
+      let query_values = query_matches.values["query_file"]
+      let query_file = query_values[0]
+      Ok(Query(@query_cmd.QueryParams::{ query_file, }))
+    }
+    Some(("publish", publish_matches)) => {
+      let bundle_values = publish_matches.values["bundle_file"]
+      let bundle_file = bundle_values[0]
+      Ok(Publish(@publish_cmd.PublishParams::{ bundle_file, }))
+    }
     Some(("mcp", mcp_matches)) =>
       match mcp_matches.subcommand {
         Some(("start", start_matches)) => {
@@ -114,6 +143,13 @@ fn parse_invocation(
       }
     _ => Err(@cli.usage_error(command.render_help()))
   }
+}
+
+///|
+pub fn parse_cli_args(
+  argv : Array[String],
+) -> @cli.CliResult[CliInvocation, @cli.CliError] {
+  parse_invocation(normalize_cli_args(argv))
 }
 
 ///|
@@ -175,7 +211,7 @@ fn main {
   let all_args = @env.args()
   println(banner())
 
-  let parse_out = parse_invocation(normalize_cli_args(all_args))
+  let parse_out = parse_cli_args(all_args)
   if parse_out is Ok(invocation) {
     let run_out = run(invocation)
     if run_out is Ok(result) {
