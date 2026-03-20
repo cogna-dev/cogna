@@ -8,5 +8,6 @@ import {
   "yufeiminds/codeiq/cmd/diff" @diff_cmd,
   "yufeiminds/codeiq/cmd/init" @init_cmd,
   "yufeiminds/codeiq/cmd/main" @main_cmd,
+  "yufeiminds/codeiq/cmd/publish" @publish_cmd,
   "yufeiminds/codeiq/cmd/query" @query_cmd,
 } for "test"

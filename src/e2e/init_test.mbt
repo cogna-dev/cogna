@@ -303,3 +303,42 @@ test "e2e query generates result from local query file" {
   }
   cleanup_tmp_dir(dir)
 }
+
+///|
+test "e2e publish generates publish receipt from local bundle" {
+  let dir = "src/e2e/tmp_codeiq_e2e_publish"
+  cleanup_tmp_dir(dir)
+  @fs.create_dir(dir)
+
+  @fs.create_dir("\{dir}/dist")
+  let bundle_file = "\{dir}/dist/bundle.ciq.tgz"
+  @fs.write_string_to_file(bundle_file, "bundle placeholder")
+
+  let publish_out = @publish_cmd.run(@publish_cmd.PublishParams::{
+    bundle_file,
+  })
+  guard publish_out is Ok(result) else {
+    cleanup_tmp_dir(dir)
+    fail("publish should succeed")
+  }
+
+  inspect(
+    result.display(),
+    content="Generated publish receipt at src/e2e/tmp_codeiq_e2e_publish/dist/publish.json",
+  )
+
+  let receipt = @fs.read_file_to_string("\{dir}/dist/publish.json")
+  assert_true(receipt.contains("\"publishId\": \"pub-skeleton-001\""))
+  assert_true(receipt.contains("\"bundleType\": \"ciq-bundle\""))
+
+  @fs.remove_file("\{dir}/dist/bundle.ciq.tgz") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/publish.json") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{dir}/dist") catch {
+    _ => ()
+  }
+  cleanup_tmp_dir(dir)
+}
