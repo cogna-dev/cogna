@@ -1,28 +1,28 @@
 ///|
-pub(all) struct ProjectMeta {
-  name : String
-  version : String
-  purl : String
+pub(all) struct Source {
+  repo : String
+  source_ref : String
 } derive(Show, Eq)
 
 ///|
-pub(all) struct BuildOptions {
-  profile : String
-  output_dir : String
+pub(all) struct Inputs {
+  include_paths : Array[String]
 } derive(Show, Eq)
 
 ///|
-pub(all) struct DiffOptions {
-  since : String
-  include_test_changes : Bool
+pub(all) struct Checks {
+  format : String
+  policy : String
 } derive(Show, Eq)
 
 ///|
 pub(all) struct Config {
   schema_version : String
-  project : ProjectMeta
-  build : BuildOptions
-  diff : DiffOptions
+  profile : String
+  purl : String
+  source : Source
+  inputs : Inputs
+  checks : Checks
 } derive(Show, Eq)
 
 ///|
