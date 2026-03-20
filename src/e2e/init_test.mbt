@@ -262,3 +262,44 @@ test "e2e check generates sarif from diff and policy bundle" {
   }
   cleanup_tmp_dir(dir)
 }
+
+///|
+test "e2e query generates result from local query file" {
+  let dir = "src/e2e/tmp_codeiq_e2e_query"
+  cleanup_tmp_dir(dir)
+  @fs.create_dir(dir)
+
+  let query_path = "\{dir}/query.json"
+  let query : Json = {
+    "schemaVersion": "ciq-query/v1",
+    "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+    "selector": { "path": "payment::create", "kind": "operation" },
+    "intent": "upgrade",
+  }
+  @fs.write_string_to_file(query_path, query.stringify(indent=2))
+
+  let query_out = @query_cmd.run(@query_cmd.QueryParams::{
+    query_file: query_path,
+  })
+  guard query_out is Ok(result) else {
+    cleanup_tmp_dir(dir)
+    fail("query should succeed")
+  }
+
+  inspect(
+    result.display(),
+    content="Generated CIQ result at src/e2e/tmp_codeiq_e2e_query/query.result.json",
+  )
+
+  let result_json = @fs.read_file_to_string("\{dir}/query.result.json")
+  assert_true(result_json.contains("\"schemaVersion\": \"ciq-result/v1\""))
+  assert_true(result_json.contains("\"kind\": \"operation\""))
+
+  @fs.remove_file("\{dir}/query.json") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/query.result.json") catch {
+    _ => ()
+  }
+  cleanup_tmp_dir(dir)
+}
