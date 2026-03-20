@@ -65,12 +65,12 @@ fn parse_invocation(
     Some(("check", _)) =>
       Ok(
         Check(@check_cmd.CheckParams::{
-          diff_file: "./dist/placeholder.diff.json",
+          diff_file: "./dist/diff.json",
           policy_bundle: "./dist/policy.ciq.tgz",
         }),
       )
     Some(("query", _)) =>
-      Ok(Query(@query_cmd.QueryParams::{ query_file: "./query.json" }))
+      Ok(Query(@query_cmd.QueryParams::{ query_file: "./dist/query.json" }))
     Some(("publish", _)) =>
       Ok(
         Publish(@publish_cmd.PublishParams::{
