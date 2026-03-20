@@ -1,3 +1,4 @@
 import {
   "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/schema" @schema,
 }

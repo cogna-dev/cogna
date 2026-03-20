@@ -112,9 +112,7 @@ test "load config rejects unsupported profile" {
   }
 
   let text = error.to_string()
-  guard text.contains(
-    "profile must be one of go-module, rust-crate, terraform-module, openapi-spec",
-  ) else {
+  guard text.contains("$.profile: value is not in enum") else {
     cleanup_tmp_config(path)
     fail("unexpected validation message for profile")
   }

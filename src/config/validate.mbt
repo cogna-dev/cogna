@@ -13,37 +13,28 @@ fn has_disallowed_input_path(paths : Array[String]) -> Bool {
 }
 
 ///|
+fn schema_error_message(error : @schema.SchemaError) -> String {
+  match error {
+    @schema.SchemaParseError(message) => "schema parse error: \{message}"
+    @schema.InvalidSchema(message) => "invalid schema: \{message}"
+    @schema.ValidationFailed(issues) =>
+      if issues.length() == 0 {
+        "validation failed"
+      } else {
+        let first = issues[0]
+        "\{first.path}: \{first.message}"
+      }
+  }
+}
+
+///|
 pub fn validate(config : Config, path : String) -> Result[Config, ConfigError] {
-  if config.schema_version != "ciq-config/v1" {
-    Err(
-      ConfigError::ValidationError(
-        path~,
-        "schema_version must be ciq-config/v1",
-      ),
-    )
-  } else if config.profile != "go-module" &&
-    config.profile != "rust-crate" &&
-    config.profile != "terraform-module" &&
-    config.profile != "openapi-spec" {
-    Err(
-      ConfigError::ValidationError(
-        path~,
-        "profile must be one of go-module, rust-crate, terraform-module, openapi-spec",
-      ),
-    )
+  let instance = config_to_json(config)
+  let schema_out = @schema.validate_json(ciq_config_v1_schema(), instance)
+  if schema_out is Err(error) {
+    Err(ConfigError::ValidationError(path~, schema_error_message(error)))
   } else if !config.purl.has_prefix("pkg:") {
     Err(ConfigError::ValidationError(path~, "purl must start with pkg:"))
-  } else if config.source.repo == "" {
-    Err(ConfigError::ValidationError(path~, "source.repo must not be empty"))
-  } else if config.source.source_ref == "" {
-    Err(ConfigError::ValidationError(path~, "source.ref must not be empty"))
-  } else if config.inputs.include_paths.length() == 0 {
-    Err(
-      ConfigError::ValidationError(
-        path~,
-        "inputs.include must have at least one path",
-      ),
-    )
   } else if has_disallowed_input_path(config.inputs.include_paths) {
     Err(
       ConfigError::ValidationError(
