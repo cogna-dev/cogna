@@ -1,0 +1,9 @@
+{
+  "name": "yufeiminds/codeiq",
+  "version": "0.1.0",
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/yufeiminds/codeiq",
+  "license": "Apache-2.0",
+  "keywords": [],
+  "description": "CodeIQ - MoonBit project with GitHub Actions"
+}
