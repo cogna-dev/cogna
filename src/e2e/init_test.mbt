@@ -342,3 +342,23 @@ test "e2e publish generates publish receipt from local bundle" {
   }
   cleanup_tmp_dir(dir)
 }
+
+///|
+test "e2e mcp start generates local server descriptor" {
+  let out = @mcp_cmd.run_start({ port: 3000 })
+  guard out is Ok(result) else { fail("mcp start should succeed") }
+
+  inspect(
+    result.display(),
+    content="Generated MCP server descriptor at ./dist/mcp-server.json (port 3000)",
+  )
+
+  let descriptor = @fs.read_file_to_string("./dist/mcp-server.json")
+  assert_true(descriptor.contains("\"name\": \"codeiq-mcp\""))
+  assert_true(descriptor.contains("\"codeiq.query.outlines\""))
+  assert_true(descriptor.contains("\"codeiq.query.symbol\""))
+
+  @fs.remove_file("./dist/mcp-server.json") catch {
+    _ => ()
+  }
+}

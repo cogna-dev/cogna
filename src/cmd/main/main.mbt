@@ -6,12 +6,20 @@ pub(all) enum CliInvocation {
   Check(@check_cmd.CheckParams)
   Query(@query_cmd.QueryParams)
   Publish(@publish_cmd.PublishParams)
+  McpStart(@mcp_cmd.McpStartParams)
 } derive(Show, Eq)
 
 ///|
 fn is_known_subcommand(name : String) -> Bool {
   match name {
-    "init" | "build" | "diff" | "check" | "query" | "publish" | "help" => true
+    "init"
+    | "build"
+    | "diff"
+    | "check"
+    | "query"
+    | "publish"
+    | "mcp"
+    | "help" => true
     _ => false
   }
 }
@@ -47,6 +55,21 @@ fn parse_invocation(
       @argparse.Command::new("check", about="Run policy checks"),
       @argparse.Command::new("query", about="Query CIQ bundle"),
       @argparse.Command::new("publish", about="Publish CIQ bundle"),
+      @argparse.Command::new(
+        "mcp",
+        about="Run local MCP agent",
+        subcommands=[
+          @argparse.Command::new("start", about="Start MCP agent", options=[
+            @argparse.OptionArg::new(
+              "port",
+              long="port",
+              action=@argparse.OptionAction::Set,
+              default_values=["3000"],
+            ),
+          ]),
+        ],
+        subcommand_required=true,
+      ),
     ],
     subcommand_required=true,
   )
@@ -77,6 +100,18 @@ fn parse_invocation(
           bundle_file: "./dist/bundle.ciq.tgz",
         }),
       )
+    Some(("mcp", mcp_matches)) =>
+      match mcp_matches.subcommand {
+        Some(("start", start_matches)) => {
+          let port_values = start_matches.values["port"]
+          let parsed_port = try? @strconv.parse_int(port_values[0])
+          guard parsed_port is Ok(port) else {
+            return Err(@cli.usage_error("--port must be an integer"))
+          }
+          Ok(McpStart(@mcp_cmd.McpStartParams::{ port, }))
+        }
+        _ => Err(@cli.usage_error(command.render_help()))
+      }
     _ => Err(@cli.usage_error(command.render_help()))
   }
 }
@@ -111,6 +146,11 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
       }
     Publish(params) =>
       match @publish_cmd.run(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    McpStart(params) =>
+      match @mcp_cmd.run_start(params) {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
