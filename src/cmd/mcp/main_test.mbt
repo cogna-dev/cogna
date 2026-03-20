@@ -157,6 +157,82 @@ test "mcp tools call returns structured content" {
 }
 
 ///|
+test "mcp tools call uses local query result when available" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  let local_result =
+    #|{
+    #|  "schemaVersion": "ciq-result/v1",
+    #|  "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+    #|  "matches": [
+    #|    {
+    #|      "id": "decl:local:payment::create",
+    #|      "kind": "operation",
+    #|      "signature": "POST /payment/create",
+    #|      "location": {"uri": "openapi/payment.yaml", "startLine": 10, "endLine": 22}
+    #|    }
+    #|  ]
+    #|}
+  @fs.write_string_to_file("./dist/query.result.json", local_result) catch {
+    _ => fail("failed to write local query result fixture")
+  }
+
+  let request = parse_json_or_fail(
+    (
+      #|{
+      #|  "jsonrpc": "2.0",
+      #|  "id": 23,
+      #|  "method": "tools/call",
+      #|  "params": {
+      #|    "name": "codeiq.query.symbol",
+      #|    "arguments": {
+      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+      #|      "selector": "payment::create",
+      #|      "kind": "operation"
+      #|    }
+      #|  }
+      #|}
+    ),
+  )
+  let response = handle_request(request).stringify(indent=2)
+  assert_true(response.contains("\"source\": \"local-query-result\""))
+  assert_true(response.contains("\"decl:local:payment::create\""))
+
+  @fs.remove_file("./dist/query.result.json") catch {
+    _ => ()
+  }
+}
+
+///|
+test "mcp ping reports local artifact availability" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  @fs.write_string_to_file("./dist/check.sarif.json", "{}") catch {
+    _ => fail("failed to write local sarif fixture")
+  }
+
+  let request = parse_json_or_fail(
+    (
+      #|{
+      #|  "jsonrpc": "2.0",
+      #|  "id": 24,
+      #|  "method": "ping",
+      #|  "params": {}
+      #|}
+    ),
+  )
+  let response = handle_request(request).stringify(indent=2)
+  assert_true(response.contains("\"status\": \"ok\""))
+  assert_true(response.contains("\"sarif\": true"))
+
+  @fs.remove_file("./dist/check.sarif.json") catch {
+    _ => ()
+  }
+}
+
+///|
 test "mcp tools call outlines accepts limit and cursor" {
   let request = parse_json_or_fail(
     (

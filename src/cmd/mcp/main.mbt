@@ -94,6 +94,26 @@ fn mcp_server_info(port : Int) -> Json {
 }
 
 ///|
+fn read_json_file(path : String) -> Json? {
+  let content = @fs.read_file_to_string(path) catch { _ => return None }
+  let parsed = try? @json.parse(content)
+  match parsed {
+    Ok(value) => Some(value)
+    _ => None
+  }
+}
+
+///|
+fn local_query_result() -> Json? {
+  read_json_file("./dist/query.result.json")
+}
+
+///|
+fn local_sarif() -> Json? {
+  read_json_file("./dist/check.sarif.json")
+}
+
+///|
 fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
     err =>
@@ -252,29 +272,54 @@ fn run_symbol_tool(args : Map[String, Json]) -> Result[Json, String] {
     _ => "lookup"
   }
 
-  Ok(
-    call_result(
-      "Resolved selector \{selector} for \{purl}",
-      {
+  let from_local = local_query_result()
+  match from_local {
+    Some(Object(local_result)) => {
+      let matches = match local_result.get("matches") {
+        Some(Array(found)) => found
+        _ => []
+      }
+      let structured : Json = {
         "schemaVersion": "ciq-result/v1",
         "purl": purl,
         "intent": intent,
-        "matches": [
+        "source": "local-query-result",
+        "matches": matches,
+      }
+      Ok(
+        call_result(
+          "Resolved selector \{selector} for \{purl} from local query result",
+          structured,
+          false,
+        ),
+      )
+    }
+    _ =>
+      Ok(
+        call_result(
+          "Resolved selector \{selector} for \{purl}",
           {
-            "id": "decl:skeleton:\{selector}",
-            "kind": kind,
-            "signature": "placeholder signature",
-            "location": {
-              "uri": "dist/symbols.ndjson.zst",
-              "startLine": 1,
-              "endLine": 1,
-            },
+            "schemaVersion": "ciq-result/v1",
+            "purl": purl,
+            "intent": intent,
+            "source": "placeholder",
+            "matches": [
+              {
+                "id": "decl:skeleton:\{selector}",
+                "kind": kind,
+                "signature": "placeholder signature",
+                "location": {
+                  "uri": "dist/symbols.ndjson.zst",
+                  "startLine": 1,
+                  "endLine": 1,
+                },
+              },
+            ],
           },
-        ],
-      },
-      false,
-    ),
-  )
+          false,
+        ),
+      )
+  }
 }
 
 ///|
@@ -325,7 +370,14 @@ pub fn handle_request(request : Json) -> Json {
 
   match method_name {
     "initialize" => jsonrpc_success(id, initialize_result())
-    "ping" => jsonrpc_success(id, Json::object({}))
+    "ping" =>
+      jsonrpc_success(id, {
+        "status": "ok",
+        "localArtifacts": {
+          "queryResult": local_query_result() is Some(_),
+          "sarif": local_sarif() is Some(_),
+        },
+      })
     "tools/list" => jsonrpc_success(id, { "tools": tool_definitions() })
     "tools/call" =>
       match handle_tool_call(params) {
