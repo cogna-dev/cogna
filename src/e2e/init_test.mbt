@@ -85,3 +85,83 @@ test "e2e build creates dist skeleton from init config" {
   }
   cleanup_tmp_dir(dir)
 }
+
+///|
+test "e2e diff generates output from base and target manifests" {
+  let dir = "src/e2e/tmp_codeiq_e2e_diff"
+  cleanup_tmp_dir(dir)
+  @fs.create_dir(dir)
+
+  let output_path = "\{dir}/codeiq.yaml"
+  let init_out = @init_cmd.run(@init_cmd.InitParams::{ output_path, })
+  guard init_out is Ok(_) else {
+    cleanup_tmp_dir(dir)
+    fail("init should succeed before build")
+  }
+
+  let build_out = @build_cmd.run(@build_cmd.BuildParams::{ repo: dir })
+  guard build_out is Ok(_) else {
+    cleanup_tmp_dir(dir)
+    fail("build should succeed before diff")
+  }
+
+  @fs.create_dir("\{dir}/dist/base")
+  @fs.create_dir("\{dir}/dist/target")
+  let manifest = @fs.read_file_to_string("\{dir}/dist/manifest.json")
+  @fs.write_string_to_file("\{dir}/dist/base/manifest.json", manifest)
+  let target_manifest = manifest.replace(
+    old="pkg:openapi/acme/payment-api@2026.03.01",
+    new="pkg:openapi/acme/payment-api@2026.04.01",
+  )
+  @fs.write_string_to_file("\{dir}/dist/target/manifest.json", target_manifest)
+
+  let diff_out = @diff_cmd.run(@diff_cmd.DiffParams::{ repo: dir })
+  guard diff_out is Ok(result) else {
+    cleanup_tmp_dir(dir)
+    fail("diff should succeed")
+  }
+
+  inspect(
+    result.display(),
+    content="Generated CIQ diff skeleton at src/e2e/tmp_codeiq_e2e_diff/dist/diff.json",
+  )
+
+  let diff_json = @fs.read_file_to_string("\{dir}/dist/diff.json")
+  assert_true(diff_json.contains("\"schemaVersion\": \"ciq-diff/v1\""))
+  assert_true(diff_json.contains("\"id\": \"manifest:purl\""))
+
+  @fs.remove_file("\{dir}/dist/base/manifest.json") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/target/manifest.json") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/diff.json") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{dir}/dist/base") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{dir}/dist/target") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/manifest.json") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/declarations.ndjson.zst") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/symbols.ndjson.zst") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/metadata.json") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{dir}/dist/checksums.txt") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{dir}/dist") catch {
+    _ => ()
+  }
+  cleanup_tmp_dir(dir)
+}
