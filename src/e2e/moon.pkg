@@ -4,6 +4,7 @@ import {
 import {
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/cmd/build" @build_cmd,
+  "yufeiminds/codeiq/cmd/check" @check_cmd,
   "yufeiminds/codeiq/cmd/diff" @diff_cmd,
   "yufeiminds/codeiq/cmd/init" @init_cmd,
   "yufeiminds/codeiq/cmd/main" @main_cmd,

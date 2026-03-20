@@ -1,3 +1,5 @@
 import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/cli" @cli,
 }
