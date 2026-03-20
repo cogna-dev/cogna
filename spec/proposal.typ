@@ -263,18 +263,32 @@ compat-policy@2026.03.01.ciq.tgz
 
 === CIQ Diff
 
-`diff` 输入代码仓库（及其基线版本信息），输出 `CIQ Diff`。`CIQ Diff` 记录的不是源文件的逐行变化，而是#strong[声明层]的 added / removed / changed / deprecated 事件，以及这些事件对应的兼容性影响级别。
+`diff` 输入代码仓库（及其基线版本信息），输出 `CIQ Diff`。它支持 `since` 参数来显式指定比较起点提交，并支持 `--test-changes` 选项把测试用例变化纳入分析范围。`CIQ Diff` 记录的不是源文件的逐行变化，而是#strong[声明层]的 added / removed / changed / deprecated 事件，以及这些事件对应的兼容性影响级别；当启用测试变化分析时，它还会额外记录测试用例的 added / modified / removed 事件。
+
+对于测试用例的识别，CodeIQ 首期采用与语言生态约定一致的规则，例如：
+
+- #strong[Rust]：识别带有 `#[test]` 标记的测试函数，以及由测试模块暴露出的测试入口。
+- #strong[Go]：识别形如 `func TestXxx(t *testing.T)` 的测试函数。
+
+这些测试变化并不替代接口层 diff，而是作为与公开声明变化并行的补充 section，用于回答“这次发布除了改了什么公开接口，还新增、修改或删除了哪些测试用例”。这类信息可进一步用于#strong[测试可观测性分析]、测试覆盖演进分析，以及与外部测试跟踪系统建立变更关联。
 
 ```json
 {
   "schemaVersion": "ciq-diff/v1",
   "basePurl": "pkg:cargo/tokio@1.42.0",
   "targetPurl": "pkg:cargo/tokio@1.43.0",
+  "since": "a1b2c3d4",
+  "includeTestChanges": true,
   "summary": {
     "added": 12,
     "removed": 1,
     "changed": 4,
     "deprecated": 2
+  },
+  "testSummary": {
+    "added": 3,
+    "modified": 2,
+    "removed": 1
   },
   "changes": [
     {
@@ -282,6 +296,20 @@ compat-policy@2026.03.01.ciq.tgz
       "id": "decl:rust:tokio::runtime::Builder::new_multi_thread",
       "path": "tokio::runtime::Builder::new_multi_thread",
       "level": "breaking"
+    }
+  ],
+  "testChanges": [
+    {
+      "kind": "modified",
+      "language": "rust",
+      "id": "test:rust:tokio::sync::mutex_tests::lock_is_fair",
+      "path": "tokio::sync::mutex_tests::lock_is_fair",
+      "signature": "#[test] fn lock_is_fair()",
+      "location": {"uri": "tests/mutex.rs", "startLine": 24, "endLine": 41},
+      "tracking": {
+        "traceabilityKey": "tokio::sync::Mutex::lock",
+        "externalIds": ["TMS-1421"]
+      }
     }
   ]
 }
@@ -484,8 +512,9 @@ MCP Agent 的工具接口设计如下：
   1. SDK 开发者先在本地代码仓库执行 `build`，得到当前版本的 `CIQ Bundle`，从而把对外公开接口固定为一个可追溯、可复用的声明快照。
   2. 接着他执行 `diff`，将当前快照与上一稳定版本进行对比，产出 `CIQ Diff`，快速识别新增、删除、变更和弃用的公开接口。
   3. 为了把工程规则纳入门禁流程，他会再准备一个本地可用的 `CIQ OPA Bundle`，然后执行 `check <diff-file> --policy <local-policy-bundle>`，验证这次代码变更是否符合 policy 要求，并把结果转成 SARIF，用于 CI 展示与拦截。
-  4. 当 `check` 通过后，他再执行 `publish`，把新的 `CIQ Bundle` 发布到 `CodeIQ Registry`，让其他团队能够下载这份稳定快照。
-  5. 最终效果是：SDK 开发者既能在发版前获得确定性的兼容性证据，也能在发版后把可查询的上下文资产交付给下游团队和 AI Agent。
+  4. 如果团队还维护测试平台或测试追踪系统，他可以进一步把 `CIQ Diff.testChanges` 中的测试用例变化与外部测试 ID 关联，用于测试可观测性分析、回归计划编排和发布证据留存。
+  5. 当 `check` 通过后，他再执行 `publish`，把新的 `CIQ Bundle` 发布到 `CodeIQ Registry`，让其他团队能够下载这份稳定快照。
+  6. 最终效果是：SDK 开发者既能在发版前获得确定性的兼容性证据，也能在发版后把可查询的上下文资产交付给下游团队和 AI Agent，同时为测试变化提供可追踪的分析证据。
 
 #figure(
   diagram(
@@ -534,7 +563,7 @@ MCP Agent 的工具接口设计如下：
 - #strong[用户故事 3：后台开发工程师]
   1. 后台开发工程师在接入第三方库或第三方 API 前，先从 `CodeIQ Registry` 下载所需的 `CIQ Bundle` 到本地缓存。
   2. 如果只是一次性查询，他直接执行 `query ./query.json`，根据查询文件中的 PURL 和 selector 获取指定声明、签名或契约说明；如果是高频交互式查询，他会执行 `mcp start`，让 AI Agent 根据当前包管理器依赖自动发现并装载需要的 bundle，再通过 MCP 反复查询这些本地产物。
-  3. 当他在本地开发自己的 OpenAPI 时，会先执行 `build` 生成当前版本快照，再执行 `diff` 与稳定版本比较，确认公开契约发生了哪些变化。
+  3. 当他在本地开发自己的 OpenAPI 时，会先执行 `build` 生成当前版本快照，再执行 `diff --since <stable-commit> --test-changes` 与稳定版本比较，确认公开契约发生了哪些变化，以及验证这些变化是否伴随测试用例调整。
   4. 最后，他会执行 `check <diff-file> --policy <local-policy-bundle>`，把这些变化转成 SARIF，用于确认自己交付的 OpenAPI 没有破坏性变更。
   5. 最终效果是：无论是消费外部依赖，还是维护自己的对外 API，他都能在统一的本地工具链中完成“下载 / 查询 / 对比 / 检查”的闭环。
 
@@ -564,7 +593,7 @@ CLI 原型如下：
 codeiq init
 codeiq build ./sdk
 codeiq build ./policy
-codeiq diff ./sdk
+codeiq diff ./sdk --since <last-release-commit> --test-changes
 codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
 codeiq mcp start
 codeiq query ./query.json

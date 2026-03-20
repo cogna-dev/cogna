@@ -1,7 +1,0 @@
-import {
-  "yufeiminds/codeiq" @lib,
-}
-
-options(
-  "is-main": true,
-)

@@ -27,4 +27,4 @@ jobs:
         run: moon build
 
       - name: Run
-        run: moon run cmd/main
+        run: moon run src/cmd/main

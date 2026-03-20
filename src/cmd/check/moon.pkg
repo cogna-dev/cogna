@@ -1,0 +1,3 @@
+import {
+  "yufeiminds/codeiq/cli" @cli,
+}

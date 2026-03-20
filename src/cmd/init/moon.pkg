@@ -1,0 +1,4 @@
+import {
+  "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/cli" @cli,
+}

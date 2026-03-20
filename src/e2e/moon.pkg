@@ -1,0 +1,8 @@
+import {
+}
+
+import {
+  "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/cmd/init" @init_cmd,
+  "yufeiminds/codeiq/cmd/main" @main_cmd,
+} for "test"
