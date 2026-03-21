@@ -1,5 +1,5 @@
 ///|
-pub fn ciq_config_v1_schema() -> @schema.JsonSchema {
+pub fn ciq_config_v1_schema() -> @json_schema.JsonSchema {
   {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "ciq-config/v1",

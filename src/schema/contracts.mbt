@@ -1,5 +1,5 @@
 ///|
-pub fn ciq_bundle_v1_schema() -> JsonSchema {
+pub fn ciq_bundle_v1_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
     "required": [
@@ -52,7 +52,7 @@ pub fn ciq_bundle_v1_schema() -> JsonSchema {
 }
 
 ///|
-pub fn ciq_diff_v1_schema() -> JsonSchema {
+pub fn ciq_diff_v1_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
     "required": [
@@ -99,7 +99,7 @@ pub fn ciq_diff_v1_schema() -> JsonSchema {
 }
 
 ///|
-pub fn ciq_query_v1_schema() -> JsonSchema {
+pub fn ciq_query_v1_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
     "required": ["schemaVersion", "purl", "selector"],
@@ -122,7 +122,7 @@ pub fn ciq_query_v1_schema() -> JsonSchema {
 }
 
 ///|
-pub fn ciq_result_v1_schema() -> JsonSchema {
+pub fn ciq_result_v1_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
     "required": ["schemaVersion", "purl", "matches"],
@@ -158,7 +158,7 @@ pub fn ciq_result_v1_schema() -> JsonSchema {
 }
 
 ///|
-pub fn sarif_v2_1_0_min_schema() -> JsonSchema {
+pub fn sarif_v2_1_0_min_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
     "required": ["version", "runs"],
@@ -238,26 +238,36 @@ pub fn sarif_v2_1_0_min_schema() -> JsonSchema {
 }
 
 ///|
-pub fn validate_ciq_bundle_v1(instance : Json) -> Result[Unit, SchemaError] {
-  validate_json(ciq_bundle_v1_schema(), instance)
+pub fn validate_ciq_bundle_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(ciq_bundle_v1_schema(), instance)
 }
 
 ///|
-pub fn validate_ciq_diff_v1(instance : Json) -> Result[Unit, SchemaError] {
-  validate_json(ciq_diff_v1_schema(), instance)
+pub fn validate_ciq_diff_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(ciq_diff_v1_schema(), instance)
 }
 
 ///|
-pub fn validate_ciq_query_v1(instance : Json) -> Result[Unit, SchemaError] {
-  validate_json(ciq_query_v1_schema(), instance)
+pub fn validate_ciq_query_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(ciq_query_v1_schema(), instance)
 }
 
 ///|
-pub fn validate_ciq_result_v1(instance : Json) -> Result[Unit, SchemaError] {
-  validate_json(ciq_result_v1_schema(), instance)
+pub fn validate_ciq_result_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(ciq_result_v1_schema(), instance)
 }
 
 ///|
-pub fn validate_sarif_v2_1_0_min(instance : Json) -> Result[Unit, SchemaError] {
-  validate_json(sarif_v2_1_0_min_schema(), instance)
+pub fn validate_sarif_v2_1_0_min(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(sarif_v2_1_0_min_schema(), instance)
 }

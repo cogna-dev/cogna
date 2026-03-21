@@ -13,11 +13,11 @@ fn has_disallowed_input_path(paths : Array[String]) -> Bool {
 }
 
 ///|
-fn schema_error_message(error : @schema.SchemaError) -> String {
+fn schema_error_message(error : @json_schema.SchemaError) -> String {
   match error {
-    @schema.SchemaParseError(message) => "schema parse error: \{message}"
-    @schema.InvalidSchema(message) => "invalid schema: \{message}"
-    @schema.ValidationFailed(issues) =>
+    @json_schema.SchemaParseError(message) => "schema parse error: \{message}"
+    @json_schema.InvalidSchema(message) => "invalid schema: \{message}"
+    @json_schema.ValidationFailed(issues) =>
       if issues.length() == 0 {
         "validation failed"
       } else {
@@ -30,7 +30,7 @@ fn schema_error_message(error : @schema.SchemaError) -> String {
 ///|
 pub fn validate(config : Config, path : String) -> Result[Config, ConfigError] {
   let instance = config_to_json(config)
-  let schema_out = @schema.validate_json(ciq_config_v1_schema(), instance)
+  let schema_out = @json_schema.validate_json(ciq_config_v1_schema(), instance)
   if schema_out is Err(error) {
     Err(ConfigError::ValidationError(path~, schema_error_message(error)))
   } else if !config.purl.has_prefix("pkg:") {

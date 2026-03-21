@@ -1,3 +1,7 @@
 import {
-  "moonbitlang/core/json" @json,
+  "yufeiminds/codeiq/lib/json-schema" @json_schema,
 }
+
+import {
+  "moonbitlang/core/json" @json,
+} for "test"
