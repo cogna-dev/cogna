@@ -83,7 +83,9 @@ test "build creates bundle skeleton files" {
     }
   }
   assert_true(metadata.contains("\"schemaVersion\": \"ciq-metadata/v1\""))
-  assert_true(metadata.contains("\"status\": \"skeleton\""))
+  assert_true(metadata.contains("\"status\": \"completed\""))
+  assert_true(metadata.contains("\"role\": \"baseline\""))
+  assert_true(metadata.contains("\"mode\": \"parser-only\""))
 
   let checksums = @fs.read_file_to_string("\{repo}/dist/checksums.txt") catch {
     _ => {
@@ -92,8 +94,28 @@ test "build creates bundle skeleton files" {
       ""
     }
   }
-  assert_true(checksums.contains("manifest.json  placeholder"))
-  assert_true(checksums.contains("symbols.ndjson.zst  placeholder"))
+  assert_true(checksums.contains("manifest.json  pending"))
+  assert_true(checksums.contains("symbols.ndjson.zst  stable-"))
+
+  let declarations = @fs.read_file_to_string(
+    "\{repo}/dist/declarations.ndjson.zst",
+  ) catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("declarations should exist")
+      ""
+    }
+  }
+  assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
+
+  let symbols = @fs.read_file_to_string("\{repo}/dist/symbols.ndjson.zst") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("symbols should exist")
+      ""
+    }
+  }
+  assert_true(symbols.contains("\"id\":\"sym:openapi-spec:"))
 
   cleanup_tmp_repo(repo)
 }

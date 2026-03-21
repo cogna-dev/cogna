@@ -61,9 +61,10 @@ test "e2e build creates dist skeleton from init config" {
   let manifest = @fs.read_file_to_string("\{dir}/dist/manifest.json")
   assert_true(manifest.contains("\"schemaVersion\": \"ciq-bundle/v1\""))
   let metadata = @fs.read_file_to_string("\{dir}/dist/metadata.json")
-  assert_true(metadata.contains("\"status\": \"skeleton\""))
+  assert_true(metadata.contains("\"status\": \"completed\""))
+  assert_true(metadata.contains("\"extractor\""))
   let checksums = @fs.read_file_to_string("\{dir}/dist/checksums.txt")
-  assert_true(checksums.contains("manifest.json  placeholder"))
+  assert_true(checksums.contains("manifest.json  pending"))
 
   @fs.remove_file("\{dir}/dist/manifest.json") catch {
     _ => ()

@@ -4,3 +4,7 @@ import {
   "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/schema" @schema,
 }
+
+import {
+  "moonbitlang/core/env" @env,
+} for "test"
