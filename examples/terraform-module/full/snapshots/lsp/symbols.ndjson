@@ -1,0 +1,4 @@
+{"id":"sym:terraform-module:terraform-module::main.tf::aws","path":"main.tf:1","kind":"provider","name":"aws","summary":"provider \"aws\" {","owner":"main.tf","location":{"uri":"main.tf","startLine":1,"endLine":1}}
+{"id":"sym:terraform-module:terraform-module::main.tf::cidr","path":"main.tf:5","kind":"variable","name":"cidr","summary":"variable \"cidr\" {","owner":"main.tf","location":{"uri":"main.tf","startLine":5,"endLine":5}}
+{"id":"sym:terraform-module:terraform-module::main.tf::vpc_id","path":"main.tf:13","kind":"output","name":"vpc_id","summary":"output \"vpc_id\" {","owner":"main.tf","location":{"uri":"main.tf","startLine":13,"endLine":13}}
+{"id":"sym:terraform-module:terraform-module::main.tf::aws_vpc.main","path":"main.tf:9","kind":"resource","name":"aws_vpc.main","summary":"resource \"aws_vpc\" \"main\" {","owner":"main.tf","location":{"uri":"main.tf","startLine":9,"endLine":9}}

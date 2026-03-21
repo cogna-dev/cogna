@@ -1,0 +1,2 @@
+{"id":"sym:go-module:go-module::main.go::Hello","path":"main.go:5","kind":"function","name":"Hello","summary":"func Hello(name string) string {","owner":"main.go","location":{"uri":"main.go","startLine":5,"endLine":5}}
+{"id":"sym:go-module:go-module::main.go::Greeter","path":"main.go:3","kind":"type","name":"Greeter","summary":"type Greeter struct {}","owner":"main.go","location":{"uri":"main.go","startLine":3,"endLine":3}}

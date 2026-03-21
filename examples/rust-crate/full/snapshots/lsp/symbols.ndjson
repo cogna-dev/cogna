@@ -1,0 +1,2 @@
+{"id":"sym:rust-crate:rust-crate::lib.rs::Counter","path":"lib.rs:1","kind":"struct","name":"Counter","summary":"pub struct Counter {","owner":"lib.rs","location":{"uri":"lib.rs","startLine":1,"endLine":1}}
+{"id":"sym:rust-crate:rust-crate::lib.rs::increment","path":"lib.rs:5","kind":"function","name":"increment","summary":"pub fn increment(value: i32) -> i32 {","owner":"lib.rs","location":{"uri":"lib.rs","startLine":5,"endLine":5}}
