@@ -1,9 +1,20 @@
+<div align="center">
+
+<pre>
+  ____          _      ___ ____
+ / ___|___   __| | ___|_ _/ ___|
+| |   / _ \ / _` |/ _ \| | |  _
+| |__| (_) | (_| |  __/| | |_| |
+ \____\___/ \__,_|\___|___\____|
+</pre>
+
 # CodeIQ
 
 ![Build](https://img.shields.io/github/actions/workflow/status/yufeiminds/codeiq/ci.yml?branch=main&label=build)
 ![Coverage](https://img.shields.io/codecov/c/github/yufeiminds/codeiq?label=coverage)
-![Code Quality](https://img.shields.io/codeclimate/maintainability/yufeiminds/codeiq?label=quality)
 ![MoonBit](https://img.shields.io/badge/language-MoonBit-6f42c1)
+
+</div>
 
 CodeIQ is a declaration-focused CLI for API and third-party dependency governance.
 It extracts interface contracts, computes diffs, and prepares structured artifacts for policy checks and downstream automation.
