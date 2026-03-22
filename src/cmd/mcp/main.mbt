@@ -1,6 +1,7 @@
 ///|
 pub(all) struct McpStartParams {
   port : Int
+  stdio : Bool
 } derive(Show, Eq)
 
 ///|
@@ -10,7 +11,28 @@ pub(all) struct McpStartResult {
 } derive(Show, Eq)
 
 ///|
+pub(all) struct McpStatusResult {
+  status : String
+  summary : String
+} derive(Show, Eq)
+
+///|
+pub(all) struct McpStopResult {
+  summary : String
+} derive(Show, Eq)
+
+///|
 pub impl @cli.Display for McpStartResult with display(self : McpStartResult) -> String {
+  self.summary
+}
+
+///|
+pub impl @cli.Display for McpStatusResult with display(self : McpStatusResult) -> String {
+  self.summary
+}
+
+///|
+pub impl @cli.Display for McpStopResult with display(self : McpStopResult) -> String {
   self.summary
 }
 
@@ -94,23 +116,13 @@ fn mcp_server_info(port : Int) -> Json {
 }
 
 ///|
-fn read_json_file(path : String) -> Json? {
-  let content = @fs.read_file_to_string(path) catch { _ => return None }
-  let parsed = try? @json.parse(content)
-  match parsed {
-    Ok(value) => Some(value)
-    _ => None
-  }
-}
-
-///|
 fn local_query_result() -> Json? {
-  read_json_file("./dist/query.result.json")
+  @bundle.read_local_query_result(".")
 }
 
 ///|
 fn local_sarif() -> Json? {
-  read_json_file("./dist/check.sarif.json")
+  @bundle.read_local_sarif(".")
 }
 
 ///|
@@ -173,40 +185,20 @@ fn get_optional_int(args : Map[String, Json], key : String) -> Int? {
 }
 
 ///|
-fn outlines_payload(
-  purl : String,
-  limit : Int,
-  cursor : String?,
-) -> Array[Json] {
-  let source : Array[Json] = [
-    {
-      "path": "\{purl}::example::module::symbol",
-      "kind": "function",
-      "summary": "Placeholder outline from local CIQ bundle cache",
-    },
-    {
-      "path": "\{purl}::example::module::contract",
-      "kind": "schema",
-      "summary": "Placeholder contract outline from local CIQ bundle cache",
-    },
-  ]
-
-  let start = match cursor {
-    Some("cursor:1") => 1
-    _ => 0
+fn query_repo_by_purl(purl : String) -> String {
+  let cwd = @env.current_dir().unwrap_or(".")
+  let manifest_path = "\{cwd}/dist/manifest.json"
+  if @fs.path_exists(manifest_path) {
+    let manifest_text = @fs.read_file_to_string(manifest_path) catch { _ => "" }
+    let manifest_out = try? @json.parse(manifest_text)
+    if manifest_out is Ok(Object(manifest)) {
+      match manifest.get("purl") {
+        Some(String(found)) if found == purl => return cwd
+        _ => ()
+      }
+    }
   }
-  let max_limit = if limit <= 0 { 20 } else { limit }
-  let end = if start + max_limit > source.length() {
-    source.length()
-  } else {
-    start + max_limit
-  }
-
-  let result : Array[Json] = []
-  for i in start..<end {
-    result.push(source[i])
-  }
-  result
+  cwd
 }
 
 ///|
@@ -228,11 +220,13 @@ fn run_outlines_tool(args : Map[String, Json]) -> Result[Json, String] {
     None => 20
   }
   let cursor = get_optional_string(args, "cursor")
-  let outlines = outlines_payload(purl, limit, cursor)
-  let next_cursor : Json = if outlines.length() < 2 {
-    Json::null()
-  } else {
-    Json::string("cursor:1")
+  let repo = query_repo_by_purl(purl)
+  let (outlines, next_cursor_str) = @query_cmd.query_outlines(
+    repo, purl, limit, cursor,
+  )
+  let next_cursor : Json = match next_cursor_str {
+    Some(value) => Json::string(value)
+    None => Json::null()
   }
   let cursor_text = match cursor {
     Some(value) => value
@@ -272,53 +266,44 @@ fn run_symbol_tool(args : Map[String, Json]) -> Result[Json, String] {
     _ => "lookup"
   }
 
-  let from_local = local_query_result()
-  match from_local {
-    Some(Object(local_result)) => {
-      let matches = match local_result.get("matches") {
-        Some(Array(found)) => found
-        _ => []
-      }
-      let structured : Json = {
-        "schemaVersion": "ciq-result/v1",
-        "purl": purl,
-        "intent": intent,
-        "source": "local-query-result",
-        "matches": matches,
-      }
-      Ok(
-        call_result(
-          "Resolved selector \{selector} for \{purl} from local query result",
-          structured,
-          false,
-        ),
-      )
+  let repo = query_repo_by_purl(purl)
+  let matches = @query_cmd.query_matches(repo, selector, kind)
+  let structured : Json = {
+    "schemaVersion": "ciq-result/v1",
+    "purl": purl,
+    "intent": intent,
+    "source": "bundle",
+    "matches": matches,
+  }
+  Ok(
+    call_result(
+      "Resolved selector \{selector} for \{purl} with \{matches.length()} match(es)",
+      structured,
+      false,
+    ),
+  )
+}
+
+///|
+pub fn serve_stdio_once(line : String) -> String {
+  let parsed = try? @json.parse(line)
+  let response = match parsed {
+    Ok(request) => handle_request(request)
+    Err(_) => jsonrpc_error(Json::null(), -32700, "parse error")
+  }
+  response.stringify(indent=0)
+}
+
+///|
+pub fn run_stdio_repl() -> Unit {
+  let stdin_text = @fs.read_file_to_string("/dev/stdin") catch { _ => "" }
+  let lines = stdin_text.split("\n").to_array()
+  for i in 0..<lines.length() {
+    let line = lines[i].to_string().trim().to_string()
+    if line == "" {
+      continue
     }
-    _ =>
-      Ok(
-        call_result(
-          "Resolved selector \{selector} for \{purl}",
-          {
-            "schemaVersion": "ciq-result/v1",
-            "purl": purl,
-            "intent": intent,
-            "source": "placeholder",
-            "matches": [
-              {
-                "id": "decl:skeleton:\{selector}",
-                "kind": kind,
-                "signature": "placeholder signature",
-                "location": {
-                  "uri": "dist/symbols.ndjson.zst",
-                  "startLine": 1,
-                  "endLine": 1,
-                },
-              },
-            ],
-          },
-          false,
-        ),
-      )
+    println(serve_stdio_once(line))
   }
 }
 
@@ -408,8 +393,39 @@ pub fn run_start(
   let write_out = write_mcp_info(info_path, mcp_server_info(params.port))
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 
+  if params.stdio {
+    run_stdio_repl()
+  }
+
   Ok({
     port: params.port,
-    summary: "Generated MCP server descriptor at \{info_path} (port \{params.port})",
+    summary: "Started MCP stdio loop with descriptor at \{info_path} (port \{params.port})",
   })
+}
+
+///|
+pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
+  let info_path = "./dist/mcp-server.json"
+  if @fs.path_exists(info_path) {
+    Ok({ status: "running", summary: "MCP descriptor found at \{info_path}" })
+  } else {
+    Ok({
+      status: "stopped",
+      summary: "MCP descriptor not found (expected \{info_path})",
+    })
+  }
+}
+
+///|
+pub fn run_stop() -> @cli.CliResult[McpStopResult, @cli.CliError] {
+  let info_path = "./dist/mcp-server.json"
+  if @fs.path_exists(info_path) {
+    @fs.remove_file(info_path) catch {
+      err =>
+        return Err(mcp_error("cannot remove \{info_path}: \{err.to_string()}"))
+    }
+    Ok({ summary: "Removed MCP descriptor at \{info_path}" })
+  } else {
+    Ok({ summary: "MCP already stopped (no descriptor at \{info_path})" })
+  }
 }

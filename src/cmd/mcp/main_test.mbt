@@ -25,14 +25,14 @@ test "mcp start writes server descriptor" {
   cleanup_tmp_dir(dir)
   @fs.create_dir(dir)
 
-  let result = run_start({ port: 8080 })
+  let result = run_start({ port: 8080, stdio: false })
   guard result is Ok(ok) else {
     cleanup_tmp_dir(dir)
     fail("mcp start should succeed")
   }
   inspect(
     ok.display(),
-    content="Generated MCP server descriptor at ./dist/mcp-server.json (port 8080)",
+    content="Started MCP stdio loop with descriptor at ./dist/mcp-server.json (port 8080)",
   )
 
   let content = @fs.read_file_to_string("./dist/mcp-server.json") catch {
@@ -54,7 +54,7 @@ test "mcp start writes server descriptor" {
 
 ///|
 test "mcp start rejects invalid port" {
-  let out = run_start({ port: 70000 })
+  let out = run_start({ port: 70000, stdio: false })
   guard out is Err(error) else {
     fail("mcp start should fail for invalid port")
   }
@@ -62,6 +62,31 @@ test "mcp start rejects invalid port" {
   let text = error.to_string()
   assert_true(text.contains("mcp failed:"))
   assert_true(text.contains("port must be in range 1..65535"))
+}
+
+///|
+test "mcp status reports stopped when descriptor missing" {
+  @fs.remove_file("./dist/mcp-server.json") catch {
+    _ => ()
+  }
+  let out = run_status()
+  guard out is Ok(result) else { fail("mcp status should succeed") }
+  assert_true(result.display().contains("not found"))
+}
+
+///|
+test "mcp stop removes descriptor when present" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  @fs.write_string_to_file("./dist/mcp-server.json", "{}") catch {
+    _ => fail("failed to write mcp descriptor")
+  }
+
+  let out = run_stop()
+  guard out is Ok(result) else { fail("mcp stop should succeed") }
+  assert_true(result.display().contains("Removed MCP descriptor"))
+  assert_true(!@fs.path_exists("./dist/mcp-server.json"))
 }
 
 ///|
@@ -133,6 +158,19 @@ test "mcp tools list response matches schema" {
 
 ///|
 test "mcp tools call returns structured content" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  let declarations =
+    #|{"id":"decl:payment:create","kind":"operation","path":"payment::create","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|
+  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
+    _ => fail("failed to compress declaration fixture")
+  }
+  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", compressed) catch {
+    _ => fail("failed to write declaration fixture")
+  }
+
   let request = parse_json_or_fail(
     (
       #|{
@@ -153,7 +191,12 @@ test "mcp tools call returns structured content" {
   let response = handle_request(request).stringify(indent=2)
   assert_true(response.contains("\"isError\": false"))
   assert_true(response.contains("\"schemaVersion\": \"ciq-result/v1\""))
-  assert_true(response.contains("\"decl:skeleton:payment::create\""))
+  assert_true(response.contains("\"source\": \"bundle\""))
+  assert_true(response.contains("\"decl:payment:create\""))
+
+  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -196,12 +239,18 @@ test "mcp tools call uses local query result when available" {
     ),
   )
   let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"source\": \"local-query-result\""))
-  assert_true(response.contains("\"decl:local:payment::create\""))
+  assert_true(response.contains("\"source\": \"bundle\""))
+  assert_true(response.contains("\"matches\": []"))
 
   @fs.remove_file("./dist/query.result.json") catch {
     _ => ()
   }
+}
+
+///|
+test "mcp stdio once handles parse error" {
+  let response = serve_stdio_once("{")
+  assert_true(response.contains("-32700"))
 }
 
 ///|
@@ -234,6 +283,20 @@ test "mcp ping reports local artifact availability" {
 
 ///|
 test "mcp tools call outlines accepts limit and cursor" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  let declarations =
+    #|{"id":"decl:1","kind":"operation","path":"openapi/payment.yaml","signature":"operation listPayments","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|{"id":"decl:2","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":21,"endLine":30}}
+    #|
+  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
+    _ => fail("failed to compress declaration fixture")
+  }
+  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", compressed) catch {
+    _ => fail("failed to write declaration fixture")
+  }
+
   let request = parse_json_or_fail(
     (
       #|{
@@ -254,6 +317,10 @@ test "mcp tools call outlines accepts limit and cursor" {
   let response = handle_request(request).stringify(indent=2)
   assert_true(response.contains("\"Returned 1 outline"))
   assert_true(response.contains("\"limit\": 1"))
+
+  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
+    _ => ()
+  }
 }
 
 ///|
