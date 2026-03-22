@@ -20,7 +20,21 @@ fn reset_repo(path : String) -> Unit {
   remove_if_exists("\{path}/dist/symbols.ndjson.zst")
   remove_if_exists("\{path}/dist/metadata.json")
   remove_if_exists("\{path}/dist/checksums.txt")
+  remove_if_exists("\{path}/dist/bundle.ciq.tgz")
   remove_dir_if_exists("\{path}/dist")
+}
+
+///|
+fn decode_zstd_text_snapshot(path : String, fail_message : String) -> String {
+  let compressed = @fs.read_file_to_bytes(path) catch {
+    _ => abort(fail_message)
+  }
+  let decompressed = @zstd.decompress(compressed) catch {
+    _ => abort("zstd decompression failed: \{path}")
+  }
+  @utf8.decode(decompressed) catch {
+    _ => abort("utf8 decode failed: \{path}")
+  }
 }
 
 ///|
@@ -125,17 +139,24 @@ fn persist_snapshot(path : String, content : String) -> Unit {
 }
 
 ///|
+fn read_fixture(path : String) -> String {
+  @fs.read_file_to_string(path) catch {
+    _ => abort("failed to read fixture file")
+  }
+}
+
+///|
 fn run_snapshot_case(
   title : String,
   profile : String,
   source_file : String,
-  source_content : String,
+  source_fixture : String,
   include_glob : String,
   snapshot_root : String,
 ) -> Unit raise {
   let repo = "src/cmd/build/tmp_snapshot_\{title}"
   cleanup_case(repo, source_file)
-  ensure_repo_with_file(repo, source_file, source_content)
+  ensure_repo_with_file(repo, source_file, read_fixture(source_fixture))
   write_config_for(repo, profile, include_glob)
   reset_repo(repo)
   write_config_for(repo, profile, include_glob)
@@ -146,22 +167,14 @@ fn run_snapshot_case(
     fail("build should succeed for snapshot case \{title}")
   }
 
-  let declarations = @fs.read_file_to_string(
+  let declarations = decode_zstd_text_snapshot(
     "\{repo}/dist/declarations.ndjson.zst",
-  ) catch {
-    _ => {
-      cleanup_case(repo, source_file)
-      fail("declarations output should exist")
-      ""
-    }
-  }
-  let symbols = @fs.read_file_to_string("\{repo}/dist/symbols.ndjson.zst") catch {
-    _ => {
-      cleanup_case(repo, source_file)
-      fail("symbols output should exist")
-      ""
-    }
-  }
+    "declarations output should exist",
+  )
+  let symbols = decode_zstd_text_snapshot(
+    "\{repo}/dist/symbols.ndjson.zst",
+    "symbols output should exist",
+  )
 
   let dec_snapshot_path = "\{snapshot_root}/declarations.ndjson"
   let sym_snapshot_path = "\{snapshot_root}/symbols.ndjson"
@@ -175,9 +188,17 @@ fn run_snapshot_case(
   } else if expected_dec == declarations && expected_sym == symbols {
     ()
   } else {
-    let update = match @env.args().search("--update-snapshots") {
-      Some(_) => true
-      None => false
+    let update = match @sys.get_env_var("CODEIQ_UPDATE_SNAPSHOTS") {
+      Some("true") => true
+      _ =>
+        match @env.args().search("--update-snapshots") {
+          Some(_) => true
+          None =>
+            match @env.args().search("--update") {
+              Some(_) => true
+              None => false
+            }
+        }
     }
     if update {
       persist_snapshot(dec_snapshot_path, declarations)
@@ -203,43 +224,33 @@ fn run_snapshot_case(
 }
 
 ///|
-test "snapshot go baseline extractor output" {
+fn run_snapshot_case_with_lsp_fallback(
+  title : String,
+  profile : String,
+  source_file : String,
+  source_fixture : String,
+  include_glob : String,
+  snapshot_root : String,
+) -> Unit raise {
+  @sys.set_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK", "true")
   run_snapshot_case(
-    "go",
-    "go-module",
-    "main.go",
-    (
-      #|package sample
-      #|
-      #|type Greeter struct {}
-      #|
-      #|func Hello(name string) string {
-      #|  return "hello"
-      #|}
-      #|
-    ),
-    "**/*.go",
+    title, profile, source_file, source_fixture, include_glob, snapshot_root,
+  )
+  @sys.unset_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+}
+
+///|
+test "snapshot go baseline extractor output" {
+  run_snapshot_case_with_lsp_fallback(
+    "go", "go-module", "main.go", "examples/go-module/full/repo/main.go", "**/*.go",
     "examples/go-module/full/snapshots/lsp",
   )
 }
 
 ///|
 test "snapshot rust baseline extractor output" {
-  run_snapshot_case(
-    "rust",
-    "rust-crate",
-    "lib.rs",
-    (
-      #|pub struct Counter {
-      #|  value: i32,
-      #|}
-      #|
-      #|pub fn increment(value: i32) -> i32 {
-      #|  value + 1
-      #|}
-      #|
-    ),
-    "**/*.rs",
+  run_snapshot_case_with_lsp_fallback(
+    "rust", "rust-crate", "lib.rs", "examples/rust-crate/full/repo/lib.rs", "**/*.rs",
     "examples/rust-crate/full/snapshots/lsp",
   )
 }
@@ -247,60 +258,15 @@ test "snapshot rust baseline extractor output" {
 ///|
 test "snapshot terraform baseline extractor output" {
   run_snapshot_case(
-    "terraform",
-    "terraform-module",
-    "main.tf",
-    (
-      #|provider "aws" {
-      #|  region = "us-east-1"
-      #|}
-      #|
-      #|variable "cidr" {
-      #|  type = string
-      #|}
-      #|
-      #|resource "aws_vpc" "main" {
-      #|  cidr_block = var.cidr
-      #|}
-      #|
-      #|output "vpc_id" {
-      #|  value = aws_vpc.main.id
-      #|}
-      #|
-    ),
-    "**/*.tf",
-    "examples/terraform-module/full/snapshots/lsp",
+    "terraform", "terraform-module", "main.tf", "examples/terraform-module/full/repo/main.tf",
+    "**/*.tf", "examples/terraform-module/full/snapshots/lsp",
   )
 }
 
 ///|
 test "snapshot openapi baseline extractor output" {
   run_snapshot_case(
-    "openapi",
-    "openapi-spec",
-    "openapi/payment.yaml",
-    (
-      #|openapi: 3.1.0
-      #|info:
-      #|  title: Payment API
-      #|  version: 1.0.0
-      #|paths:
-      #|  /payments:
-      #|    get:
-      #|      operationId: listPayments
-      #|      responses:
-      #|        "200":
-      #|          description: ok
-      #|components:
-      #|  schemas:
-      #|    Payment:
-      #|      type: object
-      #|      properties:
-      #|        id:
-      #|          type: string
-      #|
-    ),
-    "openapi/**/*.yaml",
-    "examples/openapi-spec/full/snapshots/lsp",
+    "openapi", "openapi-spec", "openapi/payment.yaml", "examples/openapi-spec/full/repo/openapi/payment.yaml",
+    "openapi/**/*.yaml", "examples/openapi-spec/full/snapshots/lsp",
   )
 }

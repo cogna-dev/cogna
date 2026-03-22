@@ -2,7 +2,10 @@ import {
 }
 
 import {
+  "Milky2018/zstd" @zstd,
+  "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
   "yufeiminds/codeiq/cmd/build" @build_cmd,
   "yufeiminds/codeiq/cmd/check" @check_cmd,
   "yufeiminds/codeiq/cmd/diff" @diff_cmd,

@@ -1,5 +1,12 @@
 import {
+  "Milky2018/zstd" @zstd,
+  "gmlewis/gzip" @gzip,
+  "gmlewis/io" @gio,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/x/sys" @sys,
+  "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/lib/process" @process,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/schema" @schema,

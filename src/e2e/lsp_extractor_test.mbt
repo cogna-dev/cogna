@@ -18,6 +18,9 @@ fn cleanup_lsp_e2e(path : String) -> Unit {
   @fs.remove_file("\{path}/dist/checksums.txt") catch {
     _ => ()
   }
+  @fs.remove_file("\{path}/dist/bundle.ciq.tgz") catch {
+    _ => ()
+  }
   @fs.remove_dir("\{path}/dist") catch {
     _ => ()
   }
@@ -40,23 +43,11 @@ fn write_openapi_repo(path : String) -> Unit {
   @fs.create_dir("\{path}/openapi") catch {
     _ => abort("failed to create lsp e2e openapi dir")
   }
-  let spec =
-    #|openapi: 3.1.0
-    #|info:
-    #|  title: Payment API
-    #|  version: 1.0.0
-    #|paths:
-    #|  /payments:
-    #|    get:
-    #|      operationId: listPayments
-    #|      responses:
-    #|        "200":
-    #|          description: ok
-    #|components:
-    #|  schemas:
-    #|    Payment:
-    #|      type: object
-    #|
+  let spec = @fs.read_file_to_string(
+    "examples/openapi-spec/full/repo/openapi/payment.yaml",
+  ) catch {
+    _ => abort("failed to read openapi fixture")
+  }
   @fs.write_string_to_file("\{path}/openapi/payment.yaml", spec) catch {
     _ => abort("failed to write openapi fixture")
   }
@@ -84,6 +75,19 @@ fn write_openapi_config(path : String) -> Unit {
 }
 
 ///|
+fn decode_zstd_text(path : String) -> String {
+  let compressed = @fs.read_file_to_bytes(path) catch {
+    _ => abort("cannot read compressed file: \{path}")
+  }
+  let decompressed = @zstd.decompress(compressed) catch {
+    _ => abort("cannot decompress file: \{path}")
+  }
+  @utf8.decode(decompressed) catch {
+    _ => abort("cannot decode utf8 file: \{path}")
+  }
+}
+
+///|
 test "e2e build lsp extractor writes baseline metadata and symbols" {
   let path = "src/e2e/tmp_lsp_extractor_e2e"
   cleanup_lsp_e2e(path)
@@ -104,15 +108,19 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   let metadata = @fs.read_file_to_string("\{path}/dist/metadata.json")
   assert_true(metadata.contains("\"role\": \"baseline\""))
   assert_true(metadata.contains("\"mode\": \"parser-only\""))
+  assert_true(metadata.contains("\"version\": \"none | baseline-v2\""))
 
-  let declarations = @fs.read_file_to_string(
-    "\{path}/dist/declarations.ndjson.zst",
-  )
+  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
   assert_true(declarations.contains("\"kind\":\"operation\""))
   assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
+  assert_true(declarations.contains("\"shape\":{\"kind\":"))
+  assert_true(declarations.contains("\"relations\":[{\"kind\":\"declared_in\""))
 
-  let symbols = @fs.read_file_to_string("\{path}/dist/symbols.ndjson.zst")
+  let symbols = decode_zstd_text("\{path}/dist/symbols.ndjson.zst")
   assert_true(symbols.contains("\"id\":\"sym:openapi-spec:"))
+
+  let bundle = @fs.read_file_to_bytes("\{path}/dist/bundle.ciq.tgz")
+  assert_true(bundle.length() > 0)
 
   cleanup_lsp_e2e(path)
 }

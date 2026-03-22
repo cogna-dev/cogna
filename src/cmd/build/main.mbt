@@ -44,6 +44,15 @@ fn write_text(path : String, content : String) -> Result[Unit, @cli.CliError] {
 }
 
 ///|
+fn write_bytes(path : String, content : Bytes) -> Result[Unit, @cli.CliError] {
+  @fs.write_bytes_to_file(path, content) catch {
+    err =>
+      return Err(build_error("cannot write file \{path}: \{err.to_string()}"))
+  }
+  Ok(())
+}
+
+///|
 fn declaration_schema_json() -> Json {
   {
     "version": "ciq-declarations/v1",
@@ -67,21 +76,52 @@ fn manifest_json(
   declarations_sha : String,
   symbols_sha : String,
   commit : String,
+  opa_bundle_sha : String?,
+  policy_rules_sha : String?,
 ) -> Json {
-  {
-    "schemaVersion": "ciq-bundle/v1",
-    "purl": config.purl,
-    "profile": config.profile,
-    "declarationSchema": declaration_schema_json(),
-    "source": {
-      "repo": config.source.repo,
-      "ref": config.source.source_ref,
-      "commit": commit,
-    },
-    "artifacts": [
-      artifact_with_sha("declarations.ndjson.zst", "zstd", declarations_sha),
-      artifact_with_sha("symbols.ndjson.zst", "zstd", symbols_sha),
-    ],
+  let base_artifacts : Array[Json] = [
+    artifact_with_sha("declarations.ndjson.zst", "zstd", declarations_sha),
+    artifact_with_sha("symbols.ndjson.zst", "zstd", symbols_sha),
+  ]
+  if config.profile == "policy-bundle" {
+    match opa_bundle_sha {
+      Some(sha) =>
+        base_artifacts.push(artifact_with_sha("opa-bundle.tar.gz", "gzip", sha))
+      None => ()
+    }
+    match policy_rules_sha {
+      Some(sha) =>
+        base_artifacts.push(artifact_with_sha("policy.rules.json", "none", sha))
+      None => ()
+    }
+    {
+      "schemaVersion": "ciq-opa-bundle/v1",
+      "purl": config.purl,
+      "profile": config.profile,
+      "source": {
+        "repo": config.source.repo,
+        "ref": config.source.source_ref,
+        "commit": commit,
+      },
+      "opa": {
+        "entrypoint": "codeiq/compat/deny",
+        "format": "opa-bundle.tar.gz",
+      },
+      "artifacts": base_artifacts,
+    }
+  } else {
+    {
+      "schemaVersion": "ciq-bundle/v1",
+      "purl": config.purl,
+      "profile": config.profile,
+      "declarationSchema": declaration_schema_json(),
+      "source": {
+        "repo": config.source.repo,
+        "ref": config.source.source_ref,
+        "commit": commit,
+      },
+      "artifacts": base_artifacts,
+    }
   }
 }
 
@@ -112,28 +152,287 @@ fn metadata_json(config : @config.Config, extract : ExtractOutput) -> Json {
 }
 
 ///|
-fn checksums_text(declarations_sha : String, symbols_sha : String) -> String {
-  (
-    #|manifest.json  pending
-    #|declarations.ndjson.zst  
-    #|symbols.ndjson.zst  
-    #|metadata.json  pending
-    #|
-  )
-  .replace(
-    old="declarations.ndjson.zst  ",
-    new="declarations.ndjson.zst  \{declarations_sha}",
-  )
-  .replace(old="symbols.ndjson.zst  ", new="symbols.ndjson.zst  \{symbols_sha}")
+fn checksums_text(
+  manifest_sha : String,
+  declarations_sha : String,
+  symbols_sha : String,
+  metadata_sha : String,
+  opa_bundle_sha : String?,
+  policy_rules_sha : String?,
+) -> String {
+  let base = "manifest.json  \{manifest_sha}\n" +
+    "declarations.ndjson.zst  \{declarations_sha}\n" +
+    "symbols.ndjson.zst  \{symbols_sha}\n" +
+    "metadata.json  \{metadata_sha}\n"
+  let with_opa = match opa_bundle_sha {
+    Some(sha) => base + "opa-bundle.tar.gz  \{sha}\n"
+    None => base
+  }
+  match policy_rules_sha {
+    Some(sha) => with_opa + "policy.rules.json  \{sha}\n"
+    None => with_opa
+  }
 }
 
 ///|
-fn stable_checksum(text : String) -> String {
-  let mut acc = 0
-  for c in text {
-    acc = (acc * 131 + c.to_int()) % 1000000007
+fn sha256_hex(data : Bytes) -> String {
+  @sha256.sha256_hexdigest(data)
+}
+
+///|
+fn utf8_bytes(text : String) -> Bytes {
+  @utf8.encode(text)
+}
+
+///|
+fn decode_utf8_or_error(
+  data : Bytes,
+  path : String,
+) -> Result[String, @cli.CliError] {
+  let text = @utf8.decode(data) catch {
+    _ => return Err(build_error("cannot decode utf8 bytes in \{path}"))
   }
-  "stable-\{acc}"
+  Ok(text)
+}
+
+///|
+fn octal_field(value : Int, width : Int) -> String {
+  let digits = value.reinterpret_as_uint().to_string(radix=8)
+  if digits.length() + 1 >= width {
+    digits + "\u0000"
+  } else {
+    let padding = String::make(width - digits.length() - 1, '0')
+    padding + digits + "\u0000"
+  }
+}
+
+///|
+fn str_field(value : String, width : Int) -> String {
+  let bytes = @utf8.encode(value)
+  if bytes.length() >= width {
+    let truncated = bytes[:width].to_bytes()
+    let text_out = decode_utf8_or_error(truncated, "tar-header")
+    match text_out {
+      Ok(text) => text
+      Err(_) => value
+    }
+  } else {
+    let padding = String::make(width - bytes.length(), '\u0000')
+    value + padding
+  }
+}
+
+///|
+fn sum_header_bytes(header : Bytes) -> Int {
+  let mut total = 0
+  for i in 0..<header.length() {
+    total = total + header[i].to_int()
+  }
+  total
+}
+
+///|
+fn tar_header(name : String, size : Int) -> Bytes {
+  let name_field = str_field(name, 100)
+  let mode_field = octal_field(420, 8)
+  let uid_field = octal_field(0, 8)
+  let gid_field = octal_field(0, 8)
+  let size_field = octal_field(size, 12)
+  let mtime_field = octal_field(0, 12)
+  let checksum_placeholder = "        "
+  let type_flag = "0"
+  let link_name = str_field("", 100)
+  let magic = "ustar\u0000"
+  let version = "00"
+  let uname = str_field("", 32)
+  let gname = str_field("", 32)
+  let devmajor = octal_field(0, 8)
+  let devminor = octal_field(0, 8)
+  let prefix = str_field("", 155)
+  let pad = String::make(12, '\u0000')
+
+  let without_checksum = name_field +
+    mode_field +
+    uid_field +
+    gid_field +
+    size_field +
+    mtime_field +
+    checksum_placeholder +
+    type_flag +
+    link_name +
+    magic +
+    version +
+    uname +
+    gname +
+    devmajor +
+    devminor +
+    prefix +
+    pad
+
+  let bytes = @utf8.encode(without_checksum)
+  let checksum = sum_header_bytes(bytes)
+  let checksum_field = octal_field(checksum, 8)
+  let finalized = name_field +
+    mode_field +
+    uid_field +
+    gid_field +
+    size_field +
+    mtime_field +
+    checksum_field +
+    type_flag +
+    link_name +
+    magic +
+    version +
+    uname +
+    gname +
+    devmajor +
+    devminor +
+    prefix +
+    pad
+  @utf8.encode(finalized)
+}
+
+///|
+fn tar_entry(name : String, content : Bytes) -> Bytes {
+  let header = tar_header(name, content.length())
+  let payload = header.to_array()
+  let content_array = content.to_array()
+  for i in 0..<content_array.length() {
+    payload.push(content_array[i])
+  }
+  let remainder = content.length() % 512
+  if remainder != 0 {
+    let pad = 512 - remainder
+    for _ in 0..<pad {
+      payload.push(b'\x00')
+    }
+  }
+  Bytes::from_array(payload)
+}
+
+///|
+fn tar_archive(entries : Array[(String, Bytes)]) -> Bytes {
+  let out : Array[Byte] = []
+  for i in 0..<entries.length() {
+    let (name, content) = entries[i]
+    let entry_bytes = tar_entry(name, content).to_array()
+    for j in 0..<entry_bytes.length() {
+      out.push(entry_bytes[j])
+    }
+  }
+  for _ in 0..<1024 {
+    out.push(b'\x00')
+  }
+  Bytes::from_array(out)
+}
+
+///|
+fn build_tar_payload(
+  manifest_text : String,
+  declarations_compressed : Bytes,
+  symbols_compressed : Bytes,
+  metadata_text : String,
+  checksums : String,
+  opa_bundle : Bytes?,
+  policy_rules : String?,
+) -> Bytes {
+  let entries : Array[(String, Bytes)] = [
+    ("manifest.json", utf8_bytes(manifest_text)),
+    ("declarations.ndjson.zst", declarations_compressed),
+    ("symbols.ndjson.zst", symbols_compressed),
+    ("metadata.json", utf8_bytes(metadata_text)),
+    ("checksums.txt", utf8_bytes(checksums)),
+  ]
+  match opa_bundle {
+    Some(content) => entries.push(("opa-bundle.tar.gz", content))
+    None => ()
+  }
+  match policy_rules {
+    Some(content) => entries.push(("policy.rules.json", utf8_bytes(content)))
+    None => ()
+  }
+  tar_archive(entries)
+}
+
+///|
+fn default_policy_rules() -> String {
+  let rules : Json = {
+    "schemaVersion": "codeiq-policy-rules/v1",
+    "rules": [
+      {
+        "id": "compat.removed-public-api",
+        "kind": "removed",
+        "level": "error",
+        "message": "Removed public API requires compatibility review",
+      },
+      {
+        "id": "compat.changed-public-api",
+        "kind": "changed",
+        "level": "warning",
+        "message": "Changed public API requires compatibility review",
+      },
+      {
+        "id": "compat.deprecated-public-api",
+        "kind": "deprecated",
+        "level": "note",
+        "message": "Deprecated public API should be tracked",
+      },
+      {
+        "id": "compat.added-public-api",
+        "kind": "added",
+        "level": "note",
+        "message": "Added public API detected",
+      },
+    ],
+  }
+  rules.stringify(indent=2)
+}
+
+///|
+fn build_opa_bundle_tar_gz(
+  config : @config.Config,
+  repo : String,
+) -> Result[(Bytes, String), @cli.CliError] {
+  let rules = @fs.read_dir(repo) catch { _ => [] }
+  let rego_files : Array[String] = []
+  for i in 0..<rules.length() {
+    if rules[i].has_suffix(".rego") {
+      rego_files.push(rules[i])
+    }
+  }
+  let mut policy_text = "package codeiq.compat\n\ndefault deny = []\n"
+  if !rego_files.is_empty() {
+    policy_text = ""
+    for i in 0..<rego_files.length() {
+      let text = @fs.read_file_to_string("\{repo}/\{rego_files[i]}") catch {
+        _ =>
+          return Err(
+            build_error("cannot read policy file \{repo}/\{rego_files[i]}"),
+          )
+      }
+      policy_text = policy_text + text + "\n"
+    }
+  }
+
+  let policy_rules = default_policy_rules()
+  let manifest : Json = { "revision": config.purl, "roots": ["codeiq"] }
+  let tar_payload = tar_archive([
+    ("policy.rego", utf8_bytes(policy_text)),
+    ("data.json", utf8_bytes("{}\n")),
+    (".manifest", utf8_bytes(manifest.stringify(indent=2))),
+    ("policy.rules.json", utf8_bytes(policy_rules)),
+  ])
+  let gz = @gio.Buffer::new()
+  let writer = @gzip.Writer::new(gz)
+  let (_, write_out) = writer.write(@gio.Slice::new(tar_payload.to_array()))
+  guard write_out is None else {
+    return Err(build_error("cannot write opa bundle gzip payload"))
+  }
+  let close_out = writer.close()
+  guard close_out is None else {
+    return Err(build_error("cannot close opa bundle gzip writer"))
+  }
+  Ok((gz.to_bytes(), policy_rules))
 }
 
 ///|
@@ -145,47 +444,122 @@ fn write_bundle_skeleton(
   let extract_out = extract_lsp_baseline(config, repo)
   guard extract_out is Ok(extract) else { return Err(extract_out.unwrap_err()) }
 
-  let declarations_sha = stable_checksum(extract.declarations_text)
-  let symbols_sha = stable_checksum(extract.symbols_text)
+  let declarations_plain = utf8_bytes(extract.declarations_text)
+  let symbols_plain = utf8_bytes(extract.symbols_text)
+  let declarations_compressed = @zstd.compress(declarations_plain) catch {
+    _ => return Err(build_error("cannot compress declarations for \{repo}"))
+  }
+  let symbols_compressed = @zstd.compress(symbols_plain) catch {
+    _ => return Err(build_error("cannot compress symbols for \{repo}"))
+  }
+
+  let declarations_sha = sha256_hex(declarations_compressed)
+  let symbols_sha = sha256_hex(symbols_compressed)
+  let mut policy_rules_out : String? = None
+  let opa_bundle_out = if config.profile == "policy-bundle" {
+    let built = build_opa_bundle_tar_gz(config, repo)
+    match built {
+      Ok((bytes, rules)) => {
+        policy_rules_out = Some(rules)
+        Some(bytes)
+      }
+      Err(error) => return Err(error)
+    }
+  } else {
+    None
+  }
+  let opa_bundle_sha = match opa_bundle_out {
+    Some(bytes) => Some(sha256_hex(bytes))
+    None => None
+  }
+  let policy_rules_sha = match policy_rules_out {
+    Some(text) => Some(sha256_hex(utf8_bytes(text)))
+    None => None
+  }
   let manifest_object = manifest_json(
     config,
     declarations_sha,
     symbols_sha,
     extract.commit,
+    opa_bundle_sha,
+    policy_rules_sha,
   )
-  let manifest_valid = @schema.validate_ciq_bundle_v1(manifest_object)
+  let manifest_valid = if config.profile == "policy-bundle" {
+    @schema.validate_ciq_opa_bundle_v1(manifest_object)
+  } else {
+    @schema.validate_ciq_bundle_v1(manifest_object)
+  }
   guard manifest_valid is Ok(_) else {
+    let expected_schema = if config.profile == "policy-bundle" {
+      "ciq-opa-bundle/v1"
+    } else {
+      "ciq-bundle/v1"
+    }
     return Err(
       build_error(
-        "manifest does not satisfy ciq-bundle/v1 schema: \{manifest_valid.unwrap_err().to_string()}",
+        "manifest does not satisfy \{expected_schema} schema: \{manifest_valid.unwrap_err().to_string()}",
       ),
     )
   }
   let manifest = manifest_object.stringify(indent=2)
   let metadata = metadata_json(config, extract).stringify(indent=2)
+  let manifest_sha = sha256_hex(utf8_bytes(manifest))
+  let metadata_sha = sha256_hex(utf8_bytes(metadata))
+  let checksums = checksums_text(
+    manifest_sha, declarations_sha, symbols_sha, metadata_sha, opa_bundle_sha, policy_rules_sha,
+  )
 
   let dir_out = ensure_dir(dist_dir)
   guard dir_out is Ok(_) else { return Err(dir_out.unwrap_err()) }
 
   let manifest_out = write_text("\{dist_dir}/manifest.json", manifest)
   guard manifest_out is Ok(_) else { return Err(manifest_out.unwrap_err()) }
-  let decl_out = write_text(
+  let decl_out = write_bytes(
     "\{dist_dir}/declarations.ndjson.zst",
-    extract.declarations_text,
+    declarations_compressed,
   )
   guard decl_out is Ok(_) else { return Err(decl_out.unwrap_err()) }
-  let symbols_out = write_text(
+  let symbols_out = write_bytes(
     "\{dist_dir}/symbols.ndjson.zst",
-    extract.symbols_text,
+    symbols_compressed,
   )
   guard symbols_out is Ok(_) else { return Err(symbols_out.unwrap_err()) }
   let metadata_out = write_text("\{dist_dir}/metadata.json", metadata)
   guard metadata_out is Ok(_) else { return Err(metadata_out.unwrap_err()) }
-  let checksums_out = write_text(
-    "\{dist_dir}/checksums.txt",
-    checksums_text(declarations_sha, symbols_sha),
-  )
+  let checksums_out = write_text("\{dist_dir}/checksums.txt", checksums)
   guard checksums_out is Ok(_) else { return Err(checksums_out.unwrap_err()) }
+  if opa_bundle_out is Some(bundle_bytes) {
+    let opa_out = write_bytes("\{dist_dir}/opa-bundle.tar.gz", bundle_bytes)
+    guard opa_out is Ok(_) else { return Err(opa_out.unwrap_err()) }
+  }
+  if policy_rules_out is Some(rules_text) {
+    let rules_out = write_text("\{dist_dir}/policy.rules.json", rules_text)
+    guard rules_out is Ok(_) else { return Err(rules_out.unwrap_err()) }
+  }
+
+  let tar_payload = build_tar_payload(
+    manifest, declarations_compressed, symbols_compressed, metadata, checksums, opa_bundle_out,
+    policy_rules_out,
+  )
+  let gz = @gio.Buffer::new()
+  let writer = @gzip.Writer::new(gz)
+  let (_, write_out2) = writer.write(@gio.Slice::new(tar_payload.to_array()))
+  guard write_out2 is None else {
+    return Err(
+      build_error(
+        "cannot write gzip payload: \{write_out2.unwrap().to_string()}",
+      ),
+    )
+  }
+  let close_out = writer.close()
+  guard close_out is None else {
+    return Err(
+      build_error("cannot close gzip writer: \{close_out.unwrap().to_string()}"),
+    )
+  }
+
+  let bundle_out = write_bytes("\{dist_dir}/bundle.ciq.tgz", gz.to_bytes())
+  guard bundle_out is Ok(_) else { return Err(bundle_out.unwrap_err()) }
 
   Ok(())
 }

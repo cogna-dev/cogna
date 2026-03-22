@@ -1,13 +1,17 @@
 {
   "name": "yufeiminds/codeiq",
   "version": "0.1.0",
-  "source": "src",
   "deps": {
-    "moonbitlang/x": "0.4.41"
+    "moonbitlang/x": "0.4.41",
+    "shu-kitamura/sha256": "0.1.1",
+    "Milky2018/zstd": "0.1.0",
+    "gmlewis/gzip": "0.34.3",
+    "gmlewis/io": "0.23.3"
   },
   "readme": "README.md",
   "repository": "https://github.com/yufeiminds/codeiq",
   "license": "Apache-2.0",
   "keywords": [],
-  "description": "CodeIQ"
+  "description": "CodeIQ",
+  "source": "src"
 }
