@@ -17,6 +17,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/diff.json")
   remove_file_if_exists("\{repo}/dist/check.sarif.json")
   remove_file_if_exists("\{repo}/dist/policy.ciq.tgz")
+  @sys.unset_env_var("CODEIQ_OPA_EVAL_JSON")
   remove_dir_if_exists("\{repo}/dist")
   remove_dir_if_exists(repo)
 }
@@ -57,6 +58,29 @@ test "check generates sarif from diff and policy" {
   @fs.write_string_to_file(policy_path, "policy placeholder") catch {
     _ => abort("failed to write policy fixture")
   }
+  @sys.set_env_var(
+    "CODEIQ_OPA_EVAL_JSON",
+    (
+      #|{
+      #|  "result": [
+      #|    {
+      #|      "expressions": [
+      #|        {
+      #|          "value": [
+      #|            {
+      #|              "rule_id": "compat.removed-public-api",
+      #|              "level": "error",
+      #|              "message": "Public API removal blocked by policy",
+      #|              "path": "manifest.purl"
+      #|            }
+      #|          ]
+      #|        }
+      #|      ]
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
 
   let out = run({ diff_file: diff_path, policy_bundle: policy_path })
   guard out is Ok(result) else {
@@ -79,6 +103,8 @@ test "check generates sarif from diff and policy" {
   assert_true(sarif.contains("\"version\": \"2.1.0\""))
   assert_true(sarif.contains("\"name\": \"codeiq-check\""))
   assert_true(sarif.contains("\"ruleId\": \"compat.changed\""))
+  assert_true(sarif.contains("\"ruleId\": \"compat.removed-public-api\""))
+  assert_true(sarif.contains("Public API removal blocked by policy"))
 
   cleanup_tmp_repo(repo)
 }
@@ -107,6 +133,36 @@ test "check fails when policy bundle is missing" {
   let text = error.to_string()
   assert_true(text.contains("check failed:"))
   assert_true(text.contains("missing policy bundle file"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "check fails when opa output env json is invalid" {
+  let repo = "src/cmd/check/tmp_check_invalid_opa_json"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+
+  let diff_path = "\{repo}/dist/diff.json"
+  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  write_diff(
+    diff_path, "pkg:openapi/acme/payment-api@2026.03.01", "pkg:openapi/acme/payment-api@2026.04.01",
+  )
+  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
+    _ => abort("failed to write policy fixture")
+  }
+  @sys.set_env_var("CODEIQ_OPA_EVAL_JSON", "{")
+
+  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  guard out is Err(error) else {
+    cleanup_tmp_repo(repo)
+    fail("check should fail when CODEIQ_OPA_EVAL_JSON is invalid")
+  }
+
+  let text = error.to_string()
+  assert_true(text.contains("check failed:"))
+  assert_true(text.contains("invalid json in CODEIQ_OPA_EVAL_JSON"))
 
   cleanup_tmp_repo(repo)
 }

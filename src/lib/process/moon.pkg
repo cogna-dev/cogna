@@ -1,0 +1,11 @@
+import {
+}
+
+options(
+  "native-stub": [ "process_native.c" ],
+  targets: {
+    "js.mbt": [ "js" ],
+    "native.mbt": [ "native", "llvm" ],
+    "wasm.mbt": [ "wasm", "wasm-gc" ],
+  },
+)

@@ -47,6 +47,142 @@ fn ensure_file_exists(
 }
 
 ///|
+fn shell_escape(value : String) -> String {
+  let escaped = value.replace_all(old="'", new="'\"'\"'")
+  "'\{escaped}'"
+}
+
+///|
+fn policy_rules_from_opa_json(value : Json) -> Array[Json] {
+  guard value is Object(root) else { return [] }
+  guard root.get("result") is Some(Array(results)) else { return [] }
+  let out : Array[Json] = []
+  for i in 0..<results.length() {
+    guard results[i] is Object(result_object) else { continue }
+    guard result_object.get("expressions") is Some(Array(expressions)) else {
+      continue
+    }
+    for j in 0..<expressions.length() {
+      guard expressions[j] is Object(expression_object) else { continue }
+      guard expression_object.get("value") is Some(Array(items)) else {
+        continue
+      }
+      for k in 0..<items.length() {
+        if items[k] is Object(_) {
+          out.push(items[k])
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
+fn map_policy_level(level : String) -> String {
+  match level {
+    "error" => "error"
+    "warning" => "warning"
+    _ => "note"
+  }
+}
+
+///|
+fn rules_from_policy_results(policy_results : Array[Json]) -> Array[Json] {
+  let rules : Array[Json] = [
+    {
+      "id": "compat.changed",
+      "shortDescription": {
+        "text": "Compatibility change requires policy review",
+      },
+    },
+  ]
+  let seen : Map[String, Unit] = { "compat.changed": () }
+  for i in 0..<policy_results.length() {
+    guard policy_results[i] is Object(policy) else { continue }
+    guard policy.get("rule_id") is Some(String(rule_id)) else { continue }
+    if seen.contains(rule_id) {
+      continue
+    }
+    let message = match policy.get("message") {
+      Some(String(text)) => text
+      _ => "Policy rule triggered"
+    }
+    rules.push({ "id": rule_id, "shortDescription": { "text": message } })
+    seen[rule_id] = ()
+  }
+  rules
+}
+
+///|
+fn sarif_results_from_policy(policy_results : Array[Json]) -> Array[Json] {
+  let out : Array[Json] = []
+  for i in 0..<policy_results.length() {
+    guard policy_results[i] is Object(policy) else { continue }
+    let rule_id = match policy.get("rule_id") {
+      Some(String(value)) if value != "" => value
+      _ => "policy.generic"
+    }
+    let level = match policy.get("level") {
+      Some(String(value)) => map_policy_level(value)
+      _ => "warning"
+    }
+    let message = match policy.get("message") {
+      Some(String(value)) if value != "" => value
+      _ => "Policy decision triggered"
+    }
+    let path = match policy.get("path") {
+      Some(String(value)) if value != "" => value
+      _ => "unknown"
+    }
+    out.push({
+      "ruleId": rule_id,
+      "level": level,
+      "message": { "text": message },
+      "locations": [
+        {
+          "physicalLocation": {
+            "artifactLocation": { "uri": path },
+            "region": { "startLine": 1, "endLine": 1 },
+          },
+        },
+      ],
+    })
+  }
+  out
+}
+
+///|
+fn evaluate_policy_with_opa(
+  policy_bundle : String,
+  diff_file : String,
+) -> Result[Array[Json], @cli.CliError] {
+  let eval_json_override = @sys.get_env_var("CODEIQ_OPA_EVAL_JSON")
+  if eval_json_override is Some(text) {
+    let parsed = try? @json.parse(text)
+    guard parsed is Ok(value) else {
+      return Err(check_error("invalid json in CODEIQ_OPA_EVAL_JSON"))
+    }
+    return Ok(policy_rules_from_opa_json(value))
+  }
+
+  if !@fs.path_exists(policy_bundle) {
+    return Err(check_error("missing policy bundle file: \{policy_bundle}"))
+  }
+
+  let command = "opa eval --bundle \{shell_escape(policy_bundle)} --input \{shell_escape(diff_file)} --format json data.codeiq.compat.deny"
+  let (exit_code, stdout, stderr) = @process.run_command_capture(command)
+  if exit_code != 0 {
+    let details = if stderr != "" { stderr } else { stdout }
+    return Err(check_error("opa eval failed (exit \{exit_code}): \{details}"))
+  }
+  let parsed = try? @json.parse(stdout)
+  guard parsed is Ok(value) else {
+    return Err(check_error("opa eval returned non-json output"))
+  }
+  Ok(policy_rules_from_opa_json(value))
+}
+
+///|
 fn parent_dir(path : String) -> String {
   let parts = path.split("/").to_array()
   if parts.length() <= 1 {
@@ -124,7 +260,17 @@ fn sarif_results_from_diff(diff : Json) -> Array[Json] {
 }
 
 ///|
-fn sarif_from_diff(diff : Json, policy_bundle : String) -> Json {
+fn sarif_from_diff(
+  diff : Json,
+  policy_bundle : String,
+  policy_results : Array[Json],
+) -> Json {
+  let results = sarif_results_from_diff(diff)
+  let from_policy = sarif_results_from_policy(policy_results)
+  for i in 0..<from_policy.length() {
+    results.push(from_policy[i])
+  }
+
   {
     "version": "2.1.0",
     "runs": [
@@ -132,21 +278,14 @@ fn sarif_from_diff(diff : Json, policy_bundle : String) -> Json {
         "tool": {
           "driver": {
             "name": "codeiq-check",
-            "rules": [
-              {
-                "id": "compat.changed",
-                "shortDescription": {
-                  "text": "Compatibility change requires policy review",
-                },
-              },
-            ],
+            "rules": rules_from_policy_results(policy_results),
           },
         },
         "invocation": {
           "executionSuccessful": true,
           "commandLine": "codeiq check --policy \{policy_bundle}",
         },
-        "results": sarif_results_from_diff(diff),
+        "results": results,
       },
     ],
   }
@@ -173,8 +312,16 @@ pub fn run(params : CheckParams) -> @cli.CliResult[CheckResult, @cli.CliError] {
   let diff_shape_out = ensure_diff_shape(diff, params.diff_file)
   guard diff_shape_out is Ok(_) else { return Err(diff_shape_out.unwrap_err()) }
 
+  let policy_results_out = evaluate_policy_with_opa(
+    params.policy_bundle,
+    params.diff_file,
+  )
+  guard policy_results_out is Ok(policy_results) else {
+    return Err(policy_results_out.unwrap_err())
+  }
+
   let sarif_path = "\{parent_dir(params.diff_file)}/check.sarif.json"
-  let sarif = sarif_from_diff(diff, params.policy_bundle)
+  let sarif = sarif_from_diff(diff, params.policy_bundle, policy_results)
   let sarif_shape_out = @schema.validate_sarif_v2_1_0_min(sarif)
   guard sarif_shape_out is Ok(_) else {
     return Err(
