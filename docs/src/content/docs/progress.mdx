@@ -1,0 +1,176 @@
+---
+title: 开发进度看板
+description: 实时同步 CodeIQ 当前开发状态、覆盖进展与下一步计划。
+order: 6
+---
+
+# CodeIQ 开发进度看板
+
+> 最后更新时间：2026-03-22（Asia/Shanghai，第九次更新）
+
+这个页面用于给团队实时同步当前开发进展，重点关注：
+
+- 当前是否可用（是否通过构建与测试）
+- 各模块完成度与风险
+- 下一步执行计划
+
+## 全局状态总览
+
+| 维度 | 当前状态 | 进度 | 说明 |
+| --- | --- | --- | --- |
+| Build 命令（LSP Baseline） | ✅ 稳定可用 | 95% | 已落地真实 zstd 压缩、真实 SHA-256、git commit 解析与 `.ciq.tgz` 打包 |
+| 示例语料（examples） | ✅ 已扩充 | 85% | 四种 profile 语料已从最小样例扩展为“较完整”覆盖 |
+| 快照测试（snapshot） | ✅ 全通过 | 100% | 快照已更新，`snapshot_test` 通过 |
+| E2E 测试 | ✅ 全通过 | 100% | `lsp_extractor_test` 与 `src/e2e` 全通过 |
+| 全量测试与构建 | ✅ 全通过 | 100% | `moon test`、`just ci` 全部通过 |
+| 特性覆盖报告 | ✅ 已产出 | 80% | 已落地初版报告，后续可持续细化特性颗粒度 |
+| 全项目执行计划 | ✅ 已产出 | 100% | 已新增 `spec/plan.typ`，覆盖差距分析、依赖顺序与里程碑 |
+| CLI 契约对齐（build/diff/mcp） | ✅ 已对齐第一版 | 80% | `build/diff` 已要求 `repo` positional，`mcp status/stop` 已实现 |
+| Bundle Reader 共享层 | ✅ 已落地第二版 | 90% | 已支持读取并解压 `.ndjson.zst`，供 query/diff/mcp 复用 |
+| 声明级消费闭环（W5/W7/W8） | ✅ 已完成当前阶段 | 100% | diff/query/mcp 均已切换到真实 bundle 记录读取，placeholder 路径移除 |
+| 治理与分发闭环（W10-W14） | ✅ 已完成当前阶段 | 100% | `check` 已执行 OPA CLI 并将 policy decision 映射到 SARIF；`publish` 已接入本地 registry stub 上传链路 |
+| 抽取质量增强（W15-W16） | ✅ 已完成第一版 | 90% | build metadata 新增 LSP 子进程探测与 fallback 记录；声明记录已升级最小结构化 `shape/relations` |
+
+## 模块级进度表
+
+| 模块 | 状态 | 已完成 | 待推进 |
+| --- | --- | --- | --- |
+| `src/cmd/build/extractor.mbt` | 🟡 持续演进 | Go/Rust/Terraform/OpenAPI 提取分支增强，支持更多声明面 | 继续优化语义精度与归属关系建模 |
+| `examples/go-module` | 🟡 高覆盖 | package/import/type/func/method/const/var/group declarations | 泛型与更复杂嵌套场景可继续补充 |
+| `examples/rust-crate` | 🟡 高覆盖 | module/re-export/trait assoc items/impl/macro/deprecated/union 等 | 增补 proc-macro 与更复杂可见性链路 |
+| `examples/terraform-module` | 🟡 高覆盖 | provider/module/resource/data/variable/output/check/dynamic/meta-args/lifecycle | 深化 provider-specific schema 语义对齐 |
+| `examples/openapi-spec` | 🟡 高覆盖 | paths/webhooks/operationId/components/composition/security/callbacks/refs | 引入 AST 级语义解析与 ref 解析链路 |
+| `src/cmd/build/snapshot_test.mbt` | ✅ 稳定 | 已绑定 examples 语料，自动校验快照一致性 | 后续可增加“覆盖率阈值断言” |
+| `src/e2e/lsp_extractor_test.mbt` | ✅ 稳定 | E2E 持续验证 baseline 元数据与产物结构 | 可扩展更多 profile 级 E2E 用例 |
+| `src/cmd/bundle/reader.mbt` | 🟡 新增 | 提供 manifest/schema 校验、local artifact 读取、ndjson 解析 | 后续接入真实 zstd 解压与 tarball 读取 |
+| `src/cmd/query/main.mbt` | ✅ 本阶段完成 | 已基于真实 bundle records 返回查询结果，移除 placeholder signature/skeleton id fallback | 后续可扩展 selector 维度（name/namespace/docs） |
+| `src/cmd/mcp/main.mbt` | ✅ 本阶段完成 | `mcp start` 新增 stdio 读取路径，tools/list + tools/call 复用真实 query backend | 后续可增强长连接生命周期与多请求并发模型 |
+| `src/cmd/main/main.mbt` | ✅ 本阶段完成 | `mcp start` 参数新增 `--stdio`（默认 true）并完成 parse 覆盖 | 后续继续对齐 docs 的命令示例与参数说明 |
+| `src/cmd/check/main.mbt` | ✅ 已升级 | 已接入 `opa eval --bundle --input --format json`，并把 policy decision 合并到 SARIF rules/results | 后续可继续完善 policy 数据模型与 rule metadata |
+| `src/cmd/publish/main.mbt` | ✅ 已升级 | 已接入 `codeiq-registry-upload/v1` 请求生成、本地 registry stub 上传、`codeiq-publish-receipt/v1` 校验 | 后续可替换为远端 Registry HTTP client |
+| `src/cmd/build/main.mbt` | ✅ 关键升级完成 | 已从 placeholder 产物切换到真实压缩/摘要/打包流程（zstd + sha256 + tgz） | 后续可补充 tarball 内容结构一致性校验与可复现构建策略 |
+| `src/cmd/build/extractor.mbt` | ✅ 本阶段完成 | 已支持 LSP server 可用性探测（gopls/rust-analyzer/terraform-ls）并写入 metadata `version/fallback`，并升级最小结构化 `shape/relations` | 后续可演进为真实 LSP 结果合并与更细粒度 relation 图 |
+| `spec/plan.typ` | ✅ 已更新第八版 | 已按 proposal 与当前代码现实重排里程碑并标注 W1-W17 实际状态 | 后续随 W11/W12/W14 实施进度持续滚动 |
+
+## 验证状态（最近一次）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `moon fmt && moon check` | ✅ 通过 | 格式与类型检查通过 |
+| `moon test src/cmd/build/snapshot_test.mbt` | ✅ 通过 | 4/4 通过 |
+| `moon test src/e2e/lsp_extractor_test.mbt` | ✅ 通过 | 1/1 通过 |
+| `moon test src/e2e` | ✅ 通过 | 9/9 通过 |
+| `moon test` | ✅ 通过 | 77/77 通过 |
+| `just ci` | ✅ 通过 | check/format-check/test/build 全通过 |
+
+### 本轮增量验证（第四次更新）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `moon test src/cmd/query/main_test.mbt` | ✅ 通过 | 3/3 通过（修复 query schema 后） |
+| `moon test src/cmd/mcp/main_test.mbt` | ✅ 通过 | 13/13 通过 |
+| `moon test src/cmd/main/parse_test.mbt` | ✅ 通过 | 7/7 通过 |
+| `moon test src/cmd/diff/main_test.mbt` | ✅ 通过 | 2/2 通过（修复错误消息路径插值后） |
+| `moon test src/cmd/bundle/reader_test.mbt` | ✅ 通过 | 2/2 通过 |
+| `moon check && moon test && just ci` | ✅ 通过 | 全量 66/66，通过 CI 脚本所有步骤 |
+
+### 本轮增量验证（第五次更新，P0 W1-W4）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `moon test src/cmd/build/main_test.mbt` | ✅ 通过 | 2/2 通过（校验真实 sha256、zstd 解压、bundle 产物存在） |
+| `moon test src/cmd/build/snapshot_test.mbt` | ✅ 通过 | 4/4 通过（快照比对改为先解压 `.ndjson.zst`） |
+| `moon test src/cmd/bundle/reader_test.mbt` | ✅ 通过 | 2/2 通过（fixture 改为真实 zstd 压缩） |
+| `moon test src/cmd/query/main_test.mbt` | ✅ 通过 | 3/3 通过（query fixture 改为真实 zstd） |
+| `moon test src/e2e/lsp_extractor_test.mbt` | ✅ 通过 | 1/1 通过（e2e 读取 zstd 并验证 bundle） |
+| `moon test src/e2e/init_test.mbt` | ✅ 通过 | 8/8 通过（去除 checksums pending 断言） |
+| `moon fmt && moon check && moon test && just ci` | ✅ 通过 | 全量 66/66，format-check/check/test/build 全通过 |
+
+### 本轮增量验证（第六次更新，P1 W5/W7/W8）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `moon check` | ✅ 通过 | 声明级 diff / query backend / mcp stdio 相关代码通过类型检查 |
+| `moon test src/cmd/diff/main_test.mbt` | ✅ 通过 | 新增声明级 diff fixture 验证 added/removed/changed |
+| `moon test src/cmd/query/main_test.mbt` | ✅ 通过 | 验证无匹配返回空 matches；符号匹配走真实 symbols |
+| `moon test src/cmd/mcp/main_test.mbt` | ✅ 通过 | tools/call 与 outlines 查询改为真实 bundle 数据；新增 stdio parse error 测试 |
+| `moon test src/cmd/main/parse_test.mbt` | ✅ 通过 | 覆盖 `mcp start --stdio` 参数解析 |
+| `moon test src/e2e/init_test.mbt` | ✅ 通过 | e2e diff/check/query 断言已与声明级语义对齐 |
+| `moon test` | ✅ 通过 | 69/69 通过 |
+| `moon build` | ✅ 通过 | 编译通过 |
+| `just ci` | ✅ 通过 | check/format-check/test/build 全通过 |
+
+## 下阶段计划（滚动）
+
+完整路线图与差距分析见 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ)，以下为摘要。
+
+| 优先级 | 工作项 | 计划动作 |
+| --- | --- | --- |
+| P0 | 真实 SHA-256 摘要（W1） | ✅ 已完成：manifest/declarations/symbols/metadata 全量写入真实 SHA-256 |
+| P0 | 真实 zstd 压缩（W2） | ✅ 已完成：declarations/symbols 产物改为真实 zstd 压缩，reader/query/快照测试已对齐 |
+| P0 | git commit 解析（W3） | ✅ 已完成：extractor 从 `.git/HEAD` 与 ref 文件读取 commit，不再固定 `unknown` |
+| P0 | `.ciq.tgz` 打包（W4） | ✅ 已完成：build 生成 `dist/bundle.ciq.tgz`，并纳入测试验证 |
+| P1 | 声明级 diff（W5） | ✅ 已完成：diff 基于 declarations/symbols 记录生成 summary 与 changes |
+| P1 | 真实 bundle 检索（W7） | ✅ 已完成：query 统一通过 bundle records 检索，移除 placeholder fallback |
+| P1 | MCP stdio 服务器循环（W8） | ✅ 已完成第一版：mcp start 默认进入 stdio 输入读取并输出 JSON-RPC 响应 |
+| P2 | OPA Bundle 格式与 build 路径（W10） | ✅ 已完成第一版：新增 `policy-bundle` profile、`ciq-opa-bundle/v1` manifest、`opa-bundle.tar.gz` 与 `policy.rules.json` 产物及校验 |
+| P2 | OPA policy 执行（W11） | ✅ 已完成：check 执行 OPA CLI，policy decision 驱动 SARIF |
+| P2 | Registry API contract + 本地 stub（W12） | ✅ 已完成：schema contract + `src/cmd/registry` 本地 stub + publish 接线完成 |
+| P2 | Docs/Spec/CLI 对齐（W13） | 🟡 持续进行：根据当前代码现实滚动修订计划与进度看板 |
+| P2 | Registry 上传（W14） | ✅ 已完成当前阶段：publish 通过 registry stub 产出不可变 receipt（schema 校验） |
+| P2 | CLI 参数补齐（W6 剩余） | ✅ 已完成：`diff --since --test-changes` 参数与输出字段全链路落地 |
+| P3 | LSP 增强抽取（W15） | ✅ 已完成第一版：build metadata 记录 LSP 子进程探测与 fallback |
+| P3 | shape 类型系统（W16） | ✅ 已完成第一版：声明记录写入最小结构化 shape/subkind/form/relations |
+
+## 本轮新增产物
+
+| 产物 | 状态 | 说明 |
+| --- | --- | --- |
+| `spec/plan.typ` | ✅ 新增 | 对当前仓库完成度、设计漂移、优先级与里程碑做了完整规划 |
+| `progress.mdx` | ✅ 已更新 | 已同步计划文档状态，并将其纳入后续固定跟踪入口 |
+
+### 本轮增量验证（第七次更新，P2 W10 第一版）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `moon test src/schema/contracts_test.mbt` | ✅ 通过 | 新增 `ciq-opa-bundle/v1`、registry upload、publish receipt schema 测试 |
+| `moon test src/cmd/build/main_test.mbt` | ✅ 通过 | 新增 policy-bundle 构建测试，校验 `opa-bundle.tar.gz`/`policy.rules.json` 与 manifest 字段 |
+| `moon fmt && moon check` | ✅ 通过 | W10 改动后格式化与类型检查通过 |
+| `moon test` | ✅ 通过 | 全量 73/73 通过 |
+| `moon build` | ✅ 通过 | 编译通过 |
+| `just ci` | ✅ 通过 | check/format-check/test/build 全通过 |
+
+### 本轮增量验证（第八次更新，计划与进度对齐）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `spec/proposal.typ` 二次审查 | ✅ 完成 | 重新核对 OPA 执行、Registry 上传、MCP 生命周期与当前代码边界 |
+| `spec/plan.typ` 更新 | ✅ 完成 | 将 W1-W17 显式标注为 ✅/🟡/⏳，并重排当下执行计划 |
+| `docs/progress.mdx` 更新 | ✅ 完成 | 同步第八次更新状态与下一阶段重点（W11/W12/W14） |
+
+### 本轮增量验证（第九次更新，W6/W11/W12/W14/W15/W16 收口）
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `moon test src/cmd/check/main_test.mbt` | ✅ 通过 | 3/3 通过（含 OPA env override 错误路径） |
+| `moon test src/cmd/publish/main_test.mbt` | ✅ 通过 | 2/2 通过（publish 走 registry stub + receipt schema） |
+| `moon test src/cmd/diff/main_test.mbt` | ✅ 通过 | 3/3 通过（新增 since/test-changes 输出断言） |
+| `moon test src/cmd/main/parse_test.mbt` | ✅ 通过 | 9/9 通过（新增 diff 选项解析断言） |
+| `moon test src/cmd/build/main_test.mbt` | ✅ 通过 | 4/4 通过（新增 LSP fallback metadata 断言） |
+| `moon test src/cmd/build/snapshot_test.mbt` | ✅ 通过 | 4/4 通过（shape/relations 结构升级后快照已刷新） |
+| `moon test src/e2e/lsp_extractor_test.mbt` | ✅ 通过 | 1/1 通过（metadata 与 declarations 新字段断言） |
+| `moon test && moon check && moon build && just ci` | ✅ 通过 | 全量 77/77，通过 check/format-check/test/build |
+
+## 维护规则（执行约束）
+
+| 规则 | 要求 |
+| --- | --- |
+| 开发周期结束后必须更新看板 | 每次开发任务完成后，必须同步更新本页面状态、验证结果与下一步计划 |
+| 更新时间必须明确 | 页面顶部“最后更新时间”需要与本次更新一致 |
+| 结果必须可追溯 | 进度与结论应以实际测试/构建结果为依据，避免主观状态描述 |
+
+## 相关文档
+
+- [索引与紧凑上下文](/docs/indexing)
+- [CLI 参考](/docs/cli)
+- [MCP 工作流](/docs/mcp)

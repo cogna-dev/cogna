@@ -14,7 +14,7 @@ order: 2
 4. 按需做一次性查询或启动 MCP。
 5. 如果需要团队共享，再发布到 Registry。
 
-> 下面的命令与行为来自当前项目计划，适合作为最终用户文档预览。命令名已经明确，参数与输出格式可能会在实现阶段继续收敛。
+> 下面命令与行为基于当前已落地实现（含 OPA CLI 执行、本地 registry stub 上传、diff 可选参数）。
 
 ## 1. 初始化
 
@@ -43,12 +43,13 @@ CodeIQ 当前重点关注以下类型的信息：
 
 ```bash
 codeiq diff ./sdk
+codeiq diff ./sdk --since 2026-03-01T00:00:00Z --test-changes true
 codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
 ```
 
 这两步的目标是：
 
-- 先把当前版本与基线版本的声明差异抽取成 `CIQ Diff`
+- 先把当前版本与基线版本的声明差异抽取成 `CIQ Diff`（可附带 `since/testChanges` 字段）
 - 再结合本地 `CIQ OPA Bundle` 执行策略检查，并输出 `SARIF`
 
 这条路径特别适合 SDK 发版、OpenAPI 演进或 Terraform Module 变更前的兼容性门禁。
@@ -87,7 +88,7 @@ codeiq mcp stop
 codeiq publish ./dist/tokio@1.43.0.ciq.tgz
 ```
 
-如果你希望同一份 bundle 被多人、多个工具或多台机器复用，那么可以把它发布到 `CodeIQ Registry`。
+如果你希望同一份 bundle 被多人、多个工具或多台机器复用，那么可以把它发布到 Registry。当前默认链路会先写入本地 stub（`.codeiq/registry`），并生成不可变 publish receipt。
 
 ## 推荐的第一条验证路径
 
