@@ -11,7 +11,9 @@ pub fn ciq_config_v1_schema() -> @json_schema.JsonSchema {
       "schemaVersion": { "type": "string", "const": "ciq-config/v1" },
       "profile": {
         "type": "string",
-        "enum": ["go-module", "rust-crate", "terraform-module", "openapi-spec"],
+        "enum": [
+          "go-module", "rust-crate", "terraform-module", "openapi-spec", "policy-bundle",
+        ],
       },
       "purl": { "type": "string", "minLength": 1 },
       "source": {

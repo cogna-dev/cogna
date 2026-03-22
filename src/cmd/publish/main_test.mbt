@@ -15,7 +15,15 @@ fn remove_dir_if_exists(path : String) -> Unit {
 ///|
 fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/bundle.ciq.tgz")
+  remove_file_if_exists("\{repo}/dist/manifest.json")
   remove_file_if_exists("\{repo}/dist/publish.json")
+  remove_file_if_exists(
+    ".codeiq/registry/index/pkg_generic_local_bundle_0.json",
+  )
+  remove_dir_if_exists(".codeiq/registry/index")
+  remove_dir_if_exists(".codeiq/registry/bundles")
+  remove_dir_if_exists(".codeiq/registry")
+  remove_dir_if_exists(".codeiq")
   remove_dir_if_exists("\{repo}/dist")
   remove_dir_if_exists(repo)
 }
@@ -50,9 +58,15 @@ test "publish generates local publish receipt" {
       ""
     }
   }
-  assert_true(receipt.contains("\"publishId\": \"pub-skeleton-001\""))
+  assert_true(
+    receipt.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""),
+  )
+  assert_true(receipt.contains("\"publishId\":"))
   assert_true(receipt.contains("\"bundleType\": \"ciq-bundle\""))
-  assert_true(receipt.contains("\"status\": \"published-local-skeleton\""))
+  assert_true(
+    receipt.contains("\"status\": \"published\"") ||
+    receipt.contains("\"status\": \"already-exists\""),
+  )
 
   cleanup_tmp_repo(repo)
 }

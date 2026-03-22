@@ -115,6 +115,7 @@ pub fn ciq_query_v1_schema() -> @json_schema.JsonSchema {
         },
         "additionalProperties": true,
       },
+      "repo": { "type": "string", "minLength": 1 },
       "intent": { "type": "string" },
     },
     "additionalProperties": false,
@@ -152,6 +153,108 @@ pub fn ciq_result_v1_schema() -> @json_schema.JsonSchema {
           "additionalProperties": false,
         },
       },
+    },
+    "additionalProperties": false,
+  }
+}
+
+///|
+pub fn ciq_opa_bundle_v1_schema() -> @json_schema.JsonSchema {
+  {
+    "type": "object",
+    "required": ["schemaVersion", "purl", "profile", "source", "artifacts"],
+    "properties": {
+      "schemaVersion": { "type": "string", "const": "ciq-opa-bundle/v1" },
+      "purl": { "type": "string", "minLength": 1 },
+      "profile": { "type": "string", "const": "policy-bundle" },
+      "source": {
+        "type": "object",
+        "required": ["repo", "ref", "commit"],
+        "properties": {
+          "repo": { "type": "string", "minLength": 1 },
+          "ref": { "type": "string", "minLength": 1 },
+          "commit": { "type": "string", "minLength": 1 },
+        },
+        "additionalProperties": false,
+      },
+      "opa": {
+        "type": "object",
+        "required": ["entrypoint", "format"],
+        "properties": {
+          "entrypoint": { "type": "string", "minLength": 1 },
+          "format": { "type": "string", "const": "opa-bundle.tar.gz" },
+        },
+        "additionalProperties": false,
+      },
+      "artifacts": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["path", "sha256", "compression"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "minLength": 1 },
+            "compression": { "type": "string", "minLength": 1 },
+          },
+          "additionalProperties": false,
+        },
+      },
+    },
+    "additionalProperties": false,
+  }
+}
+
+///|
+pub fn codeiq_registry_upload_v1_schema() -> @json_schema.JsonSchema {
+  {
+    "type": "object",
+    "required": [
+      "schemaVersion", "endpoint", "bundleFile", "bundleType", "purl", "digest",
+      "size",
+    ],
+    "properties": {
+      "schemaVersion": {
+        "type": "string",
+        "const": "codeiq-registry-upload/v1",
+      },
+      "endpoint": { "type": "string", "const": "POST /api/v1/bundles" },
+      "bundleFile": { "type": "string", "minLength": 1 },
+      "bundleType": {
+        "type": "string",
+        "enum": ["ciq-bundle", "ciq-opa-bundle"],
+      },
+      "purl": { "type": "string", "minLength": 1 },
+      "digest": { "type": "string", "minLength": 1 },
+      "size": { "type": "integer" },
+    },
+    "additionalProperties": false,
+  }
+}
+
+///|
+pub fn codeiq_publish_receipt_v1_schema() -> @json_schema.JsonSchema {
+  {
+    "type": "object",
+    "required": [
+      "schemaVersion", "publishId", "bundleId", "purl", "digest", "bundleType", "downloadUrl",
+      "status",
+    ],
+    "properties": {
+      "schemaVersion": {
+        "type": "string",
+        "const": "codeiq-publish-receipt/v1",
+      },
+      "publishId": { "type": "string", "minLength": 1 },
+      "bundleId": { "type": "string", "minLength": 1 },
+      "purl": { "type": "string", "minLength": 1 },
+      "digest": { "type": "string", "minLength": 1 },
+      "bundleType": {
+        "type": "string",
+        "enum": ["ciq-bundle", "ciq-opa-bundle"],
+      },
+      "downloadUrl": { "type": "string", "minLength": 1 },
+      "status": { "type": "string", "enum": ["published", "already-exists"] },
     },
     "additionalProperties": false,
   }
@@ -263,6 +366,27 @@ pub fn validate_ciq_result_v1(
   instance : Json,
 ) -> Result[Unit, @json_schema.SchemaError] {
   @json_schema.validate_json(ciq_result_v1_schema(), instance)
+}
+
+///|
+pub fn validate_ciq_opa_bundle_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(ciq_opa_bundle_v1_schema(), instance)
+}
+
+///|
+pub fn validate_codeiq_registry_upload_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(codeiq_registry_upload_v1_schema(), instance)
+}
+
+///|
+pub fn validate_codeiq_publish_receipt_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(codeiq_publish_receipt_v1_schema(), instance)
 }
 
 ///|

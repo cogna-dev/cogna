@@ -1,8 +1,6 @@
 import {
-  "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "shu-kitamura/sha256" @sha256,
-  "yufeiminds/codeiq/cmd/registry" @registry,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
 }
