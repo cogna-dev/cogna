@@ -1,6 +1,13 @@
 import {
+  "yufeiminds/codeiq/cmd/bundle" @bundle,
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
 }
+
+import {
+  "Milky2018/zstd" @zstd,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "shu-kitamura/sha256" @sha256,
+} for "test"

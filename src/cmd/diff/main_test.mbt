@@ -15,7 +15,11 @@ fn remove_dir_if_exists(path : String) -> Unit {
 ///|
 fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/base/manifest.json")
+  remove_file_if_exists("\{repo}/dist/base/declarations.ndjson.zst")
+  remove_file_if_exists("\{repo}/dist/base/symbols.ndjson.zst")
   remove_file_if_exists("\{repo}/dist/target/manifest.json")
+  remove_file_if_exists("\{repo}/dist/target/declarations.ndjson.zst")
+  remove_file_if_exists("\{repo}/dist/target/symbols.ndjson.zst")
   remove_file_if_exists("\{repo}/dist/diff.json")
   remove_dir_if_exists("\{repo}/dist/base")
   remove_dir_if_exists("\{repo}/dist/target")
@@ -25,6 +29,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 
 ///|
 fn write_manifest(path : String, purl : String, profile : String) -> Unit {
+  let sha = @sha256.sha256_hexdigest(@utf8.encode("fixture"))
   let content : Json = {
     "schemaVersion": "ciq-bundle/v1",
     "purl": purl,
@@ -37,18 +42,28 @@ fn write_manifest(path : String, purl : String, profile : String) -> Unit {
     "source": {
       "repo": "https://github.com/acme/payment-api",
       "ref": "main",
-      "commit": "unknown",
+      "commit": "1234567890abcdef1234567890abcdef12345678",
     },
     "artifacts": [
       {
         "path": "declarations.ndjson.zst",
-        "sha256": "placeholder",
+        "sha256": sha,
         "compression": "zstd",
       },
     ],
   }
   @fs.write_string_to_file(path, content.stringify(indent=2)) catch {
     _ => abort("failed to write manifest fixture")
+  }
+}
+
+///|
+fn write_records(path : String, lines : String) -> Unit {
+  let compressed = @zstd.compress(@utf8.encode(lines)) catch {
+    _ => abort("failed to compress records fixture")
+  }
+  @fs.write_bytes_to_file(path, compressed) catch {
+    _ => abort("failed to write records fixture")
   }
 }
 
@@ -72,7 +87,30 @@ test "diff generates skeleton diff output" {
     "openapi-spec",
   )
 
-  let out = run({ repo, })
+  let base_declarations =
+    #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|{"id":"decl:payment:remove","kind":"operation","path":"openapi/payment.yaml","signature":"operation removePayment","location":{"uri":"openapi/payment.yaml","startLine":30,"endLine":40}}
+    #|
+  let base_symbols =
+    #|{"id":"sym:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
+    #|
+  let target_declarations =
+    #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPaymentV2","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|{"id":"decl:payment:add","kind":"operation","path":"openapi/payment.yaml","signature":"operation addPayment","location":{"uri":"openapi/payment.yaml","startLine":50,"endLine":60}}
+    #|
+  let target_symbols =
+    #|{"id":"sym:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
+    #|
+
+  write_records("\{repo}/dist/base/declarations.ndjson.zst", base_declarations)
+  write_records("\{repo}/dist/base/symbols.ndjson.zst", base_symbols)
+  write_records(
+    "\{repo}/dist/target/declarations.ndjson.zst",
+    target_declarations,
+  )
+  write_records("\{repo}/dist/target/symbols.ndjson.zst", target_symbols)
+
+  let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(result) else {
     cleanup_tmp_repo(repo)
     fail("diff should succeed")
@@ -80,7 +118,7 @@ test "diff generates skeleton diff output" {
 
   inspect(
     result.display(),
-    content="Generated CIQ diff skeleton at src/cmd/diff/tmp_diff_repo/dist/diff.json",
+    content="Generated CIQ declaration diff at src/cmd/diff/tmp_diff_repo/dist/diff.json",
   )
 
   let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {
@@ -102,7 +140,12 @@ test "diff generates skeleton diff output" {
       "\"targetPurl\": \"pkg:openapi/acme/payment-api@2026.04.01\"",
     ),
   )
-  assert_true(diff_text.contains("\"id\": \"manifest:purl\""))
+  assert_true(diff_text.contains("\"kind\": \"added\""))
+  assert_true(diff_text.contains("\"kind\": \"removed\""))
+  assert_true(diff_text.contains("\"kind\": \"changed\""))
+  assert_true(diff_text.contains("\"decl:payment:add\""))
+  assert_true(diff_text.contains("\"decl:payment:remove\""))
+  assert_true(diff_text.contains("\"decl:payment:create\""))
 
   cleanup_tmp_repo(repo)
 }
@@ -120,7 +163,7 @@ test "diff fails when base manifest is missing" {
     "openapi-spec",
   )
 
-  let out = run({ repo, })
+  let out = run({ repo, since: None, include_test_changes: false })
   guard out is Err(error) else {
     cleanup_tmp_repo(repo)
     fail("diff should fail when base manifest is missing")
@@ -129,6 +172,60 @@ test "diff fails when base manifest is missing" {
   let text = error.to_string()
   assert_true(text.contains("diff failed:"))
   assert_true(text.contains("base/manifest.json"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "diff includes since and test changes fields when requested" {
+  let repo = "src/cmd/diff/tmp_diff_since_test_changes"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+  @fs.create_dir("\{repo}/dist/base")
+  @fs.create_dir("\{repo}/dist/target")
+
+  write_manifest(
+    "\{repo}/dist/base/manifest.json",
+    "pkg:openapi/acme/payment-api@2026.03.01",
+    "openapi-spec",
+  )
+  write_manifest(
+    "\{repo}/dist/target/manifest.json",
+    "pkg:openapi/acme/payment-api@2026.04.01",
+    "openapi-spec",
+  )
+
+  let records =
+    #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|
+  write_records("\{repo}/dist/base/declarations.ndjson.zst", records)
+  write_records("\{repo}/dist/base/symbols.ndjson.zst", records)
+  write_records("\{repo}/dist/target/declarations.ndjson.zst", records)
+  write_records("\{repo}/dist/target/symbols.ndjson.zst", records)
+
+  let out = run({
+    repo,
+    since: Some("2026-03-01T00:00:00Z"),
+    include_test_changes: true,
+  })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("diff should succeed with since and test-changes")
+  }
+
+  let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("diff output should exist")
+      ""
+    }
+  }
+
+  assert_true(diff_text.contains("\"since\": \"2026-03-01T00:00:00Z\""))
+  assert_true(diff_text.contains("\"includeTestChanges\": true"))
+  assert_true(diff_text.contains("\"testSummary\""))
+  assert_true(diff_text.contains("\"testChanges\": []"))
 
   cleanup_tmp_repo(repo)
 }

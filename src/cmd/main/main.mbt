@@ -7,6 +7,8 @@ pub(all) enum CliInvocation {
   Query(@query_cmd.QueryParams)
   Publish(@publish_cmd.PublishParams)
   McpStart(@mcp_cmd.McpStartParams)
+  McpStatus
+  McpStop
 } derive(Show, Eq)
 
 ///|
@@ -50,8 +52,35 @@ fn parse_invocation(
           default_values=["./codeiq.yaml"],
         ),
       ]),
-      @argparse.Command::new("build", about="Build CIQ bundle"),
-      @argparse.Command::new("diff", about="Compute CIQ diff"),
+      @argparse.Command::new("build", about="Build CIQ bundle", positionals=[
+        @argparse.PositionArg::new(
+          "repo",
+          num_args=@argparse.ValueRange::single(),
+        ),
+      ]),
+      @argparse.Command::new(
+        "diff",
+        about="Compute CIQ diff",
+        positionals=[
+          @argparse.PositionArg::new(
+            "repo",
+            num_args=@argparse.ValueRange::single(),
+          ),
+        ],
+        options=[
+          @argparse.OptionArg::new(
+            "since",
+            long="since",
+            action=@argparse.OptionAction::Set,
+          ),
+          @argparse.OptionArg::new(
+            "test-changes",
+            long="test-changes",
+            action=@argparse.OptionAction::Set,
+            default_values=["false"],
+          ),
+        ],
+      ),
       @argparse.Command::new(
         "check",
         about="Run policy checks",
@@ -93,7 +122,15 @@ fn parse_invocation(
               action=@argparse.OptionAction::Set,
               default_values=["3000"],
             ),
+            @argparse.OptionArg::new(
+              "stdio",
+              long="stdio",
+              action=@argparse.OptionAction::Set,
+              default_values=["true"],
+            ),
           ]),
+          @argparse.Command::new("status", about="Show MCP agent status"),
+          @argparse.Command::new("stop", about="Stop MCP agent"),
         ],
         subcommand_required=true,
       ),
@@ -110,8 +147,28 @@ fn parse_invocation(
       let output_path = output_values[0]
       Ok(Init(@init_cmd.InitParams::{ output_path, }))
     }
-    Some(("build", _)) => Ok(Build(@build_cmd.BuildParams::{ repo: "./" }))
-    Some(("diff", _)) => Ok(Diff(@diff_cmd.DiffParams::{ repo: "./" }))
+    Some(("build", build_matches)) => {
+      let repo_values = build_matches.values["repo"]
+      Ok(Build(@build_cmd.BuildParams::{ repo: repo_values[0] }))
+    }
+    Some(("diff", diff_matches)) => {
+      let repo_values = diff_matches.values["repo"]
+      let since = match diff_matches.values.get("since") {
+        Some(values) if !values.is_empty() => Some(values[0])
+        _ => None
+      }
+      let include_test_changes = match diff_matches.values.get("test-changes") {
+        Some(values) if !values.is_empty() => values[0] == "true"
+        _ => false
+      }
+      Ok(
+        Diff(@diff_cmd.DiffParams::{
+          repo: repo_values[0],
+          since,
+          include_test_changes,
+        }),
+      )
+    }
     Some(("check", check_matches)) => {
       let diff_values = check_matches.values["diff_file"]
       let policy_values = check_matches.values["policy"]
@@ -137,8 +194,12 @@ fn parse_invocation(
           guard parsed_port is Ok(port) else {
             return Err(@cli.usage_error("--port must be an integer"))
           }
-          Ok(McpStart(@mcp_cmd.McpStartParams::{ port, }))
+          let stdio_values = start_matches.values["stdio"]
+          let stdio = stdio_values[0] == "true"
+          Ok(McpStart(@mcp_cmd.McpStartParams::{ port, stdio }))
         }
+        Some(("status", _)) => Ok(McpStatus)
+        Some(("stop", _)) => Ok(McpStop)
         _ => Err(@cli.usage_error(command.render_help()))
       }
     _ => Err(@cli.usage_error(command.render_help()))
@@ -187,6 +248,16 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
       }
     McpStart(params) =>
       match @mcp_cmd.run_start(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    McpStatus =>
+      match @mcp_cmd.run_status() {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    McpStop =>
+      match @mcp_cmd.run_stop() {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
