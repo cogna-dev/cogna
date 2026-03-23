@@ -10,5 +10,6 @@
 - Keep module cohesion: when a feature has only a few related functions, keep them in one file instead of splitting one function per file.
 - Keep import naming concise: package exports should avoid redundant package-name prefixes (prefer `@cli.Error` over `@cli.CliError`).
 - Use minimal naming: avoid repeating directory/context words in file and symbol names (e.g. `src/e2e/init_test.mbt`, not `init_e2e_test.mbt`).
+- Never modify system-level configuration; changes must stay within the current project directory or `/tmp`.
 - Never commit temporary files or auto-generated files; only commit intentional source/docs/test artifacts.
 - After every development cycle, update the progress dashboard at `docs/src/content/docs/progress.mdx` before reporting completion.
