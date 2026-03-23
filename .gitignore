@@ -4,3 +4,9 @@ _build/
 .mooncakes/
 .moonagent/
 dist/
+trace.json
+.codeiq/
+.claude/settings*
+src/cmd/**/tmp_*/
+src/cmd/registry/tmp_sig_consts/
+src/cmd/registry/tmp_registry_sigcheck/
