@@ -109,6 +109,13 @@ fn segment_after(value : String, marker : String) -> String? {
 }
 
 ///|
+fn normalize_reference_target(value : String) -> String {
+  segment_after(value, "$ref:")
+    .map(target => trim_quotes(trim_spaces(target)))
+    .unwrap_or(value |> trim_spaces |> trim_quotes)
+}
+
+///|
 fn strip_braces(value : String) -> String {
   let mut out = trim_spaces(value)
   if out.has_suffix("{") {
@@ -529,9 +536,7 @@ fn declaration_relations_v2(
   }
 
   if kind == "reference" {
-    let reference_target = signature.replace(old="$ref:", new="")
-      |> trim_spaces
-      |> trim_quotes
+    let reference_target = normalize_reference_target(signature)
     if reference_target != "" {
       push_unique_relation(relations, "references_type", reference_target)
     }
@@ -732,6 +737,67 @@ fn go_import_name(clean_line : String) -> String {
 }
 
 ///|
+fn strip_go_tag(line : String) -> String {
+  match line.find("`") {
+    Some(idx) => line[0:idx].to_string() |> trim_spaces
+    None => line
+  }
+}
+
+///|
+fn go_struct_name(line : String, grouped~ : Bool) -> String {
+  let source = if grouped {
+    line
+  } else {
+    line.strip_prefix("type ").unwrap_or(line).to_string()
+  }
+  first_token(source)
+}
+
+///|
+fn extract_go_struct_field(
+  declarations : Array[Json],
+  symbols : Array[Json],
+  profile : String,
+  server : String,
+  path : String,
+  line_no : Int,
+  owner : String,
+  line : String,
+  docs : String,
+) -> Unit {
+  let clean = line_before_comment(line) |> trim_spaces |> strip_go_tag
+  if clean == "" || clean == "{" || clean == "}" {
+    return
+  }
+
+  let is_embedded = !clean.contains(" ") && !clean.contains("\t")
+  let raw_name = if is_embedded {
+    clean
+  } else {
+    first_token(clean)
+  }
+  let name = raw_name.strip_prefix("*").unwrap_or(raw_name).to_string()
+  if name == "" {
+    return
+  }
+
+  push_record(
+    declarations,
+    symbols,
+    profile,
+    server,
+    "go",
+    path,
+    line_no,
+    if is_embedded { "embedded_field" } else { "field" },
+    "\{owner}.\{name}",
+    clean,
+    docs,
+  )
+}
+
+///|
 fn extract_go_record(
   declarations : Array[Json],
   symbols : Array[Json],
@@ -844,6 +910,8 @@ fn extract_go_file(
   let mut pending_doc_line = 0
   let mut group_kind = ""
   let mut group_scope_depth = 0
+  let mut active_struct = ""
+  let mut active_struct_depth = 0
 
   for i in 0..<lines.length() {
     let line_no = i + 1
@@ -869,6 +937,8 @@ fn extract_go_file(
     if line == ")" {
       group_kind = ""
       group_scope_depth = 0
+      active_struct = ""
+      active_struct_depth = 0
       pending_doc = ""
       pending_doc_line = 0
       continue
@@ -905,18 +975,45 @@ fn extract_go_file(
       } else {
         ""
       }
+      if active_struct != "" && active_struct_depth > 0 {
+        extract_go_struct_field(
+          declarations,
+          symbols,
+          profile,
+          server,
+          path,
+          line_no,
+          active_struct,
+          line,
+          docs,
+        )
+      }
       let group_line = strip_braces(line)
       if group_scope_depth == 0 && group_line != "" {
         let synthetic = "\{group_kind} \{group_line}"
         extract_go_record(
           declarations, symbols, profile, server, path, line_no, synthetic, docs,
         )
+        if group_kind == "type" && line.contains("struct") && line.has_suffix("{") {
+          active_struct = go_struct_name(group_line, grouped=true)
+          active_struct_depth = 0
+        }
       }
       for c in line {
         if c == '{' {
           group_scope_depth = group_scope_depth + 1
+          if active_struct != "" {
+            active_struct_depth = active_struct_depth + 1
+          }
         } else if c == '}' && group_scope_depth > 0 {
           group_scope_depth = group_scope_depth - 1
+          if active_struct != "" {
+            active_struct_depth = active_struct_depth - 1
+            if active_struct_depth <= 0 {
+              active_struct = ""
+              active_struct_depth = 0
+            }
+          }
         }
       }
       pending_doc = ""
@@ -927,17 +1024,49 @@ fn extract_go_file(
     let declaration_prefixes = [
       "package ", "import ", "type ", "func ", "const ", "var ",
     ]
+    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
+      pending_doc
+    } else {
+      ""
+    }
+    if active_struct != "" && active_struct_depth > 0 {
+      extract_go_struct_field(
+        declarations,
+        symbols,
+        profile,
+        server,
+        path,
+        line_no,
+        active_struct,
+        line,
+        docs,
+      )
+    }
     if starts_with_any(line, declaration_prefixes) {
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
-        pending_doc
-      } else {
-        ""
-      }
       extract_go_record(
         declarations, symbols, profile, server, path, line_no, line, docs,
       )
+      if line.has_prefix("type ") && line.contains("struct") && line.has_suffix("{") {
+        active_struct = go_struct_name(line, grouped=false)
+        active_struct_depth = 0
+      }
       pending_doc = ""
       pending_doc_line = 0
+    }
+    for c in line {
+      if c == '{' {
+        if active_struct != "" {
+          active_struct_depth = active_struct_depth + 1
+        }
+      } else if c == '}' {
+        if active_struct != "" {
+          active_struct_depth = active_struct_depth - 1
+          if active_struct_depth <= 0 {
+            active_struct = ""
+            active_struct_depth = 0
+          }
+        }
+      }
     }
   }
 }
@@ -1546,6 +1675,7 @@ fn extract_openapi_file(
   let mut in_components = false
   let mut components_indent = -1
   let mut current_component_section = ""
+  let mut current_component_name = ""
   let mut current_operation = ""
 
   for i in 0..<lines.length() {
@@ -1566,6 +1696,7 @@ fn extract_openapi_file(
       in_components = true
       components_indent = indent
       current_component_section = ""
+      current_component_name = ""
       continue
     }
     if line == "webhooks:" {
@@ -1586,6 +1717,7 @@ fn extract_openapi_file(
       in_webhooks = false
       in_components = false
       current_component_section = ""
+      current_component_name = ""
       current_path = ""
       current_operation = ""
     }
@@ -1595,6 +1727,7 @@ fn extract_openapi_file(
       !(line == "components:" || line == "webhooks:") {
       in_components = false
       current_component_section = ""
+      current_component_name = ""
     }
 
     if in_components && indent == components_indent + 2 && line.has_suffix(":") {
@@ -1602,6 +1735,7 @@ fn extract_openapi_file(
         .strip_suffix(":")
         .unwrap_or(line)
         .to_string()
+      current_component_name = ""
       continue
     }
 
@@ -1611,6 +1745,18 @@ fn extract_openapi_file(
         None => current_path = line
       }
       current_operation = ""
+      push_simple_record(
+        declarations,
+        symbols,
+        profile,
+        server,
+        "openapi",
+        path,
+        line_no,
+        "path",
+        current_path,
+        "path \{current_path}",
+      )
       continue
     }
     if in_webhooks &&
@@ -1643,6 +1789,7 @@ fn extract_openapi_file(
       indent == components_indent + 4 {
       let name = line.strip_suffix(":").unwrap_or(line).to_string()
       if name != "properties" && name != "required" {
+        current_component_name = name
         let kind = openapi_component_kind(current_component_section)
         push_simple_record(
           declarations,
@@ -1716,7 +1863,9 @@ fn extract_openapi_file(
     }
 
     if (in_paths || in_webhooks || in_components) && line.contains("allOf:") {
-      let scope = if current_operation == "" {
+      let scope = if in_components && current_component_name != "" {
+        current_component_name
+      } else if current_operation == "" {
         current_path
       } else {
         current_operation
@@ -1729,7 +1878,9 @@ fn extract_openapi_file(
     }
 
     if (in_paths || in_webhooks || in_components) && line.contains("oneOf:") {
-      let scope = if current_operation == "" {
+      let scope = if in_components && current_component_name != "" {
+        current_component_name
+      } else if current_operation == "" {
         current_path
       } else {
         current_operation
@@ -1742,7 +1893,9 @@ fn extract_openapi_file(
     }
 
     if (in_paths || in_webhooks || in_components) && line.contains("anyOf:") {
-      let scope = if current_operation == "" {
+      let scope = if in_components && current_component_name != "" {
+        current_component_name
+      } else if current_operation == "" {
         current_path
       } else {
         current_operation
@@ -1755,7 +1908,9 @@ fn extract_openapi_file(
     }
 
     if line.has_prefix("discriminator:") {
-      let scope = if current_operation == "" {
+      let scope = if in_components && current_component_name != "" {
+        current_component_name
+      } else if current_operation == "" {
         current_path
       } else {
         current_operation
@@ -1772,7 +1927,7 @@ fn extract_openapi_file(
         if scope == "" {
           "discriminator"
         } else {
-          scope
+          "\{scope}.discriminator"
         },
         line,
       )
@@ -1827,9 +1982,7 @@ fn extract_openapi_file(
     }
 
     if line.contains("$ref:") {
-      let ref_target = segment_after(line, "$ref:")
-        .map(value => trim_quotes(value))
-        .unwrap_or("")
+      let ref_target = normalize_reference_target(line)
       if ref_target != "" {
         push_simple_record(
           declarations, symbols, profile, server, "openapi", path, line_no, "reference",
