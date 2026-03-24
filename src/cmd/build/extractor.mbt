@@ -292,7 +292,7 @@ fn profile_mode(profile : String) -> (String, String) {
   match profile {
     "go-module" => ("lsp-assisted", "gopls")
     "rust-crate" => ("lsp-assisted", "rust-analyzer")
-    "terraform-module" => ("parser-first + lsp-supplement", "terraform-ls")
+    "terraform-module" => ("parser-first", "hcl-parser")
     "openapi-spec" => ("parser-only", "none")
     "policy-bundle" => ("policy-bundle", "opa")
     _ => ("parser-only", "none")
@@ -311,7 +311,7 @@ fn lsp_probe(server : String, version_arg : String) -> (String, Bool) {
     return ("none", false)
   }
   let command = "\{shell_escape(server)} \{version_arg}"
-  let (exit_code, stdout, stderr) = @process.run_command_capture(command)
+  let (exit_code, stdout, stderr) = @shell.run_command_capture(command)
   if exit_code != 0 {
     let details = if stderr != "" { stderr } else { stdout }
     let normalized = trim_spaces(details)
@@ -335,13 +335,13 @@ fn lsp_runtime_probe(
   profile : String,
   configured_server : String,
 ) -> (String, Bool) {
-  if @sys.get_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK") is Some("true") {
+  if @sys.get_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK") is Some("true") &&
+    (profile == "go-module" || profile == "rust-crate") {
     return ("missing:forced-by-test", true)
   }
   match profile {
     "go-module" => lsp_probe(configured_server, "version")
     "rust-crate" => lsp_probe(configured_server, "--version")
-    "terraform-module" => lsp_probe(configured_server, "version")
     _ => ("none", false)
   }
 }
@@ -357,8 +357,199 @@ fn declaration_shape(kind : String, signature : String) -> Json {
 }
 
 ///|
-fn declaration_relations(path : String) -> Array[Json] {
-  [{ "kind": "declared_in", "target": "file:\{path}" }]
+fn parse_first_param(signature : String) -> String {
+  match signature.find("(") {
+    Some(open_idx) =>
+      match signature.find(")") {
+        Some(close_idx) if close_idx > open_idx + 1 => {
+          let body = signature[open_idx + 1:close_idx].to_string()
+            |> trim_spaces
+          if body == "" {
+            ""
+          } else {
+            let first = body.split(",").to_array()[0].to_string() |> trim_spaces
+            match first.find(" ") {
+              Some(space_idx) if space_idx > 0 =>
+                first[space_idx + 1:].to_string() |> trim_spaces
+              _ => first
+            }
+          }
+        }
+        _ => ""
+      }
+    _ => ""
+  }
+}
+
+///|
+fn parse_return_type(signature : String) -> String {
+  match signature.find(")") {
+    Some(close_idx) => {
+      let tail = signature[close_idx + 1:].to_string() |> trim_spaces
+      if tail.has_prefix("{") || tail == "" {
+        return ""
+      }
+      if tail.has_prefix("->") {
+        return tail[2:].to_string() |> trim_spaces |> strip_braces
+      }
+      if tail.has_prefix("(") ||
+        tail.has_prefix("[") ||
+        tail.has_prefix("*") ||
+        tail.has_prefix("&") ||
+        tail.has_prefix("string") ||
+        tail.has_prefix("int") ||
+        tail.has_prefix("bool") ||
+        tail.has_prefix("float") ||
+        tail.has_prefix("byte") ||
+        tail.has_prefix("char") {
+        return strip_braces(tail)
+      }
+      ""
+    }
+    _ => ""
+  }
+}
+
+///|
+fn push_unique_relation(
+  relations : Array[Json],
+  kind : String,
+  target : String,
+) -> Unit {
+  if kind == "" || target == "" {
+    return
+  }
+  let candidate = "\{kind}::\{target}"
+  for i in 0..<relations.length() {
+    guard relations[i] is Object(object) else { continue }
+    let existing_kind = match object.get("kind") {
+      Some(String(value)) => value
+      _ => ""
+    }
+    let existing_target = match object.get("target") {
+      Some(String(value)) => value
+      _ => ""
+    }
+    if "\{existing_kind}::\{existing_target}" == candidate {
+      return
+    }
+  }
+  relations.push({ "kind": kind, "target": target })
+}
+
+///|
+fn declaration_relations_v2(
+  profile : String,
+  path : String,
+  kind : String,
+  name : String,
+  signature : String,
+) -> Array[Json] {
+  let relations : Array[Json] = []
+  push_unique_relation(relations, "declared_in", "file:\{path}")
+
+  if kind == "struct" ||
+    kind == "enum" ||
+    kind == "interface" ||
+    kind == "trait" ||
+    kind == "module" ||
+    kind == "resource" ||
+    kind == "schema" {
+    push_unique_relation(relations, "contains", "decl:\{profile}::\{name}")
+    push_unique_relation(relations, "has_member", "decl:\{profile}::\{name}")
+  }
+
+  if kind == "function" ||
+    kind == "method" ||
+    kind == "associated_fn" ||
+    kind == "operation" {
+    let first_param = parse_first_param(signature)
+    if first_param != "" {
+      push_unique_relation(
+        relations,
+        "has_parameter",
+        "type:\{profile}::\{first_param}",
+      )
+      push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{first_param}",
+      )
+    }
+    let ret = parse_return_type(signature)
+    if ret != "" {
+      push_unique_relation(relations, "returns", "type:\{profile}::\{ret}")
+      push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{ret}",
+      )
+    }
+  }
+
+  if kind == "impl" {
+    if signature.contains(" for ") {
+      let parts = signature.split(" for ").to_array()
+      if parts.length() >= 2 {
+        let trait_name = parts[0]
+          .to_string()
+          .strip_prefix("impl")
+          .unwrap_or(parts[0].to_string())
+          .to_string()
+          |> trim_spaces
+        let target_type = parts[1].to_string() |> strip_braces |> trim_spaces
+        if trait_name != "" && target_type != "" {
+          push_unique_relation(
+            relations,
+            "implements",
+            "type:\{profile}::\{trait_name}",
+          )
+          push_unique_relation(
+            relations,
+            "references_type",
+            "type:\{profile}::\{target_type}",
+          )
+        }
+      }
+    } else {
+      let target = signature
+        .strip_prefix("impl")
+        .unwrap_or(signature)
+        .to_string()
+        |> strip_braces
+        |> trim_spaces
+      if target != "" {
+        push_unique_relation(
+          relations,
+          "references_type",
+          "type:\{profile}::\{target}",
+        )
+      }
+    }
+  }
+
+  if kind == "reference" {
+    let reference_target = signature.replace(old="$ref:", new="")
+      |> trim_spaces
+      |> trim_quotes
+    if reference_target != "" {
+      push_unique_relation(relations, "references_type", reference_target)
+    }
+  }
+
+  if kind == "meta_for_each" || kind == "meta_depends_on" {
+    let parts = signature.split("=").to_array()
+    let target = if parts.length() >= 2 {
+      parts[1].to_string() |> trim_spaces
+    } else {
+      ""
+    }
+    if target != "" {
+      push_unique_relation(relations, "references_type", target)
+    }
+  }
+
+  relations
 }
 
 ///|
@@ -405,7 +596,7 @@ fn make_declaration(
     "baselineRole": "baseline",
     "language": language,
     "source_refs": [{ "uri": path, "startLine": line_no, "endLine": line_no }],
-    "relations": declaration_relations(path),
+    "relations": declaration_relations_v2(profile, path, kind, name, signature),
     "location": { "uri": path, "startLine": line_no, "endLine": line_no },
     "language_specific": { "profile": profile, "server": server },
   }
@@ -1240,6 +1431,25 @@ fn extract_terraform_file(
   path : String,
   lines : Array[String],
 ) -> Unit {
+  // Phase 1: emit block-level declaration records via lib/hcl parser.
+  let hcl_file = @hcl.parse_hcl_file(lines)
+  for block in hcl_file.blocks {
+    push_simple_record(
+      declarations,
+      symbols,
+      profile,
+      server,
+      "terraform",
+      path,
+      block.line_no,
+      block.kind,
+      block.name,
+      block.signature,
+    )
+  }
+
+  // Phase 2: scan attribute-level records using the original line-by-line pass,
+  // keeping active_block context identical to the previous implementation.
   let mut active_block = ""
   let block_stack : Array[String] = []
 
@@ -1257,10 +1467,8 @@ fn extract_terraform_file(
       block_stack.push(next_active)
       active_block = next_active
       if kind != "" {
-        push_simple_record(
-          declarations, symbols, profile, server, "terraform", path, line_no, kind,
-          name, line,
-        )
+        // Block-level declarations are already emitted by the lib/hcl parser path.
+        continue
       }
     }
 
@@ -1868,7 +2076,19 @@ fn extract_lsp_baseline(
   guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
 
   let (mode, server) = profile_mode(config.profile)
-  let (server_version, fallback) = lsp_runtime_probe(config.profile, server)
+  let (server_version, probe_failed) = lsp_runtime_probe(config.profile, server)
+  let force_lsp_hardfail = @sys.get_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+    is Some("true")
+  if probe_failed &&
+    (config.profile == "go-module" || config.profile == "rust-crate") &&
+    force_lsp_hardfail {
+    return Err(
+      extractor_error(
+        "LSP server '\{server}' is required for profile '\{config.profile}' but could not be started: \{server_version}",
+      ),
+    )
+  }
+  let fallback = probe_failed
   let records_out = collect_records(config, repo, files, server)
   guard records_out is Ok((declarations, symbols)) else {
     return Err(records_out.unwrap_err())

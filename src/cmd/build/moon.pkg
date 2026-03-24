@@ -6,7 +6,8 @@ import {
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/lib/process" @process,
+  "yufeiminds/codeiq/lib/shell" @shell,
+  "yufeiminds/codeiq/lib/hcl" @hcl,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/schema" @schema,
@@ -14,4 +15,5 @@ import {
 
 import {
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/json" @json,
 } for "test"

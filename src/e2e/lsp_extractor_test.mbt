@@ -110,6 +110,14 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   assert_true(metadata.contains("\"mode\": \"parser-only\""))
   assert_true(metadata.contains("\"version\": \"none | baseline-v2\""))
 
+  let manifest = @fs.read_file_to_string("\{path}/dist/manifest.json")
+  assert_true(manifest.contains("\"schemaVersion\": \"ciq-bundle/v1\""))
+  assert_true(manifest.contains("\"declarationSchema\""))
+
+  let checksums = @fs.read_file_to_string("\{path}/dist/checksums.txt")
+  assert_true(checksums.contains("manifest.json  "))
+  assert_true(checksums.contains("metadata.json  "))
+
   let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
   assert_true(declarations.contains("\"kind\":\"operation\""))
   assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
@@ -121,6 +129,69 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
 
   let bundle = @fs.read_file_to_bytes("\{path}/dist/bundle.ciq.tgz")
   assert_true(bundle.length() > 0)
+
+  cleanup_lsp_e2e(path)
+}
+
+///|
+fn write_go_repo(path : String) -> Unit {
+  @fs.create_dir(path) catch {
+    _ => abort("failed to create go e2e repo")
+  }
+  let source = @fs.read_file_to_string("examples/go-module/full/repo/main.go") catch {
+    _ => abort("failed to read go fixture")
+  }
+  @fs.write_string_to_file("\{path}/main.go", source) catch {
+    _ => abort("failed to write go fixture")
+  }
+}
+
+///|
+fn write_go_config(path : String) -> Unit {
+  let content =
+    #|schemaVersion: ciq-config/v1
+    #|profile: go-module
+    #|purl: pkg:golang/example/demo@0.1.0
+    #|source:
+    #|  repo: https://github.com/example/demo
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - **/*.go
+    #|checks:
+    #|  format: sarif
+    #|  policy: default-compat
+    #|
+  @fs.write_string_to_file("\{path}/codeiq.yaml", content) catch {
+    _ => abort("failed to write go config")
+  }
+}
+
+///|
+test "e2e go extractor includes richer relations" {
+  let path = "src/e2e/tmp_lsp_extractor_go"
+  cleanup_lsp_e2e(path)
+  write_go_repo(path)
+  write_go_config(path)
+
+  let out = @build_cmd.run({ repo: path })
+  guard out is Ok(_) else {
+    cleanup_lsp_e2e(path)
+    fail("go build should succeed")
+  }
+
+  let metadata = @fs.read_file_to_string("\{path}/dist/metadata.json")
+  assert_true(metadata.contains("\"server\": \"gopls\""))
+
+  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  assert_true(declarations.contains("\"kind\":\"function\""))
+  assert_true(declarations.contains("\"relations\":[{"))
+  assert_true(declarations.contains("\"kind\":\"declared_in\""))
+  assert_true(
+    declarations.contains("\"kind\":\"has_parameter\"") ||
+    declarations.contains("\"kind\":\"returns\"") ||
+    declarations.contains("\"kind\":\"references_type\""),
+  )
 
   cleanup_lsp_e2e(path)
 }

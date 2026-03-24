@@ -250,6 +250,9 @@ test "build creates policy-bundle artifacts and opa manifest" {
   assert_true(manifest.contains("\"schemaVersion\": \"ciq-opa-bundle/v1\""))
   assert_true(manifest.contains("\"profile\": \"policy-bundle\""))
   assert_true(manifest.contains("\"entrypoint\": \"codeiq/compat/deny\""))
+  assert_true(manifest.contains("\"provenance\""))
+  assert_true(manifest.contains("\"checksums\": \"checksums.txt\""))
+  assert_true(manifest.contains("\"status\": \"unsigned\""))
   assert_true(manifest.contains("\"path\": \"opa-bundle.tar.gz\""))
   assert_true(manifest.contains("\"path\": \"policy.rules.json\""))
   assert_true(!manifest.contains("\"declarationSchema\""))
@@ -289,8 +292,71 @@ test "build creates policy-bundle artifacts and opa manifest" {
 }
 
 ///|
-test "build marks fallback when lsp server is unavailable" {
-  let repo = "src/cmd/build/tmp_build_go_lsp_fallback"
+test "build policy-bundle supports signature status and key id env" {
+  let repo = "src/cmd/build/tmp_build_policy_signature_repo"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
+  let out = run({ repo, })
+  @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
+  @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("policy bundle build should succeed")
+  }
+
+  let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("manifest should exist")
+      ""
+    }
+  }
+  assert_true(manifest.contains("\"status\": \"verified\""))
+  assert_true(manifest.contains("\"keyId\": \"acme-main\""))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build policy-bundle includes signature value when provided" {
+  let repo = "src/cmd/build/tmp_build_policy_signature_value_repo"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
+  @sys.set_env_var("CODEIQ_SIGNATURE_VALUE", "ZmFrZS1zaWduYXR1cmU=")
+  let out = run({ repo, })
+  @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
+  @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
+  @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("policy bundle build should succeed")
+  }
+
+  let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("manifest should exist")
+      ""
+    }
+  }
+  assert_true(manifest.contains("\"status\": \"verified\""))
+  assert_true(manifest.contains("\"keyId\": \"acme-main\""))
+  assert_true(manifest.contains("\"value\": \"ZmFrZS1zaWduYXR1cmU=\""))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build fails when lsp server is unavailable for go profile" {
+  let repo = "src/cmd/build/tmp_build_go_lsp_hardfail"
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -309,7 +375,7 @@ test "build marks fallback when lsp server is unavailable" {
     #|  policy: default-compat
     #|
   @fs.write_string_to_file("\{repo}/codeiq.yaml", config) catch {
-    _ => abort("failed to write go fallback config")
+    _ => abort("failed to write go hardfail config")
   }
   @fs.write_string_to_file(
     "\{repo}/main.go",
@@ -318,23 +384,58 @@ test "build marks fallback when lsp server is unavailable" {
     _ => abort("failed to write go fixture")
   }
 
+  @sys.set_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK", "true")
   let out = run({ repo, })
-  guard out is Ok(_) else {
+  @sys.unset_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+  guard out is Err(e) else {
     cleanup_tmp_repo(repo)
-    fail("build should succeed when lsp server is missing")
+    fail("build should fail when lsp server is missing for go-module")
+  }
+  assert_true(e.message.contains("gopls"))
+  assert_true(e.message.contains("missing:"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build fails when lsp server is unavailable for rust profile" {
+  let repo = "src/cmd/build/tmp_build_rust_lsp_hardfail"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  let config =
+    #|schemaVersion: ciq-config/v1
+    #|profile: rust-crate
+    #|purl: pkg:cargo/acme-demo@0.1.0
+    #|source:
+    #|  repo: https://github.com/acme/demo
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - "**/*.rs"
+    #|checks:
+    #|  format: sarif
+    #|  policy: default-compat
+    #|
+  @fs.write_string_to_file("\{repo}/codeiq.yaml", config) catch {
+    _ => abort("failed to write rust hardfail config")
+  }
+  @fs.write_string_to_file(
+    "\{repo}/lib.rs",
+    "pub fn hello() -> &'static str { \"hi\" }\n",
+  ) catch {
+    _ => abort("failed to write rust fixture")
   }
 
-  let metadata = @fs.read_file_to_string("\{repo}/dist/metadata.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("metadata should exist for fallback case")
-      ""
-    }
+  @sys.set_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK", "true")
+  let out = run({ repo, })
+  @sys.unset_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+  guard out is Err(e) else {
+    cleanup_tmp_repo(repo)
+    fail("build should fail when lsp server is missing for rust-crate")
   }
-  assert_true(metadata.contains("\"mode\": \"lsp-assisted\""))
-  assert_true(metadata.contains("\"server\": \"gopls\""))
-  assert_true(metadata.contains("\"fallback\": true"))
-  assert_true(metadata.contains("missing:"))
+  assert_true(e.message.contains("rust-analyzer"))
+  assert_true(e.message.contains("missing:"))
 
   cleanup_tmp_repo(repo)
 }

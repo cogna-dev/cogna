@@ -1,4 +1,7 @@
 import {
+  "gmlewis/flate" @flate,
+  "gmlewis/gzip" @gzip,
+  "gmlewis/io" @gio,
   "Milky2018/zstd" @zstd,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,

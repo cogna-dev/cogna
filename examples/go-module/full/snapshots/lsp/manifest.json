@@ -1,0 +1,214 @@
+{
+  "schemaVersion": "ciq-bundle/v1",
+  "purl": "pkg:golang/example/demo@0.1.0",
+  "profile": "go-module",
+  "declarationSchema": {
+    "version": "ciq-declarations/v1",
+    "format": "ndjson.zst",
+    "model": "signature + shape + language_specific tagged union",
+    "schema": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "canonical_name",
+        "path",
+        "signature",
+        "shape",
+        "visibility",
+        "docs",
+        "baselineRole",
+        "language",
+        "source_refs",
+        "relations",
+        "location",
+        "language_specific"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shape": {
+          "type": "object",
+          "required": [
+            "kind",
+            "subkind",
+            "form",
+            "signature"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "subkind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "form": {
+              "type": "string",
+              "enum": [
+                "symbol",
+                "callable"
+              ]
+            },
+            "signature": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "visibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "docs": {
+          "type": "string"
+        },
+        "baselineRole": {
+          "type": "string",
+          "const": "baseline"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "uri",
+              "startLine",
+              "endLine"
+            ],
+            "properties": {
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "startLine": {
+                "type": "integer"
+              },
+              "endLine": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "relations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "target"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "declared_in",
+                  "contains",
+                  "has_member",
+                  "has_parameter",
+                  "returns",
+                  "references_type",
+                  "implements"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "location": {
+          "type": "object",
+          "required": [
+            "uri",
+            "startLine",
+            "endLine"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "startLine": {
+              "type": "integer"
+            },
+            "endLine": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        },
+        "language_specific": {
+          "type": "object",
+          "required": [
+            "profile",
+            "server"
+          ],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "server": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "source": {
+    "repo": "https://github.com/example/demo",
+    "ref": "main",
+    "commit": "<normalized>"
+  },
+  "artifacts": [
+    {
+      "path": "declarations.ndjson.zst",
+      "sha256": "92a33e103ba395f5e47a9e287a18949f6ffbe97aaeb91c853f94599ab02e4542",
+      "compression": "zstd"
+    },
+    {
+      "path": "symbols.ndjson.zst",
+      "sha256": "7ded12e6386c8325a3ab0858899b4252d2e0068782928f1563275c4cf89ffb44",
+      "compression": "zstd"
+    }
+  ]
+}

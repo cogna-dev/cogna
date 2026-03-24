@@ -1,0 +1,214 @@
+---
+title: Provider 覆盖率报告
+description: 基于 repo 实现、examples 快照与官方资料整理当前各语言/生态的 Extractor 覆盖情况。
+order: 7
+---
+
+# Provider 覆盖率报告
+
+这页只回答一个问题：CodeIQ 当前到底能从哪些语言 / 生态里提取哪些声明事实，以及这些能力现在属于 `LSP Extractor` 还是 `CodeIQ Extractor`。
+
+这里的结论只基于当前 repo 证据：`src/cmd/build/extractor.mbt`、`src/schema/declarations.mbt`、`src/e2e/lsp_extractor_test.mbt`、`examples/*/snapshots/lsp/*`、以及 `spec/A001-lsp-extractor.typ` 中定义的完整语法覆盖面。
+
+## 总览矩阵
+
+| Profile | 当前 build 模式 | `LSP Extractor` | `CodeIQ Extractor` | 当前结论 |
+| --- | --- | --- | --- | --- |
+| `go-module` | `lsp-assisted` + `gopls` | ✅ 当前主 baseline | ⚪ 规划中 | Go 目前按 LSP baseline 对外表述 |
+| `rust-crate` | `lsp-assisted` + `rust-analyzer` | ✅ 当前主 baseline | ⚪ 规划中 | Rust 目前按 LSP baseline 对外表述 |
+| `terraform-module` | `parser-first` + `hcl-parser` | — | ✅ 当前实现 | Terraform 只按 CodeIQ Extractor 记账 |
+| `openapi-spec` | `parser-only` + `none` | — | ✅ 当前实现 | OpenAPI 只按 CodeIQ Extractor 记账 |
+
+> 说明：`src/cmd/build/extractor.mbt` 当前的 `profile_mode(...)` 明确把 Go / Rust 标成 `lsp-assisted`，把 Terraform / OpenAPI 标成 `parser-first` / `parser-only`。因此本页把 Terraform 和 OpenAPI 只放进 `CodeIQ Extractor` 列，不把它们描述成 LSP 生态。
+
+> 表格中的状态口径：`✅ 已验证` 表示当前 repo 已有 snapshot / test 证据；`🟡 部分` 表示 spec 已纳入或当前只覆盖一部分表现；`⚪ 规划中 / 未覆盖` 表示当前 repo 还没有直接证据。
+
+## 当前可稳定写入 bundle 的声明事实
+
+无论 provider 来自哪条抽取路径，只要进入当前 bundle，就会落到同一份声明 contract。`src/schema/declarations.mbt` 当前要求的核心字段包括：
+
+- `id`
+- `kind`
+- `name`
+- `canonical_name`
+- `path`
+- `signature`
+- `shape`
+- `visibility`
+- `docs`
+- `baselineRole`
+- `language`
+- `source_refs`
+- `relations`
+- `location`
+- `language_specific`
+
+这意味着本页关注的“覆盖率”不是 IDE 交互功能，而是这些字段能否稳定落盘进 `declarations.ndjson.zst` / `symbols.ndjson.zst` / `metadata.json`。
+
+## Go (`go-module`)
+
+**当前定位**
+
+- `LSP Extractor`：当前 baseline
+- `CodeIQ Extractor`：尚未实现，保留为未来交叉验证对象
+
+**完整特性对比表（来自 `spec/A001-lsp-extractor.typ`）**
+
+| 完整特性 | 当前 repo 证据 | `LSP Extractor` | `CodeIQ Extractor` | 备注 |
+| --- | --- | --- | --- | --- |
+| package doc | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未单独证明 | ⚪ 规划中 | 目前 Go snapshot 主要覆盖 declaration / symbol，不单独冻结 package doc |
+| const / var | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `LevelInfo`、`Version`、`Enabled`、`defaultName` 等已产出 |
+| type alias | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Message` 已作为 `type_alias` 落盘 |
+| struct | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Greeter` 已落盘 |
+| embedded field | `examples/go-module/full/repo/main.go` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前示例只有普通字段 `Prefix` |
+| interface | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `PayloadReader` 已落盘 |
+| generic type / function | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | spec 已把它列入完整目标面，但当前 Go fixture 还未证明 |
+| method | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Greet` 已作为 `method` 落盘 |
+| re-export 风格注释 | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前 repo 还没有直接 snapshot 证据 |
+| deprecated 注释 | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前 Go fixture 没有 deprecated 注释样本 |
+
+**Repo evidence**
+
+- `src/cmd/build/extractor.mbt`：`profile_mode("go-module") => ("lsp-assisted", "gopls")`
+- `examples/go-module/full/snapshots/lsp/declarations.ndjson`
+- `src/e2e/lsp_extractor_test.mbt`
+
+**Nuance**
+
+当前 Go 对外仍应写成 `LSP Extractor` baseline，但 repo 里的 record 归一化逻辑主要仍在 `src/cmd/build/extractor.mbt` 内完成。换句话说，当前已经记录了 `gopls` server 元数据与 LSP-backed 定位，但还不应把它描述成“已经完整实现独立 LSP RPC 消费链”。
+
+## Rust (`rust-crate`)
+
+**当前定位**
+
+- `LSP Extractor`：当前 baseline
+- `CodeIQ Extractor`：尚未实现，保留为未来交叉验证对象
+
+**完整特性对比表（来自 `spec/A001-lsp-extractor.typ`）**
+
+| 完整特性 | 当前 repo 证据 | `LSP Extractor` | `CodeIQ Extractor` | 备注 |
+| --- | --- | --- | --- | --- |
+| pub module | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `inner` 已作为 `module` 落盘 |
+| pub fn | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `new` 已作为 `function` 落盘 |
+| pub struct / enum | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `ApiItem<T>`、`InnerStruct`、`Status` 已落盘 |
+| trait | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Service<T>` 已落盘 |
+| impl | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `<T> ApiItem<T>` 已落盘 |
+| associated type | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Service<T>::Output` 已落盘 |
+| const | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `API_VERSION`、`Service<T>::VERSION` 已落盘 |
+| type alias | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Id` 已落盘 |
+| generic | `examples/rust-crate/full/repo/lib.rs` | ✅ 已验证 | ⚪ 规划中 | `ApiItem<T>`、`Service<T>` 已直接覆盖 generic surface |
+| where clause | `examples/rust-crate/full/repo/lib.rs` | ✅ 已验证 | ⚪ 规划中 | 当前 Rust fixture 已显式使用 `where T: Clone` |
+| re-export | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `pub use ... as ExposedStruct` 已落盘为 `use` |
+| doc comment | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前 snapshot 还没有独立 doc comment 样本 |
+| deprecated attribute | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `ApiItem<T>` 已通过 `docs: "Deprecated"` 体现 |
+
+**Repo evidence**
+
+- `src/cmd/build/extractor.mbt`：`profile_mode("rust-crate") => ("lsp-assisted", "rust-analyzer")`
+- `examples/rust-crate/full/snapshots/lsp/declarations.ndjson`
+- `spec/A001-lsp-extractor.typ`
+
+**Nuance**
+
+Rust 与 Go 一样，当前最准确的表述是：产品上属于 `LSP Extractor` baseline，产物上已经写入 `rust-analyzer` 元数据与 richer declaration facts，但统一 record 仍由当前 build extractor 逻辑落盘。
+
+## Terraform (`terraform-module`)
+
+**当前定位**
+
+- `LSP Extractor`：不支持
+- `CodeIQ Extractor`：当前实现
+
+**完整特性对比表（来自 `spec/A001-lsp-extractor.typ`）**
+
+| 完整特性 | 当前 repo 证据 | `LSP Extractor` | `CodeIQ Extractor` | 备注 |
+| --- | --- | --- | --- | --- |
+| variable | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `cidr`、`subnets` 已落盘 |
+| output | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `vpc_id` 已落盘 |
+| local | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `locals` 已落盘 |
+| resource | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `aws_vpc.main`、`aws_subnet.this`、`aws_security_group.app` 已落盘 |
+| data source | `examples/terraform-module/full/repo/main.tf` | — | ⚪ 当前 snapshot 未覆盖 | fixture 有 `data "aws_caller_identity" "current"`，但当前快照没有对应 declaration |
+| provider | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `provider "aws"` 已落盘 |
+| module call | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `module "network_labels"` 已落盘 |
+| dynamic block | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `dynamic "ingress"` 已落盘 |
+| 复杂 object type | `examples/terraform-module/full/repo/main.tf` | — | ⚪ 当前 fixture 未覆盖 | 当前例子只有 `string` 与 `map(string)` |
+| validation | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `variable.cidr.validation` 已落盘 |
+| precondition / postcondition | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `precondition` 与 `postcondition` 已落盘 |
+
+**Repo evidence**
+
+- `src/cmd/build/extractor.mbt`：`profile_mode("terraform-module") => ("parser-first", "hcl-parser")`
+- `src/lib/hcl/parse.mbt`
+- `src/lib/hcl/types.mbt`
+- `examples/terraform-module/full/snapshots/lsp/declarations.ndjson`
+
+**为什么这里只记在 CodeIQ Extractor 列**
+
+Terraform 的权威输入本来就是 HCL block / attribute 结构；当前 repo 也把 server 写成 `hcl-parser`，而不是 `terraform-ls`。所以虽然 examples 目录里为了统一 harness 仍使用 `snapshots/lsp/` 这个路径名，但 provider 语义上这里应视为 CodeIQ 自身的 parser-first 抽取面。
+
+## OpenAPI (`openapi-spec`)
+
+**当前定位**
+
+- `LSP Extractor`：不支持
+- `CodeIQ Extractor`：当前实现
+
+**完整特性对比表（来自 `spec/A001-lsp-extractor.typ`）**
+
+| 完整特性 | 当前 repo 证据 | `LSP Extractor` | `CodeIQ Extractor` | 备注 |
+| --- | --- | --- | --- | --- |
+| paths | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | 🟡 部分 | 当前主要通过 `operation` 与 path-level `parameters` 表达 path surface |
+| operation | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `listPayments`、`getPayment`、`POST /payments` 等已落盘 |
+| parameter | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `RequestId` 与 path-level parameters 已落盘 |
+| requestBody | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `PaymentRequest`、`paymentEvent`、`paymentUpdated` 已落盘 |
+| response | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `NotFound` 已落盘 |
+| component schema | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `Payment`、`PaymentBase`、`ErrorResponse` 等已落盘 |
+| `allOf` / `oneOf` / `anyOf` | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | 组合 schema 节点已分别落盘 |
+| securityScheme | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `ApiKeyAuth`、`OAuth2` 已落盘 |
+| discriminator | `examples/openapi-spec/full/repo/openapi/payment.yaml` | — | ⚪ 当前 snapshot 未覆盖 | fixture 有 discriminator，但当前快照没有单独的 `discriminator` 记录 |
+| external `$ref` | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `./shared.yaml#/components/schemas/AlternativePayment` 已落盘 |
+
+**Repo evidence**
+
+- `src/cmd/build/extractor.mbt`：`profile_mode("openapi-spec") => ("parser-only", "none")`
+- `src/e2e/lsp_extractor_test.mbt`：验证 `parser-only` metadata 与 `operation` declarations
+- `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson`
+
+**为什么这里只记在 CodeIQ Extractor 列**
+
+OpenAPI 的权威输入就是规格文本本身。当前 repo 明确不依赖 language server，并把 server 记为 `none`。因此这里的覆盖率应理解为 spec-driven CodeIQ extraction，而不是 LSP extraction。
+
+## 与官方生态的关系
+
+本页主体以 repo 现状为准，但 provider 选择也和各自官方生态一致：
+
+- Go：`gopls` 官方能力面包含 definition、references、implementation、typeDefinition、hover、documentSymbol、signatureHelp 等，适合作为 LSP baseline。
+- Rust：`rust-analyzer` 官方能力面同样覆盖 goto definition / implementation / type definition、hover、document symbol、signature help、references。
+- Terraform：HashiCorp 的语言与工具链更自然地围绕 HCL parser / config inspection 建模，而不是把 LSP 当成声明抽取真值源。
+- OpenAPI：OpenAPI Specification 本身就是结构化 contract，天然适合 spec-driven extraction。
+
+## 当前缺口与下一步
+
+| 项目 | 当前状态 | 下一步 |
+| --- | --- | --- |
+| Go / Rust 原生 `CodeIQ Extractor` | ⚪ 尚未实现 | 复用同一份 `examples/*/snapshots/codeiq/` 语料做交叉验证 |
+| Terraform / OpenAPI 快照目录命名 | 🟡 当前仍放在 `snapshots/lsp/` | 后续可在不破坏 harness 的前提下补充更清晰的 provider 语义说明 |
+| 完整特性面冻结 | 🟡 已在 `spec/A001-lsp-extractor.typ` 定义 | 继续让 snapshot tests 与 docs 同步收口 |
+
+## 验证入口
+
+- `src/cmd/build/extractor.mbt`
+- `src/schema/declarations.mbt`
+- `src/e2e/lsp_extractor_test.mbt`
+- `examples/go-module/full/snapshots/lsp/declarations.ndjson`
+- `examples/rust-crate/full/snapshots/lsp/declarations.ndjson`
+- `examples/terraform-module/full/snapshots/lsp/declarations.ndjson`
+- `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson`
+- `spec/A001-lsp-extractor.typ`
+
+## 相关文档
+
+- [概览](/docs/introduction)
+- [索引与紧凑上下文](/docs/indexing)
+- [MCP 工作流](/docs/mcp)
+- [开发进度看板](/docs/progress)

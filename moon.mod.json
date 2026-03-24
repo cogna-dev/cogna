@@ -5,8 +5,10 @@
     "moonbitlang/x": "0.4.41",
     "shu-kitamura/sha256": "0.1.1",
     "Milky2018/zstd": "0.1.0",
+    "gmlewis/flate": "0.36.3",
     "gmlewis/gzip": "0.34.3",
-    "gmlewis/io": "0.23.3"
+    "gmlewis/io": "0.23.3",
+    "moonbitlang/async": "0.16.8"
   },
   "readme": "README.md",
   "repository": "https://github.com/yufeiminds/codeiq",

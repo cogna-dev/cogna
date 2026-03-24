@@ -58,6 +58,7 @@ fn declaration_schema_json() -> Json {
     "version": "ciq-declarations/v1",
     "format": "ndjson.zst",
     "model": "signature + shape + language_specific tagged union",
+    "schema": @schema.ciq_declaration_v1_schema(),
   }
 }
 
@@ -68,6 +69,40 @@ fn artifact_with_sha(
   sha256 : String,
 ) -> Json {
   { "path": path, "sha256": sha256, "compression": compression }
+}
+
+///|
+fn runtime_signature_from_env() -> Json {
+  let status = match @sys.get_env_var("CODEIQ_SIGNATURE_STATUS") {
+    Some("verified") => "verified"
+    Some("untrusted") => "untrusted"
+    _ => "unsigned"
+  }
+  let signature_value = match @sys.get_env_var("CODEIQ_SIGNATURE_VALUE") {
+    Some(raw) => {
+      let trimmed = raw.trim().to_string()
+      if trimmed == "" {
+        None
+      } else {
+        Some(trimmed)
+      }
+    }
+    None => None
+  }
+  let signature : Map[String, Json] = {
+    "status": Json::string(status),
+    "algorithm": Json::string("sha256"),
+  }
+  match @sys.get_env_var("CODEIQ_SIGNATURE_KEY_ID") {
+    Some(value) if value.trim().to_string() != "" =>
+      signature["keyId"] = Json::string(value.trim().to_string())
+    _ => ()
+  }
+  match signature_value {
+    Some(value) => signature["value"] = Json::string(value)
+    None => ()
+  }
+  Json::object(signature)
 }
 
 ///|
@@ -106,6 +141,10 @@ fn manifest_json(
       "opa": {
         "entrypoint": "codeiq/compat/deny",
         "format": "opa-bundle.tar.gz",
+      },
+      "provenance": {
+        "checksums": "checksums.txt",
+        "signature": runtime_signature_from_env(),
       },
       "artifacts": base_artifacts,
     }
