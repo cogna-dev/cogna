@@ -152,6 +152,14 @@ pub fn parse_hcl_file(lines : Array[String]) -> HclFile {
     let line_no = i + 1
     let line = trim_line(lines[i].to_string())
 
+    if line.contains("{") && line.contains("}") {
+      let (kind, name) = block_kind_name(line)
+      if kind != "" {
+        blocks.push({ kind, name, signature: line, line_no, attrs: [] })
+        continue
+      }
+    }
+
     if line.has_suffix("{") {
       let (kind, name) = block_kind_name(line)
       kind_stack.push(kind)
