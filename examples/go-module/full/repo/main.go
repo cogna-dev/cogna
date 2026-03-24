@@ -1,3 +1,4 @@
+// Package sample exposes provider coverage fixtures.
 package sample
 
 import (
@@ -9,8 +10,14 @@ import (
 
 type (
 	Message = string
-	Greeter struct {
+	// StringSet documents a re-export style alias sample.
+	StringSet = map[string]struct{}
+	Greeter   struct {
 		Prefix string `json:"prefix"`
+	}
+	Box[T any] struct {
+		Greeter
+		Value T
 	}
 	PayloadReader interface {
 		Read() (Message, error)
@@ -37,6 +44,15 @@ func Hello(name string) string {
 		name = defaultName
 	}
 	return fmt.Sprintf("hello %s", ToUpper(name))
+}
+
+// Deprecated: use Hello instead.
+func LegacyHello(name string) string {
+	return Hello(name)
+}
+
+func MapValue[T any, U any](value T, mapper func(T) U) U {
+	return mapper(value)
 }
 
 func (g *Greeter) Greet(name string) Message {
