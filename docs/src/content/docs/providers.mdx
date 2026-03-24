@@ -56,16 +56,16 @@ order: 7
 
 | 完整特性 | 当前 repo 证据 | `LSP Extractor` | `CodeIQ Extractor` | 备注 |
 | --- | --- | --- | --- | --- |
-| package doc | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未单独证明 | ⚪ 规划中 | 目前 Go snapshot 主要覆盖 declaration / symbol，不单独冻结 package doc |
+| package doc | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `sample` package 已带 `docs` 落盘 |
 | const / var | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `LevelInfo`、`Version`、`Enabled`、`defaultName` 等已产出 |
 | type alias | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Message` 已作为 `type_alias` 落盘 |
 | struct | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Greeter` 已落盘 |
-| embedded field | `examples/go-module/full/repo/main.go` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前示例只有普通字段 `Prefix` |
+| embedded field | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Box.Greeter` 已作为 `embedded_field` 落盘 |
 | interface | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `PayloadReader` 已落盘 |
-| generic type / function | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | spec 已把它列入完整目标面，但当前 Go fixture 还未证明 |
+| generic type / function | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Box[T any]` 与 `MapValue[T any, U any]` 已落盘 |
 | method | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `Greet` 已作为 `method` 落盘 |
-| re-export 风格注释 | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前 repo 还没有直接 snapshot 证据 |
-| deprecated 注释 | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前 Go fixture 没有 deprecated 注释样本 |
+| re-export 风格注释 | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `StringSet` 已通过 `docs` 冻结注释样本 |
+| deprecated 注释 | `examples/go-module/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `LegacyHello` 已通过 `docs` 冻结 deprecated 注释 |
 
 **Repo evidence**
 
@@ -99,7 +99,7 @@ order: 7
 | generic | `examples/rust-crate/full/repo/lib.rs` | ✅ 已验证 | ⚪ 规划中 | `ApiItem<T>`、`Service<T>` 已直接覆盖 generic surface |
 | where clause | `examples/rust-crate/full/repo/lib.rs` | ✅ 已验证 | ⚪ 规划中 | 当前 Rust fixture 已显式使用 `where T: Clone` |
 | re-export | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `pub use ... as ExposedStruct` 已落盘为 `use` |
-| doc comment | `spec/A001-lsp-extractor.typ` | ⚪ 当前 fixture 未覆盖 | ⚪ 规划中 | 当前 snapshot 还没有独立 doc comment 样本 |
+| doc comment | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `inner`、`InnerStruct`、`ApiItem<T>`、`new`、`Id` 已带 docs |
 | deprecated attribute | `examples/rust-crate/full/snapshots/lsp/declarations.ndjson` | ✅ 已验证 | ⚪ 规划中 | `ApiItem<T>` 已通过 `docs: "Deprecated"` 体现 |
 
 **Repo evidence**
@@ -127,11 +127,11 @@ Rust 与 Go 一样，当前最准确的表述是：产品上属于 `LSP Extracto
 | output | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `vpc_id` 已落盘 |
 | local | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `locals` 已落盘 |
 | resource | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `aws_vpc.main`、`aws_subnet.this`、`aws_security_group.app` 已落盘 |
-| data source | `examples/terraform-module/full/repo/main.tf` | — | ⚪ 当前 snapshot 未覆盖 | fixture 有 `data "aws_caller_identity" "current"`，但当前快照没有对应 declaration |
+| data source | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `aws_caller_identity.current` 已作为 `data` 落盘 |
 | provider | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `provider "aws"` 已落盘 |
 | module call | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `module "network_labels"` 已落盘 |
 | dynamic block | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `dynamic "ingress"` 已落盘 |
-| 复杂 object type | `examples/terraform-module/full/repo/main.tf` | — | ⚪ 当前 fixture 未覆盖 | 当前例子只有 `string` 与 `map(string)` |
+| 复杂 object type | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `variable.settings.type` 已冻结 `object({ env = string, retries = number })` |
 | validation | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `variable.cidr.validation` 已落盘 |
 | precondition / postcondition | `examples/terraform-module/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `precondition` 与 `postcondition` 已落盘 |
 
@@ -157,7 +157,7 @@ Terraform 的权威输入本来就是 HCL block / attribute 结构；当前 repo
 
 | 完整特性 | 当前 repo 证据 | `LSP Extractor` | `CodeIQ Extractor` | 备注 |
 | --- | --- | --- | --- | --- |
-| paths | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | 🟡 部分 | 当前主要通过 `operation` 与 path-level `parameters` 表达 path surface |
+| paths | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `/payments` 与 `/payments/{paymentId}` 已作为独立 `path` 落盘 |
 | operation | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `listPayments`、`getPayment`、`POST /payments` 等已落盘 |
 | parameter | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `RequestId` 与 path-level parameters 已落盘 |
 | requestBody | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `PaymentRequest`、`paymentEvent`、`paymentUpdated` 已落盘 |
@@ -165,7 +165,7 @@ Terraform 的权威输入本来就是 HCL block / attribute 结构；当前 repo
 | component schema | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `Payment`、`PaymentBase`、`ErrorResponse` 等已落盘 |
 | `allOf` / `oneOf` / `anyOf` | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | 组合 schema 节点已分别落盘 |
 | securityScheme | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `ApiKeyAuth`、`OAuth2` 已落盘 |
-| discriminator | `examples/openapi-spec/full/repo/openapi/payment.yaml` | — | ⚪ 当前 snapshot 未覆盖 | fixture 有 discriminator，但当前快照没有单独的 `discriminator` 记录 |
+| discriminator | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `Payment.discriminator` 已作为独立 record 落盘 |
 | external `$ref` | `examples/openapi-spec/full/snapshots/lsp/declarations.ndjson` | — | ✅ 已验证 | `./shared.yaml#/components/schemas/AlternativePayment` 已落盘 |
 
 **Repo evidence**
@@ -191,9 +191,10 @@ OpenAPI 的权威输入就是规格文本本身。当前 repo 明确不依赖 la
 
 | 项目 | 当前状态 | 下一步 |
 | --- | --- | --- |
-| Go / Rust 原生 `CodeIQ Extractor` | ⚪ 尚未实现 | 复用同一份 `examples/*/snapshots/codeiq/` 语料做交叉验证 |
+| Go / Rust 原生 `CodeIQ Extractor` | ⚪ 尚未实现 | 复用当前完整 provider 语料补充 `examples/*/snapshots/codeiq/` 做交叉验证 |
 | Terraform / OpenAPI 快照目录命名 | 🟡 当前仍放在 `snapshots/lsp/` | 后续可在不破坏 harness 的前提下补充更清晰的 provider 语义说明 |
-| 完整特性面冻结 | 🟡 已在 `spec/A001-lsp-extractor.typ` 定义 | 继续让 snapshot tests 与 docs 同步收口 |
+| OpenAPI deeper relations | 🟡 当前已覆盖 path/discriminator/ref | 后续可继续增强 discriminator mapping、callback scope 与 richer relations |
+| 完整特性面冻结 | ✅ 当前阶段已按 provider matrix 收口 | 继续让 snapshot tests、e2e 与 docs 同步演进 |
 
 ## 验证入口
 
