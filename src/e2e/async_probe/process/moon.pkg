@@ -1,0 +1,14 @@
+import {
+}
+
+import {
+  "moonbitlang/async" @async,
+  "moonbitlang/async/process" @aprocess,
+  "moonbitlang/core/encoding/utf8" @utf8,
+} for "test"
+
+options(
+  targets: {
+    "main_test.mbt": [ "native" ],
+  },
+)

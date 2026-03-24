@@ -1,0 +1,22 @@
+import {
+  "yufeiminds/codeiq/cmd/bundle" @bundle,
+  "yufeiminds/codeiq/cmd/query" @query_cmd,
+  "yufeiminds/codeiq/lib/mcp-sdk" @mcp_sdk,
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/cli" @cli,
+}
+
+import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "Milky2018/zstd" @zstd,
+} for "test"
+
+options(
+  targets: {
+    "main_test.mbt": [ "llvm" ],
+    "smoke_test.mbt": [ "native", "llvm" ],
+  },
+)

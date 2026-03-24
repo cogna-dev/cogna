@@ -17,6 +17,12 @@ pub(all) struct McpStatusResult {
 } derive(Show, Eq)
 
 ///|
+pub(all) struct McpDescriptor {
+  path : String
+  info : Json
+} derive(Show, Eq)
+
+///|
 pub(all) struct McpStopResult {
   summary : String
 } derive(Show, Eq)
@@ -51,78 +57,65 @@ fn validate_port(port : Int) -> Result[Unit, @cli.CliError] {
 }
 
 ///|
-fn tool_outlines_definition() -> Json {
-  {
-    "name": "codeiq.query.outlines",
-    "description": "List high-level outlines for a local CIQ bundle",
-    "inputSchema": {
-      "type": "object",
-      "required": ["purl"],
-      "properties": {
-        "purl": { "type": "string" },
-        "limit": { "type": "integer" },
-        "cursor": { "type": "string" },
-      },
-      "additionalProperties": false,
-    },
-  }
-}
-
-///|
-fn tool_symbol_definition() -> Json {
-  {
-    "name": "codeiq.query.symbol",
-    "description": "Query declaration details by selector",
-    "inputSchema": {
-      "type": "object",
-      "required": ["purl", "selector"],
-      "properties": {
-        "purl": { "type": "string" },
-        "selector": { "type": "string" },
-        "kind": { "type": "string" },
-        "intent": { "type": "string" },
-      },
-      "additionalProperties": false,
-    },
-  }
-}
-
-///|
 fn tool_definitions() -> Array[Json] {
-  [tool_outlines_definition(), tool_symbol_definition()]
+  @mcp_sdk.tool_definitions()
 }
 
 ///|
-fn initialize_result() -> Json {
-  {
-    "protocolVersion": "2025-11-25",
-    "capabilities": { "tools": { "listChanged": false } },
-    "serverInfo": { "name": "codeiq-mcp", "version": "0.1.0" },
-    "instructions": "Use tools/list then tools/call with local CIQ bundle references.",
+fn tools_state_path() -> String {
+  @mcp_sdk.tools_state_path()
+}
+
+///|
+fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
+  if @fs.path_exists("./dist") {
+    Ok(())
+  } else {
+    @fs.create_dir("./dist") catch {
+      err =>
+        return Err(
+          mcp_error("cannot create ./dist directory: \{err.to_string()}"),
+        )
+    }
+    Ok(())
   }
 }
 
 ///|
-fn mcp_server_info(port : Int) -> Json {
+fn sync_tools_state() -> Result[Bool, @cli.CliError] {
+  let out = @mcp_sdk.sync_tools_state()
+  guard out is Ok(changed) else { return Err(mcp_error(out.unwrap_err())) }
+  Ok(changed)
+}
+
+///|
+fn descriptor_path() -> String {
+  "./dist/mcp-server.json"
+}
+
+///|
+fn pid_json(pid : Int?) -> Json {
+  match pid {
+    Some(value) => Json::number(value.to_double(), repr="\{value}")
+    None => Json::null()
+  }
+}
+
+///|
+fn mcp_server_info(port : Int, stdio~ : Bool = true, pid? : Int) -> Json {
+  let bundle_resolved = @fs.path_exists("./dist/manifest.json")
   {
     "schemaVersion": "codeiq-mcp-descriptor/v1",
     "name": "codeiq-mcp",
     "protocolVersion": "2025-11-25",
-    "transport": "stdio",
+    "transport": if stdio { "stdio" } else { "detached-stdio" },
     "port": port,
-    "initializeResult": initialize_result(),
+    "pid": pid_json(pid),
+    "command": if stdio { "stdio-inline" } else { "moon run src/cmd/main --" },
+    "bundleResolved": bundle_resolved,
+    "initializeResult": @mcp_core.initialize_result(),
     "tools": tool_definitions(),
   }
-}
-
-///|
-fn local_query_result() -> Json? {
-  @bundle.read_local_query_result(".")
-}
-
-///|
-fn local_sarif() -> Json? {
-  @bundle.read_local_sarif(".")
 }
 
 ///|
@@ -135,241 +128,65 @@ fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
 }
 
 ///|
-fn request_id(request : Json) -> Json {
-  guard request is Object(request_object) else { return Json::null() }
-  match request_object.get("id") {
-    Some(id) => id
-    _ => Json::null()
+fn read_mcp_info(path : String) -> Result[McpDescriptor, @cli.CliError] {
+  let text = @fs.read_file_to_string(path) catch {
+    err =>
+      return Err(mcp_error("cannot read mcp info \{path}: \{err.to_string()}"))
   }
-}
-
-///|
-fn jsonrpc_success(id : Json, result : Json) -> Json {
-  { "jsonrpc": "2.0", "id": id, "result": result }
-}
-
-///|
-fn jsonrpc_error(id : Json, code : Int, message : String) -> Json {
-  {
-    "jsonrpc": "2.0",
-    "id": id,
-    "error": ({ "code": code, "message": message } : Json),
+  let parsed = try? @json.parse(text)
+  guard parsed is Ok(info) else {
+    return Err(mcp_error("mcp descriptor is not valid json"))
   }
+  Ok({ path, info })
 }
 
 ///|
-fn get_required_string(
-  args : Map[String, Json],
-  key : String,
-) -> Result[String, String] {
-  match args.get(key) {
-    Some(String(value)) => Ok(value)
-    _ => Err("missing required string argument \{key}")
-  }
-}
-
-///|
-fn get_optional_string(args : Map[String, Json], key : String) -> String? {
-  match args.get(key) {
-    Some(String(value)) => Some(value)
-    _ => None
-  }
-}
-
-///|
-fn get_optional_int(args : Map[String, Json], key : String) -> Int? {
-  match args.get(key) {
+fn descriptor_pid(info : Json) -> Int? {
+  guard info is Object(info_object) else { return None }
+  match info_object.get("pid") {
     Some(Number(value, ..)) => Some(value.to_int())
     _ => None
   }
 }
 
 ///|
-fn query_repo_by_purl(purl : String) -> String {
-  let cwd = @env.current_dir().unwrap_or(".")
-  let manifest_path = "\{cwd}/dist/manifest.json"
-  if @fs.path_exists(manifest_path) {
-    let manifest_text = @fs.read_file_to_string(manifest_path) catch { _ => "" }
-    let manifest_out = try? @json.parse(manifest_text)
-    if manifest_out is Ok(Object(manifest)) {
-      match manifest.get("purl") {
-        Some(String(found)) if found == purl => return cwd
-        _ => ()
-      }
+fn write_runtime_state_with_pid(path : String, port : Int, pid : Int) -> Result[Unit, @cli.CliError] {
+  write_mcp_info(path, mcp_server_info(port, stdio=false, pid=pid))
+}
+
+///|
+fn wait_for_process_start(pid : Int) -> Bool {
+  for _ in 0..<10 {
+    if @shell.is_alive(pid) {
+      return true
     }
+    @shell.sleep_ms(100)
   }
-  cwd
+  false
 }
 
 ///|
-fn call_result(text : String, structured : Json, is_error : Bool) -> Json {
-  {
-    "content": [{ "type": "text", "text": text }],
-    "structuredContent": structured,
-    "isError": is_error,
-  }
-}
-
-///|
-fn run_outlines_tool(args : Map[String, Json]) -> Result[Json, String] {
-  let purl_out = get_required_string(args, "purl")
-  guard purl_out is Ok(purl) else { return Err(purl_out.unwrap_err()) }
-
-  let limit = match get_optional_int(args, "limit") {
-    Some(value) => value
-    None => 20
-  }
-  let cursor = get_optional_string(args, "cursor")
-  let repo = query_repo_by_purl(purl)
-  let (outlines, next_cursor_str) = @query_cmd.query_outlines(
-    repo, purl, limit, cursor,
-  )
-  let next_cursor : Json = match next_cursor_str {
-    Some(value) => Json::string(value)
-    None => Json::null()
-  }
-  let cursor_text = match cursor {
-    Some(value) => value
-    None => ""
-  }
-
-  Ok(
-    call_result(
-      "Returned \{outlines.length()} outline(s) for \{purl}",
-      {
-        "purl": purl,
-        "limit": limit,
-        "cursor": cursor_text,
-        "outlines": outlines,
-        "nextCursor": next_cursor,
-      },
-      false,
-    ),
-  )
-}
-
-///|
-fn run_symbol_tool(args : Map[String, Json]) -> Result[Json, String] {
-  let purl_out = get_required_string(args, "purl")
-  guard purl_out is Ok(purl) else { return Err(purl_out.unwrap_err()) }
-  let selector_out = get_required_string(args, "selector")
-  guard selector_out is Ok(selector) else {
-    return Err(selector_out.unwrap_err())
-  }
-
-  let kind = match args.get("kind") {
-    Some(String(value)) => value
-    _ => "symbol"
-  }
-  let intent = match args.get("intent") {
-    Some(String(value)) => value
-    _ => "lookup"
-  }
-
-  let repo = query_repo_by_purl(purl)
-  let matches = @query_cmd.query_matches(repo, selector, kind)
-  let structured : Json = {
-    "schemaVersion": "ciq-result/v1",
-    "purl": purl,
-    "intent": intent,
-    "source": "bundle",
-    "matches": matches,
-  }
-  Ok(
-    call_result(
-      "Resolved selector \{selector} for \{purl} with \{matches.length()} match(es)",
-      structured,
-      false,
-    ),
-  )
-}
-
-///|
-pub fn serve_stdio_once(line : String) -> String {
-  let parsed = try? @json.parse(line)
-  let response = match parsed {
-    Ok(request) => handle_request(request)
-    Err(_) => jsonrpc_error(Json::null(), -32700, "parse error")
-  }
-  response.stringify(indent=0)
-}
-
-///|
-pub fn run_stdio_repl() -> Unit {
-  let stdin_text = @fs.read_file_to_string("/dev/stdin") catch { _ => "" }
-  let lines = stdin_text.split("\n").to_array()
-  for i in 0..<lines.length() {
-    let line = lines[i].to_string().trim().to_string()
-    if line == "" {
-      continue
+fn wait_for_process_stop(pid : Int) -> Bool {
+  for _ in 0..<20 {
+    if !@shell.is_alive(pid) {
+      return true
     }
-    println(serve_stdio_once(line))
+    @shell.sleep_ms(100)
   }
+  false
 }
 
 ///|
-fn handle_tool_call(params : Json) -> Result[Json, (Int, String)] {
-  guard params is Object(params_object) else {
-    return Err((-32602, "tools/call params must be an object"))
+fn spawn_detached_stdio_process(port : Int) -> Result[Int, @cli.CliError] {
+  let command = "moon run src/cmd/main -- mcp serve --port \{port}"
+  let spawn_out = @shell.spawn_detached(command)
+  guard spawn_out is Ok(pid) else {
+    return Err(mcp_error(spawn_out.unwrap_err()))
   }
-  guard params_object.get("name") is Some(String(name)) else {
-    return Err((-32602, "tools/call missing tool name"))
-  }
-
-  let args : Map[String, Json] = match params_object.get("arguments") {
-    Some(Object(arguments)) => arguments
-    Some(Null) => {}
-    None => {}
-    _ => return Err((-32602, "tools/call arguments must be an object"))
-  }
-
-  match name {
-    "codeiq.query.outlines" =>
-      match run_outlines_tool(args) {
-        Ok(result) => Ok(result)
-        Err(message) => Err((-32602, message))
-      }
-    "codeiq.query.symbol" =>
-      match run_symbol_tool(args) {
-        Ok(result) => Ok(result)
-        Err(message) => Err((-32602, message))
-      }
-    _ => Err((-32601, "unknown tool: \{name}"))
-  }
-}
-
-///|
-pub fn handle_request(request : Json) -> Json {
-  let id = request_id(request)
-  guard request is Object(request_object) else {
-    return jsonrpc_error(id, -32600, "invalid request: expected object")
-  }
-  guard request_object.get("method") is Some(String(method_name)) else {
-    return jsonrpc_error(id, -32600, "invalid request: missing method")
-  }
-
-  let params : Json = match request_object.get("params") {
-    Some(value) => value
-    _ => Json::object({})
-  }
-
-  match method_name {
-    "initialize" => jsonrpc_success(id, initialize_result())
-    "ping" =>
-      jsonrpc_success(id, {
-        "status": "ok",
-        "localArtifacts": {
-          "queryResult": local_query_result() is Some(_),
-          "sarif": local_sarif() is Some(_),
-        },
-      })
-    "tools/list" => jsonrpc_success(id, { "tools": tool_definitions() })
-    "tools/call" =>
-      match handle_tool_call(params) {
-        Ok(result) => jsonrpc_success(id, result)
-        Err((code, message)) => jsonrpc_error(id, code, message)
-      }
-    _ => jsonrpc_error(id, -32601, "method not found: \{method_name}")
+  if wait_for_process_start(pid) {
+    Ok(pid)
+  } else {
+    Err(mcp_error("detached MCP process did not start in time"))
   }
 }
 
@@ -380,34 +197,53 @@ pub fn run_start(
   let port_out = validate_port(params.port)
   guard port_out is Ok(_) else { return Err(port_out.unwrap_err()) }
 
-  if !@fs.path_exists("./dist") {
-    @fs.create_dir("./dist") catch {
-      err =>
-        return Err(
-          mcp_error("cannot create ./dist directory: \{err.to_string()}"),
-        )
-    }
-  }
-
-  let info_path = "./dist/mcp-server.json"
-  let write_out = write_mcp_info(info_path, mcp_server_info(params.port))
-  guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
+  let dist_out = ensure_dist_dir()
+  guard dist_out is Ok(_) else { return Err(dist_out.unwrap_err()) }
 
   if params.stdio {
-    run_stdio_repl()
+    return Err(
+      mcp_error(
+        "inline stdio mode moved to `codeiq mcp serve`; use `codeiq mcp start --stdio false` for detached mode",
+      ),
+    )
   }
+
+  let pid_out = spawn_detached_stdio_process(params.port)
+  guard pid_out is Ok(pid) else { return Err(pid_out.unwrap_err()) }
+  let info_path = descriptor_path()
+  let write_out = write_runtime_state_with_pid(info_path, params.port, pid)
+  guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
+  let sync_out = sync_tools_state()
+  guard sync_out is Ok(_) else { return Err(sync_out.unwrap_err()) }
+  @mcp_sdk.clear_runtime_state()
 
   Ok({
     port: params.port,
-    summary: "Started MCP stdio loop with descriptor at \{info_path} (port \{params.port})",
+    summary: "Started MCP detached stdio process with descriptor at \{info_path} (port \{params.port}, pid \{pid})",
   })
 }
 
 ///|
 pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
-  let info_path = "./dist/mcp-server.json"
+  let info_path = descriptor_path()
   if @fs.path_exists(info_path) {
-    Ok({ status: "running", summary: "MCP descriptor found at \{info_path}" })
+    let info_out = read_mcp_info(info_path)
+    guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }
+    match descriptor_pid(descriptor.info) {
+      Some(pid) =>
+        if @shell.is_alive(pid) {
+          Ok({
+            status: "running",
+            summary: "MCP descriptor found at \{info_path} with live pid \{pid}",
+          })
+        } else {
+          Ok({
+            status: "stopped",
+            summary: "MCP descriptor found at \{info_path} but pid \{pid} is not running",
+          })
+        }
+      None => Ok({ status: "running", summary: "MCP descriptor found at \{info_path}" })
+    }
   } else {
     Ok({
       status: "stopped",
@@ -418,14 +254,46 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
 
 ///|
 pub fn run_stop() -> @cli.CliResult[McpStopResult, @cli.CliError] {
-  let info_path = "./dist/mcp-server.json"
+  let info_path = descriptor_path()
+  let state_path = tools_state_path()
+  @mcp_sdk.clear_runtime_state()
   if @fs.path_exists(info_path) {
+    let info_out = read_mcp_info(info_path)
+    guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }
+    match descriptor_pid(descriptor.info) {
+      Some(pid) => {
+        if @shell.is_alive(pid) {
+          ignore(@shell.terminate(pid))
+          if !wait_for_process_stop(pid) {
+            ignore(@shell.force_kill(pid))
+            ignore(wait_for_process_stop(pid))
+          }
+        }
+      }
+      None => ()
+    }
     @fs.remove_file(info_path) catch {
       err =>
         return Err(mcp_error("cannot remove \{info_path}: \{err.to_string()}"))
     }
+    if @fs.path_exists(state_path) {
+      @fs.remove_file(state_path) catch {
+        err =>
+          return Err(
+            mcp_error("cannot remove \{state_path}: \{err.to_string()}"),
+          )
+      }
+    }
     Ok({ summary: "Removed MCP descriptor at \{info_path}" })
   } else {
+    if @fs.path_exists(state_path) {
+      @fs.remove_file(state_path) catch {
+        err =>
+          return Err(
+            mcp_error("cannot remove \{state_path}: \{err.to_string()}"),
+          )
+      }
+    }
     Ok({ summary: "MCP already stopped (no descriptor at \{info_path})" })
   }
 }

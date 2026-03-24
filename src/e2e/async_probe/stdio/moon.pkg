@@ -1,0 +1,13 @@
+import {
+}
+
+import {
+  "moonbitlang/async" @async,
+  "moonbitlang/async/stdio" @astdio,
+} for "test"
+
+options(
+  targets: {
+    "main_test.mbt": [ "native" ],
+  },
+)

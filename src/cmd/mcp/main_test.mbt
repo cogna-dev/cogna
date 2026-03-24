@@ -15,6 +15,7 @@ fn remove_dir_if_exists(path : String) -> Unit {
 ///|
 fn cleanup_tmp_dir(dir : String) -> Unit {
   remove_file_if_exists("\{dir}/dist/mcp-server.json")
+  remove_file_if_exists("\{dir}/dist/mcp-tools-state.json")
   remove_dir_if_exists("\{dir}/dist")
   remove_dir_if_exists(dir)
 }
@@ -30,10 +31,8 @@ test "mcp start writes server descriptor" {
     cleanup_tmp_dir(dir)
     fail("mcp start should succeed")
   }
-  inspect(
-    ok.display(),
-    content="Started MCP stdio loop with descriptor at ./dist/mcp-server.json (port 8080)",
-  )
+  assert_true(ok.display().contains("Started MCP detached stdio process"))
+  assert_true(ok.display().contains("pid "))
 
   let content = @fs.read_file_to_string("./dist/mcp-server.json") catch {
     _ => {
@@ -44,11 +43,16 @@ test "mcp start writes server descriptor" {
   }
   assert_true(content.contains("\"name\": \"codeiq-mcp\""))
   assert_true(content.contains("\"protocolVersion\": \"2025-11-25\""))
+  assert_true(content.contains("\"bundleResolved\""))
+  assert_true(content.contains("\"listChanged\": true"))
   assert_true(content.contains("\"initializeResult\""))
   assert_true(content.contains("\"codeiq.query.outlines\""))
   assert_true(content.contains("\"codeiq.query.symbol\""))
+  assert_true(content.contains("\"transport\": \"detached-stdio\""))
+  assert_true(content.contains("\"pid\":"))
+  assert_true(@fs.path_exists("./dist/mcp-tools-state.json"))
 
-  remove_file_if_exists("./dist/mcp-server.json")
+  ignore(run_stop())
   cleanup_tmp_dir(dir)
 }
 
@@ -65,6 +69,15 @@ test "mcp start rejects invalid port" {
 }
 
 ///|
+test "mcp start rejects inline stdio mode" {
+  let out = run_start({ port: 3000, stdio: true })
+  guard out is Err(error) else {
+    fail("mcp start with stdio=true should fail")
+  }
+  assert_true(error.to_string().contains("mcp serve"))
+}
+
+///|
 test "mcp status reports stopped when descriptor missing" {
   @fs.remove_file("./dist/mcp-server.json") catch {
     _ => ()
@@ -75,292 +88,23 @@ test "mcp status reports stopped when descriptor missing" {
 }
 
 ///|
+test "mcp status reports running for live pid descriptor" {
+  let start_out = run_start({ port: 3010, stdio: false })
+  guard start_out is Ok(_) else { fail("mcp start should succeed") }
+  let out = run_status()
+  guard out is Ok(result) else { fail("mcp status should succeed") }
+  assert_true(result.display().contains("live pid"))
+  ignore(run_stop())
+}
+
+///|
 test "mcp stop removes descriptor when present" {
-  @fs.create_dir("./dist") catch {
-    _ => ()
-  }
-  @fs.write_string_to_file("./dist/mcp-server.json", "{}") catch {
-    _ => fail("failed to write mcp descriptor")
-  }
+  let start_out = run_start({ port: 3020, stdio: false })
+  guard start_out is Ok(_) else { fail("mcp start should succeed") }
 
   let out = run_stop()
   guard out is Ok(result) else { fail("mcp stop should succeed") }
   assert_true(result.display().contains("Removed MCP descriptor"))
   assert_true(!@fs.path_exists("./dist/mcp-server.json"))
-}
-
-///|
-fn parse_json_or_fail(text : String) -> Json {
-  let parsed = try? @json.parse(text)
-  guard parsed is Ok(value) else { abort("invalid json in test") }
-  value
-}
-
-///|
-test "mcp initialize request returns protocol metadata" {
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 1,
-      #|  "method": "initialize",
-      #|  "params": {}
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"protocolVersion\": \"2025-11-25\""))
-  assert_true(response.contains("\"codeiq-mcp\""))
-}
-
-///|
-test "mcp tools list includes outlines and symbol" {
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 2,
-      #|  "method": "tools/list",
-      #|  "params": {}
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"tools\""))
-  assert_true(response.contains("\"codeiq.query.outlines\""))
-  assert_true(response.contains("\"codeiq.query.symbol\""))
-}
-
-///|
-test "mcp tools list response matches schema" {
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 20,
-      #|  "method": "tools/list",
-      #|  "params": {}
-      #|}
-    ),
-  )
-  let response = handle_request(request)
-  guard response is Object(response_object) else {
-    fail("response should be object")
-  }
-  guard response_object.get("result") is Some(Object(result_object)) else {
-    fail("tools/list response should contain result object")
-  }
-  guard result_object.get("tools") is Some(Array(tools)) else {
-    fail("tools/list response should contain tools array")
-  }
-  assert_true(tools.length() == 2)
-}
-
-///|
-test "mcp tools call returns structured content" {
-  @fs.create_dir("./dist") catch {
-    _ => ()
-  }
-  let declarations =
-    #|{"id":"decl:payment:create","kind":"operation","path":"payment::create","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
-    #|
-  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => fail("failed to compress declaration fixture")
-  }
-  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", compressed) catch {
-    _ => fail("failed to write declaration fixture")
-  }
-
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 3,
-      #|  "method": "tools/call",
-      #|  "params": {
-      #|    "name": "codeiq.query.symbol",
-      #|    "arguments": {
-      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01",
-      #|      "selector": "payment::create",
-      #|      "kind": "operation"
-      #|    }
-      #|  }
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"isError\": false"))
-  assert_true(response.contains("\"schemaVersion\": \"ciq-result/v1\""))
-  assert_true(response.contains("\"source\": \"bundle\""))
-  assert_true(response.contains("\"decl:payment:create\""))
-
-  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
-    _ => ()
-  }
-}
-
-///|
-test "mcp tools call uses local query result when available" {
-  @fs.create_dir("./dist") catch {
-    _ => ()
-  }
-  let local_result =
-    #|{
-    #|  "schemaVersion": "ciq-result/v1",
-    #|  "purl": "pkg:openapi/acme/payment-api@2026.04.01",
-    #|  "matches": [
-    #|    {
-    #|      "id": "decl:local:payment::create",
-    #|      "kind": "operation",
-    #|      "signature": "POST /payment/create",
-    #|      "location": {"uri": "openapi/payment.yaml", "startLine": 10, "endLine": 22}
-    #|    }
-    #|  ]
-    #|}
-  @fs.write_string_to_file("./dist/query.result.json", local_result) catch {
-    _ => fail("failed to write local query result fixture")
-  }
-
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 23,
-      #|  "method": "tools/call",
-      #|  "params": {
-      #|    "name": "codeiq.query.symbol",
-      #|    "arguments": {
-      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01",
-      #|      "selector": "payment::create",
-      #|      "kind": "operation"
-      #|    }
-      #|  }
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"source\": \"bundle\""))
-  assert_true(response.contains("\"matches\": []"))
-
-  @fs.remove_file("./dist/query.result.json") catch {
-    _ => ()
-  }
-}
-
-///|
-test "mcp stdio once handles parse error" {
-  let response = serve_stdio_once("{")
-  assert_true(response.contains("-32700"))
-}
-
-///|
-test "mcp ping reports local artifact availability" {
-  @fs.create_dir("./dist") catch {
-    _ => ()
-  }
-  @fs.write_string_to_file("./dist/check.sarif.json", "{}") catch {
-    _ => fail("failed to write local sarif fixture")
-  }
-
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 24,
-      #|  "method": "ping",
-      #|  "params": {}
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"status\": \"ok\""))
-  assert_true(response.contains("\"sarif\": true"))
-
-  @fs.remove_file("./dist/check.sarif.json") catch {
-    _ => ()
-  }
-}
-
-///|
-test "mcp tools call outlines accepts limit and cursor" {
-  @fs.create_dir("./dist") catch {
-    _ => ()
-  }
-  let declarations =
-    #|{"id":"decl:1","kind":"operation","path":"openapi/payment.yaml","signature":"operation listPayments","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
-    #|{"id":"decl:2","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":21,"endLine":30}}
-    #|
-  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => fail("failed to compress declaration fixture")
-  }
-  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", compressed) catch {
-    _ => fail("failed to write declaration fixture")
-  }
-
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 21,
-      #|  "method": "tools/call",
-      #|  "params": {
-      #|    "name": "codeiq.query.outlines",
-      #|    "arguments": {
-      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01",
-      #|      "limit": 1,
-      #|      "cursor": "cursor:1"
-      #|    }
-      #|  }
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"Returned 1 outline"))
-  assert_true(response.contains("\"limit\": 1"))
-
-  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
-    _ => ()
-  }
-}
-
-///|
-test "mcp tools call reports missing required argument" {
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 22,
-      #|  "method": "tools/call",
-      #|  "params": {
-      #|    "name": "codeiq.query.symbol",
-      #|    "arguments": {
-      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01"
-      #|    }
-      #|  }
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"code\": -32602"))
-  assert_true(response.contains("missing required string argument selector"))
-}
-
-///|
-test "mcp tools call unknown tool returns jsonrpc error" {
-  let request = parse_json_or_fail(
-    (
-      #|{
-      #|  "jsonrpc": "2.0",
-      #|  "id": 4,
-      #|  "method": "tools/call",
-      #|  "params": {
-      #|    "name": "codeiq.query.unknown",
-      #|    "arguments": {}
-      #|  }
-      #|}
-    ),
-  )
-  let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"code\": -32601"))
-  assert_true(response.contains("unknown tool"))
+  assert_true(!@fs.path_exists("./dist/mcp-tools-state.json"))
 }

@@ -8,6 +8,8 @@ order: 4
 
 CodeIQ 的 MCP Agent 是一个本地常驻内存查询代理。它的作用不是构建 bundle，也不是执行差异比较或策略检查，而是在 bundle 已经准备好的前提下，为 AI 客户端提供高频查询能力。
 
+在当前 R5 主线里，它更准确的角色是：#strong[review consumption surface]。也就是先由 CLI 生成 bundle、diff、SARIF、query result，再由 MCP 为审查者或 Agent 暴露稳定的查询入口。
+
 在这个模型里：
 
 - `build` 负责生成 `CIQ Bundle` 或 `CIQ OPA Bundle`
@@ -83,6 +85,14 @@ codeiq mcp stop
 
 - `status`：检查当前服务是否可用，适合排查连接问题或自动化探活。
 - `stop`：在本地开发或脚本收尾阶段关闭服务。
+
+如果需要以前台 stdio 方式直接与 MCP 客户端对接，可使用：
+
+```bash
+codeiq mcp serve
+```
+
+该模式会直接进入 stdio request/response loop，不再走 detached lifecycle。
 
 ## 本地 MCP 与 CLI 的边界
 
