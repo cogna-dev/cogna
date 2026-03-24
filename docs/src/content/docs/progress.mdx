@@ -138,8 +138,10 @@ order: 6
 ## 下一步（按 R7 收口任务执行）
 
 1. 进入 `R8`：处理 signature path、shared verifier feasibility 与 trust 议题。
-2. 在 `R8` 完成后进入 `R9`：处理 deployment / auth / security / ops 收口。
-3. 继续保持 MoonBit 工具链回归跟踪，待上游修复后恢复更多 native/js 全量回归。
+2. 在 `R8` 开始实现前，先保留并跟踪当前 MoonBit native `link-core` ICE 的独立最小 repro：`repro/moonbit-link-core-ice/`。
+3. 当前已确认最小触发条件为 native blackbox test 中的 live `@zstd.compress(b"")` 调用；`plain_control` / `zstd import-only` / `dead declaration` / normal `build --target native` 均为对照通过。
+4. 在 `R8` 完成后进入 `R9`：处理 deployment / auth / security / ops 收口。
+5. 继续保持 MoonBit 工具链回归跟踪，待上游修复后恢复更多 native/js 全量回归。
 
 ## 相关文档
 
