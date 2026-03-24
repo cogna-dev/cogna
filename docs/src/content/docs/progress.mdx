@@ -8,7 +8,7 @@ order: 6
 
 > 最后更新时间：2026-03-24（Asia/Shanghai）
 
-此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步：当前 roadmap 已重新排序，优先关闭主业务流程，再做单机 registry 基线，最后再处理 trust / deployment / security。
+此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步：当前 roadmap 已重新排序，先完成主业务流程与单机 registry 基线，再优先关闭 provider 能力矩阵覆盖，最后再处理 trust / deployment / security。
 
 ## 当前总览（唯一状态面板）
 
@@ -20,144 +20,125 @@ order: 6
 | R4 | Externalization Hardening | ✅ Completed | process lifecycle hardening 已交付 |
 | R5 | Core Workflow Complete | ✅ Completed | 主业务流程闭环已完成并完成收口 |
 | R6 | Single-Machine Registry Baseline | ✅ Completed | 单机/免认证 registry + publish baseline 已完成并关闭 |
-| R7 | Registry Trust & Verifier | ⚪ Planned | 再处理 signature path、shared verifier 与 trust 议题 |
-| R8 | Deployment & Security Hardening | ⚪ Planned | 最后处理部署、auth、security、ops 与企业级 hardening |
+| R7 | Provider Matrix Coverage | ✅ Completed | Go / Rust / Terraform / OpenAPI provider 证据面已完成收口 |
+| R8 | Registry Trust & Verifier | ⚪ Planned | Provider matrix 收口后再处理 signature path、shared verifier 与 trust 议题 |
+| R9 | Deployment & Security Hardening | ⚪ Planned | 最后处理部署、auth、security、ops 与企业级 hardening |
 
 ## 已完成阶段（摘要）
 
-- `R1-R4` 已完成并冻结为当前 repo 基线；
+- `R1-R6` 已完成并冻结为当前 repo 基线；
 - `R5` 已完成，主业务流程 `init → build → diff → check → query → MCP review` 已形成稳定闭环；
-- 当前看板不再保留 `R5` 的执行清单，只保留当前 active release（`R6`）的唯一执行清单。
+- `R6` 已完成，单机/免认证 registry + publish baseline 已关闭；
+- 当前看板记录最新完成阶段与下一阶段方向：`R7` 已完成，下一步进入 `R8`。
 
-## R6 · Single-Machine Registry Baseline（Completed）
+## R7 · Provider Matrix Coverage（Completed）
 
 **Scope**
 
-- 收口单机、免认证 registry baseline，聚焦本地 artifact movement：
-  - `publish` 写入本地 registry；
-  - `registry upload-local / download-local / download(materialize)` 可回归；
-  - upload/download/receipt contract 与命令行为保持一致。
+- 把 `spec/A001-lsp-extractor.typ` 中列出的 provider 能力面尽量冻结为 repo 证据：
+  - Go：package doc、embedded field、generic type/function、deprecated / 注释样本；
+  - Rust：独立 doc comment 样本；
+  - Terraform：data source、复杂 object type；
+  - OpenAPI：path、discriminator、reference normalization。
 
 **Done when**
 
-- `publish ↔ registry(upload-local/download-local/download)` 单机闭环稳定；
-- `codeiq-registry-upload/v1`、`codeiq-registry-download/v1`、`codeiq-publish-receipt/v1` contract 与实现一致；
-- R6 对外文档（plan/progress/CLI）和验证命令保持一致。
+- `examples/*/full/repo/*` 对四类 provider 的完整能力样本与 `examples/*/full/snapshots/lsp/*` 对齐；
+- `src/cmd/build/extractor.mbt`、`src/lib/hcl/parse.mbt` 与 tests 能稳定产出新的 provider records；
+- plan / progress / providers docs 对当前 active release 与验证命令保持一致。
 
 **Verify**
 
-- `moon test src/cmd/registry/main_test.mbt --target wasm -v`
-- `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v`
-- `moon test src/cmd/publish/main_test.mbt --target wasm -v`
-- `moon test src/e2e/registry_test.mbt --target wasm -v`
-- `moon test src/schema/contracts_test.mbt --target native -v`
+- `moon check`
+- `moon test src/cmd/build/snapshot_test.mbt`
+- `moon test src/e2e/lsp_extractor_test.mbt`
 - `pnpm build`（在 `docs/` 下）
 
 **Out of scope**
 
-- registry HTTP server productization、shared verifier、hosted deployment、KMS/key rotation。
+- shared verifier、auth、hosted deployment、KMS/key rotation。
 
-## R6 执行清单（唯一执行清单）
+## R7 执行清单（唯一执行清单）
 
-### R6-1 · Registry command contract freeze
+### R7-1 · Provider fixture / snapshot closure
 
 **状态：✅ Completed**
 
-- **Goal**：固定 `registry upload-local / download-local / download(materialize)` 的本地 contract、ETag/304 语义与输出产物。
-- **Main touchpoints**：`src/cmd/registry/main.mbt`、`src/cmd/registry/main_test.mbt`、`src/cmd/registry/download_bundle_test.mbt`、`src/schema/contracts_test.mbt`、`docs/src/content/docs/cli.mdx`
-- **Depends on**：`R5`
+- **Goal**：补齐 examples 语料与 snapshots，让 provider matrix 的关键缺口都有 repo 级证据。
+- **Main touchpoints**：`examples/go-module/full/repo/main.go`、`examples/rust-crate/full/repo/lib.rs`、`examples/terraform-module/full/repo/main.tf`、`examples/openapi-spec/full/repo/openapi/payment.yaml`、`examples/*/full/snapshots/lsp/*`
+- **Depends on**：`R6`
 - **Done when**：
-  - `codeiq-registry-upload/v1`、`codeiq-registry-download/v1` 的字段、状态码与 materialize 行为稳定；
-  - `upload-local` / `download-local` / `download --output` 的 CLI 文档与测试一致；
-  - 本地 index/bundles 布局被视为当前单机 baseline 真值源。
+  - Go snapshot 覆盖 package doc、embedded field、generic type/function、deprecated / 注释样本；
+  - Rust snapshot 覆盖独立 doc comment；
+  - Terraform snapshot 覆盖 data source 与 object type；
+  - OpenAPI snapshot 覆盖 path 与 discriminator。
 - **Verify**：
-  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target native -v`
-- **Out of scope**：HTTP server、远端 registry productization。
+  - `moon test src/cmd/build/snapshot_test.mbt`
+- **Out of scope**：原生 `CodeIQ Extractor` 交叉验证实现。
 
-### R6-2 · Publish local-registry path stabilization
+### R7-2 · Extractor implementation closure
 
 **状态：✅ Completed**
 
-- **Goal**：固定 `publish` 写入本地 registry 的路径、receipt 语义与 already-exists 语义。
-- **Main touchpoints**：`src/cmd/publish/main.mbt`、`src/cmd/publish/main_test.mbt`、`src/cmd/registry/main.mbt`、`docs/src/content/docs/cli.mdx`
-- **Depends on**：`R6-1`
+- **Goal**：让 build-time extractor 与 parser-first/provider-specific 路径真实产出 provider matrix 所需 records，而不是只在 docs 中声明。
+- **Main touchpoints**：`src/cmd/build/extractor.mbt`、`src/lib/hcl/parse.mbt`、`src/e2e/lsp_extractor_test.mbt`
+- **Depends on**：`R7-1`
 - **Done when**：
-  - `codeiq-publish-receipt/v1` 与 registry 返回值在本地 baseline 上保持一致；
-  - `publish` 的 `published` / `already-exists` 语义稳定；
-  - 当前 no-auth baseline 的 signature metadata 行为在文档中明确表达为“记录但不产品化 trust”。
-- **Verify**：
-  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target native -v`
-- **Out of scope**：shared verifier、trust root、key rotation。
-
-### R6-3 · Single-machine end-to-end registry proof
-
-**状态：✅ Completed**
-
-- **Goal**：把 `build → registry upload-local → registry download-local → publish → registry download(materialize)` 固定为单机 e2e 证据链。
-- **Main touchpoints**：`src/e2e/registry_test.mbt`、`src/e2e/moon.pkg`、`src/cmd/build/*`、`src/cmd/registry/*`、`src/cmd/publish/*`
-- **Depends on**：`R6-1`、`R6-2`
-- **Done when**：
-  - e2e 测试覆盖 build bundle、写入 registry、解析 metadata、生成 publish receipt、materialize bundle；
-  - 该链路成为单机 registry baseline 的主证据，而不是散落在命令级测试中；
-  - dashboard/CLI 文档都引用该 e2e 证据链。
-- **Verify**：
-  - `moon test src/e2e/registry_test.mbt --target wasm -v`
-- **Out of scope**：跨机器共享、auth、hosted operations。
-
-### R6-4 · Dashboard / docs / release closeout
-
-**状态：✅ Completed**
-
-- **Goal**：让 progress / CLI / plan 对 R6 范围、验证矩阵和已知限制保持一致，并为关闭 R6 做准备。
-- **Main touchpoints**：`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx`、`spec/plan.typ`
-- **Depends on**：`R6-1`、`R6-2`、`R6-3`
-- **Done when**：
-  - 当前看板只保留 R6 执行清单，不再保留 R5 与 R7+ 的执行清单；
-  - R6 验证命令、已知限制（native large-graph ICE → wasm target workaround）与 out-of-scope 叙述一致；
-  - docs build 继续通过。
+  - Terraform inline data block 能被 parser-first 路径提取；
+  - OpenAPI path / discriminator / `$ref` normalization 能稳定落盘；
+  - Go field / embedded field 与 Rust doc comment 样本能稳定进入 bundle records。
 - **Verify**：
   - `moon check`
+  - `moon test src/e2e/lsp_extractor_test.mbt`
+- **Out of scope**：LSP runtime productization、shared verifier。
+
+### R7-3 · Provider docs / dashboard / release alignment
+
+**状态：✅ Completed**
+
+- **Goal**：让 `providers/progress/plan` 对 active release、provider coverage 现状和验证矩阵保持一致。
+- **Main touchpoints**：`docs/src/content/docs/providers.mdx`、`docs/src/content/docs/progress.mdx`、`spec/plan.typ`
+- **Depends on**：`R7-1`、`R7-2`
+- **Done when**：
+  - 文档把 provider matrix 作为当前 active release 明确写出；
+  - progress / plan 与 provider docs 对 release 顺序、验证命令和下一步保持一致；
+  - docs build 继续通过。
+- **Verify**：
   - `pnpm build`（在 `docs/` 下）
-- **Out of scope**：R7/R8 的具体实施计划。
+- **Out of scope**：同时展开 `R8+` 的 trust / deployment 实施细节。
 
-## 当前验证状态（R6相关）
+## 当前验证状态（R7相关）
 
-以下结果是当前 `R6` 可继续复用的基线证据：
+以下结果是当前 `R7` provider matrix 可继续复用的基线证据：
 
 | 验证项 | 结果 | 备注 |
 | --- | --- | --- |
-| `moon test src/cmd/registry/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 registry upload/download/inproc/signature/digest contract |
-| `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 registry download materialize 产物 |
-| `moon test src/cmd/publish/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 publish local/remote-stub receipt contract |
-| `moon test src/e2e/registry_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 build→registry upload/download→publish→materialize 单机闭环 |
-| `moon test src/schema/contracts_test.mbt --target native -v` | ✅ 通过（本轮） | 覆盖 registry/upload/download/receipt schema contract |
+| `moon test src/cmd/build/snapshot_test.mbt` | ✅ 通过（本轮） | 覆盖四类 provider snapshots 与 metadata |
+| `moon test src/e2e/lsp_extractor_test.mbt` | ✅ 通过（本轮） | 新增 Go / Rust / Terraform / OpenAPI provider evidence assertions |
 | `moon check` | ✅ 通过（本轮） | 当前为 warnings only（0 errors） |
-| `pnpm build`（`docs/`） | ✅ 通过 | 当前文档站可构建 |
+| `pnpm build`（`docs/`） | ✅ 通过（本轮） | 当前文档站可构建 |
 
 **环境说明**
 
-- 当前大图 native 测试仍会触发 MoonBit 编译器 ICE（`Invalid_argument("Moonc.Basic_lst.iter2")`），因此 `registry/publish/e2e registry` 的主验证目标暂固定为 `wasm`；
-- 该 workaround 只影响验证 target，不改变当前单机 registry baseline 的功能语义。
+- 当前大图 native 测试仍会触发 MoonBit 编译器 ICE（`Invalid_argument("Moonc.Basic_lst.iter2")`），但本轮 provider coverage 验证主要落在 build snapshot / e2e extractor 路径；
+- `moon check` 仍为当前 MoonBit 代码修改的主错误门槛，warnings 为既有基线。
 
 ## 非当前执行项（只保留方向）
 
-- `R7`：处理 signature path、shared verifier feasibility、trust 模型；
-- `R8`：处理 deployment、auth、security、ops 与企业级 hardening；
+- `R8`：处理 signature path、shared verifier feasibility、trust 模型；
+- `R9`：处理 deployment、auth、security、ops 与企业级 hardening；
 - 它们不是当前 release 的执行清单，不在本页继续展开。
 
 ## 本轮补充文档
 
-- `docs/src/content/docs/progress.mdx`：已完成 R6 收口并将状态更新为 completed；
-- `docs/src/content/docs/cli.mdx`：已补充 `registry upload-local/download-local/download` 命令文档并与 R6 语义对齐。
-- `src/e2e/registry_test.mbt`：新增 R6 单机 registry/publish 闭环 e2e 证据（build→upload-local→download-local→publish→download materialize）。
+- `docs/src/content/docs/providers.mdx`：已更新 provider 覆盖矩阵，纳入 Go/Rust/Terraform/OpenAPI 新证据；
+- `docs/src/content/docs/progress.mdx`：已完成 provider matrix dashboard 收口；
+- `spec/plan.typ`：已把下一阶段从 trust/verifier 调整为 provider matrix coverage，并完成本轮收口。
 
-## 下一步（按 R6 收口任务执行）
+## 下一步（按 R7 收口任务执行）
 
-1. 进入 `R7`：处理 signature path、shared verifier feasibility 与 trust 议题。
-2. 在 `R7` 完成后进入 `R8`：处理 deployment / auth / security / ops 收口。
+1. 进入 `R8`：处理 signature path、shared verifier feasibility 与 trust 议题。
+2. 在 `R8` 完成后进入 `R9`：处理 deployment / auth / security / ops 收口。
 3. 继续保持 MoonBit 工具链回归跟踪，待上游修复后恢复更多 native/js 全量回归。
 
 ## 相关文档
