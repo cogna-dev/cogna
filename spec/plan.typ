@@ -9,19 +9,20 @@
     (name: "Yufei Li", email: "yufeiminds@gmail.com", affiliation: ""),
   ),
   abstract: [
-    本文重新设计 CodeIQ 的当前 release plan，核心原则是#strong[先闭环主业务流程，再做分发、部署与安全加固]。仓库已经具备 `init → build → diff → check → query → mcp` 的本地工作流和大量 e2e / unit test 证据，而 registry / publish / signature / verifier 虽然已有局部实现，但它们不应继续占据当前 release 的中心。新的计划因此把优先级调整为三层：第一层是开发代码提取、分析、审查主流程；第二层是单机 registry + 免认证基线；第三层才是 registry 信任链、部署与安全硬化。
+    本文重新设计 CodeIQ 的当前 release plan，核心原则是#strong[先闭环主业务流程与 provider 证据面，再处理分发信任链、部署与安全加固]。仓库已经具备 `init → build → diff → check → query → mcp` 的本地工作流、单机 registry baseline 与大量 e2e / unit test 证据，而下一阶段最缺的不是 registry trust，而是#strong[把 Go / Rust / Terraform / OpenAPI 的 provider 能力矩阵完整冻结成 repo 级证据]。新的计划因此把优先级调整为四层：第一层是开发代码提取、分析、审查主流程；第二层是单机 registry + 免认证基线；第三层是 provider matrix coverage；第四层才是 registry 信任链、部署与安全硬化。
   ],
-  keywords: ("CodeIQ", "Plan", "Workflow", "Registry", "MCP", "Security"),
-  date: "March 23, 2026",
+  keywords: ("CodeIQ", "Plan", "Workflow", "Registry", "Providers", "Security"),
+  date: "March 24, 2026",
 )
 
 = 计划定位
 
-这份计划只回答三个问题：
+这份计划只回答四个问题：
 
 - #strong[当前最应优先关闭的主业务流程是什么]；
 - #strong[单机 registry 与免认证基线应该排在什么位置]；
-- #strong[哪些 registry / verifier / deployment / security 工作必须明确降级到后续 release]。
+- #strong[provider 能力矩阵何时收口为 repo 级证据]；
+- #strong[哪些 trust / deployment / security 工作必须明确降级到后续 release]。
 
 本计划继续遵循以下硬约束：
 
@@ -41,10 +42,10 @@
   [`init/build/diff/check/query`], [#strong[本地基线已形成]], [主业务流程已经存在 repo 级命令实现与 e2e 证据], [`src/e2e/init_test.mbt`；`src/cmd/build/main_test.mbt`；`src/cmd/diff/main_test.mbt`；`src/cmd/check/main_test.mbt`；`src/cmd/query/main_test.mbt`],
   [`build-time extractor baseline`], [#strong[已形成第一版]], [LSP extractor 已作为 build-time baseline 接入；Terraform 已转向 `lib/hcl`], [`src/e2e/lsp_extractor_test.mbt`；`src/cmd/build/extractor.mbt`；`src/lib/hcl/*`],
   [`MCP review surface`], [#strong[局部闭环]], [`mcp start / status / stop`、`tools/list`、`tools/call` 已存在；可消费本地 bundle 查询结果], [`src/cmd/mcp/main_test.mbt`；`src/e2e/review/lifecycle_test.mbt`；`src/lib/mcp-sdk/*`],
-  [`single-machine publish / registry stub`], [#strong[存在但降级]], [本地 publish / registry stub 已实现，但不再作为当前 release 中心], [`src/cmd/registry/main_test.mbt`；`src/cmd/registry/download_bundle_test.mbt`；`src/cmd/publish/main_test.mbt`],
+  [`single-machine publish / registry stub`], [#strong[已完成并降级]], [本地 publish / registry stub 已实现并完成收口，但不再作为当前 release 中心], [`src/cmd/registry/main_test.mbt`；`src/cmd/registry/download_bundle_test.mbt`；`src/cmd/publish/main_test.mbt`],
 )
 
-这意味着新的 active release 不应该再以 registry / verifier 为中心，而应围绕#strong[开发代码提取、分析、审查主流程] 去补齐最后的闭环。
+这意味着新的 active release 不应该再以 registry / verifier 为中心，而应围绕#strong[provider 能力矩阵与 build-time extractor 证据面] 去补齐最后的闭环。
 
 = 新的 release 顺序
 
@@ -67,85 +68,8 @@
 - #strong[Non-goals]：registry remote HTTP fixture、shared verifier、部署、auth、KMS、security hardening。
 - #strong[Carries forward]：
   - 单机 registry + 免认证 baseline 进入 `R6`；
-  - registry trust / verifier / deployment / security 进入 `R7+ / backlog`。
-
-=== R5 收口任务（唯一执行清单）
-
-==== R5-1：Extractor / artifact contract freeze
-
-- #strong[Goal]：把当前 build-time extractor baseline、bundle artifact layout、declaration schema 与相关 snapshots 作为主流程真值源固定下来。
-- #strong[Main touchpoints]：`src/cmd/build/*`、`src/schema/declarations.mbt`、`src/schema/declarations_test.mbt`、`src/e2e/lsp_extractor_test.mbt`、`examples/*/snapshots/*`。
-- #strong[Depends on]：无。
-- #strong[Done when]：
-  - declaration / symbol / metadata / checksums / bundle layout 在当前 v1 语义下冻结；
-  - Terraform `lib/hcl` 与 Go/Rust build-time extraction 的当前定位在文档中稳定表达；
-  - snapshots 与 schema tests 成为后续 release 的固定回归基线。
-- #strong[Verify]：
-  - `moon test src/cmd/build/main_test.mbt`
-  - `moon test src/cmd/build/snapshot_test.mbt`
-  - `moon test src/e2e/lsp_extractor_test.mbt`
-  - `moon test src/schema/declarations_test.mbt`
-- #strong[Out of scope]：registry / publish / verifier 能力扩展。
-
-==== R5-2：Analysis / review loop stabilization（completed）
-
-- #strong[Goal]：把 `diff → check → query` 定义为当前主分析与审查链路，并让 MCP 明确承担 review consumption 角色。
-- #strong[Main touchpoints]：`src/cmd/diff/*`、`src/cmd/check/*`、`src/cmd/query/*`、`src/cmd/mcp/*`、`src/lib/mcp-sdk/*`、`src/e2e/init_test.mbt`。
-- #strong[Depends on]：`R5-1`。
-- #strong[Done when]：
-  - diff / check / query 的输入输出 contract 与 CLI 叙述稳定；
-  - MCP 工具面（`codeiq.query.outlines` / `codeiq.query.symbol`）在主业务流程中的定位被明确为 review 消费面；
-  - 当前 review 流程所需的最小本地证据链（bundle → diff → sarif / result → MCP query）被文档和测试同时覆盖。
-- #strong[Verify]：
-  - `moon test src/cmd/diff/main_test.mbt`
-  - `moon test src/cmd/check/main_test.mbt`
-  - `moon test src/cmd/query/main_test.mbt`
-  - `moon test src/cmd/mcp/main_test.mbt`
-  - `moon test src/e2e/init_test.mbt`
-- #strong[Out of scope]：真实远端 registry、MCP 多会话 / long-running supervision、signature trust chain。
-
-- #strong[Result]：已完成。
-  - `diff/check/query` contract 在 CLI 与测试中保持一致；
-  - MCP 保持 review consumption 角色（`codeiq.query.outlines` / `codeiq.query.symbol`）；
-  - review 证据链已由 `src/e2e/review/main_test.mbt`（wasm）与 `src/e2e/review/lifecycle_test.mbt`（native）补齐；
-  - 为绕过当前 MoonBit link-core ICE，大图命令测试目标已按语义拆分：`diff/query/init/review` 主链路回归走 wasm，MCP detached lifecycle 维持 native。
-
-==== R5-3：Workflow docs / product language closeout（completed）
-
-- #strong[Goal]：让 CLI / progress / plan 对主业务流程的优先级保持一致，不再让 registry / verifier 抢占 roadmap 中心。
-- #strong[Main touchpoints]：`docs/src/content/docs/cli.mdx`、`docs/src/content/docs/progress.mdx`、`spec/plan.typ`。
-- #strong[Depends on]：`R5-2`。
-- #strong[Done when]：
-  - 文档把主业务流程明确写成第一优先级；
-  - publish / registry 被降级为后续 release，而不是当前 active release 的 headline；
-  - progress page 与 plan 对 release 顺序完全一致。
-- #strong[Verify]：
-  - `pnpm build`（在 `docs/` 下）
-- #strong[Out of scope]：同时关闭后续 registry / security release。
-
-- #strong[Result]：已完成。
-  - `cli/progress/plan` 已统一强调主业务流程优先（`init → build → diff → check → query → MCP review`）；
-  - `publish/registry` 已统一降级到后续 release（`R6+`），不再作为当前 headline；
-  - R5 主流程证据链引用已与最新测试结构对齐（`src/e2e/review/*`）。
-
-==== R5-4：Release closeout（completed）
-
-- #strong[Goal]：在 `R5-1` 到 `R5-3` 完成后关闭主业务流程优先的当前 release。
-- #strong[Main touchpoints]：`spec/plan.typ`、`docs/src/content/docs/progress.mdx`。
-- #strong[Depends on]：`R5-1`、`R5-2`、`R5-3`。
-- #strong[Done when]：
-  - `spec/plan.typ` 与 `progress.mdx` 都把 R5 标为 completed；
-  - verify 清单只引用主业务流程闭环的证据；
-  - registry / publish / trust / deployment 被统一移到后续 release。
-- #strong[Verify]：
-  - `pnpm build`（在 `docs/` 下）
-  - 相关 MoonBit tests 通过
-- #strong[Out of scope]：继续把 platform/back-end work 混入当前 release。
-
-- #strong[Result]：已完成。
-  - `spec/plan.typ` 与 `docs/src/content/docs/progress.mdx` 已统一将 R5 标记为 completed；
-  - 验证清单聚焦主业务流程闭环证据（含 `src/e2e/review/main_test.mbt` 与 `src/e2e/review/lifecycle_test.mbt`）；
-  - registry / publish / trust / deployment 统一顺延到 `R6-R8`。
+  - provider matrix coverage 进入 `R7`；
+  - registry trust / verifier / deployment / security 进入 `R8+ / backlog`。
 
 == R6：Single-Machine Registry Baseline（completed）
 
@@ -167,36 +91,74 @@
   - `pnpm build`（在 `docs/` 下）
 - #strong[Explicitly excludes]：shared verifier、auth、hosted deployment、enterprise security。
 
-=== R6 收口任务（唯一执行清单）
+== R7：Provider Matrix Coverage（completed）
 
-==== R6-1：Single-machine registry loop freeze（completed）
-
-- #strong[Goal]：把 `publish ↔ registry(upload-local/download-local/download)` 的单机闭环固定为当前 release 的回归基线。
-- #strong[Main touchpoints]：`src/cmd/registry/*`、`src/cmd/publish/*`、`src/e2e/registry_test.mbt`、`src/schema/contracts_test.mbt`、`docs/src/content/docs/cli.mdx`、`docs/src/content/docs/progress.mdx`。
-- #strong[Depends on]：`R5`。
+- #strong[Scope]：在 R6 关闭后，优先把 `spec/A001-lsp-extractor.typ` 中列出的 provider 能力矩阵尽量冻结为 repo 证据，覆盖 Go / Rust / Terraform / OpenAPI 的完整 examples、snapshots、extractor 与 e2e 测试，而不是立即转入 trust / verifier 议题。
+- #strong[Includes]：
+  - Go：package doc、embedded field、generic type/function、deprecated / 注释样本；
+  - Rust：独立 doc comment 样本；
+  - Terraform：data source、复杂 object type；
+  - OpenAPI：path、discriminator、reference normalization；
+  - `providers.mdx` / `progress.mdx` / `plan.typ` 的同步收口。
 - #strong[Done when]：
-  - `registry upload-local / download-local / download(materialize)` 与 `publish` 在单机路径形成稳定闭环；
-  - `codeiq-registry-upload/v1`、`codeiq-registry-download/v1`、`codeiq-publish-receipt/v1` 的 contract 与命令行为保持一致；
-  - 端到端最小证据链（build bundle → registry upload-local → registry resolve/download → publish receipt）有独立 e2e 覆盖。
+  - `examples/*/full/repo/*` 与 `examples/*/full/snapshots/lsp/*` 对 provider matrix 关键项形成 repo 级证据；
+  - `src/cmd/build/extractor.mbt`、`src/lib/hcl/parse.mbt` 与 `src/e2e/lsp_extractor_test.mbt` 对新增 provider records 有稳定验证；
+  - docs / progress / plan 对 active release 与 verify 命令完全一致。
 - #strong[Verify]：
-  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v`
-  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
-  - `moon test src/e2e/registry_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target native -v`
+  - `moon check`
+  - `moon test src/cmd/build/snapshot_test.mbt`
+  - `moon test src/e2e/lsp_extractor_test.mbt`
   - `pnpm build`（在 `docs/` 下）
-- #strong[Out of scope]：registry HTTP server productization、shared verifier、hosted deployment、KMS/key rotation。
+- #strong[Explicitly excludes]：shared verifier、auth、hosted deployment、enterprise security。
 
-- #strong[Result]：已完成。
-  - `registry upload-local / download-local / download(materialize)` 与 `publish` 单机闭环已稳定；
-  - `codeiq-registry-upload/v1`、`codeiq-registry-download/v1`、`codeiq-publish-receipt/v1` contract 与命令行为一致；
-  - `spec/plan.typ`、`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx` 已统一 R6 语义与验证命令。
+=== R7 收口任务（唯一执行清单）
 
-== R7：Registry Trust & Verifier（planned）
+==== R7-1：Provider fixture / snapshot closure（completed）
 
-- #strong[Scope]：等单机 registry baseline 已稳定后，再处理 signature path、shared verifier feasibility、以及是否继续保留 shell OpenSSL CLI 的正式决定。
+- #strong[Goal]：补齐 examples 语料与 snapshots，让 provider matrix 的关键缺口都有 repo 级证据。
+- #strong[Main touchpoints]：`examples/go-module/full/repo/main.go`、`examples/rust-crate/full/repo/lib.rs`、`examples/terraform-module/full/repo/main.tf`、`examples/openapi-spec/full/repo/openapi/payment.yaml`、`examples/*/full/snapshots/lsp/*`。
+- #strong[Depends on]：`R6`。
+- #strong[Done when]：
+  - Go snapshot 覆盖 package doc、embedded field、generic type/function、deprecated / 注释样本；
+  - Rust snapshot 覆盖独立 doc comment；
+  - Terraform snapshot 覆盖 data source 与 object type；
+  - OpenAPI snapshot 覆盖 path 与 discriminator。
+- #strong[Verify]：
+  - `moon test src/cmd/build/snapshot_test.mbt`
+- #strong[Out of scope]：原生 `CodeIQ Extractor` 交叉验证实现。
 
-== R8：Deployment & Security Hardening（planned）
+==== R7-2：Extractor implementation closure（completed）
+
+- #strong[Goal]：让 build-time extractor 与 parser-first/provider-specific 路径真实产出 provider matrix 所需 records，而不是只在 docs 中声明。
+- #strong[Main touchpoints]：`src/cmd/build/extractor.mbt`、`src/lib/hcl/parse.mbt`、`src/e2e/lsp_extractor_test.mbt`。
+- #strong[Depends on]：`R7-1`。
+- #strong[Done when]：
+  - Terraform inline data block 能被 parser-first 路径提取；
+  - OpenAPI path / discriminator / `$ref` normalization 能稳定落盘；
+  - Go field / embedded field 与 Rust doc comment 样本能稳定进入 bundle records。
+- #strong[Verify]：
+  - `moon check`
+  - `moon test src/e2e/lsp_extractor_test.mbt`
+- #strong[Out of scope]：LSP runtime productization、shared verifier。
+
+==== R7-3：Provider docs / dashboard / release alignment（completed）
+
+- #strong[Goal]：让 `providers/progress/plan` 对 active release、provider coverage 现状和验证矩阵保持一致。
+- #strong[Main touchpoints]：`docs/src/content/docs/providers.mdx`、`docs/src/content/docs/progress.mdx`、`spec/plan.typ`。
+- #strong[Depends on]：`R7-1`、`R7-2`。
+- #strong[Done when]：
+  - 文档把 provider matrix 作为当前 active release 明确写出；
+  - progress / plan 与 provider docs 对 release 顺序、验证命令和下一步保持一致；
+  - docs build 继续通过。
+- #strong[Verify]：
+  - `pnpm build`（在 `docs/` 下）
+- #strong[Out of scope]：同时展开 `R8+` 的 trust / deployment 实施细节。
+
+== R8：Registry Trust & Verifier（planned）
+
+- #strong[Scope]：等 provider matrix baseline 已稳定后，再处理 signature path、shared verifier feasibility、以及是否继续保留 shell OpenSSL CLI 的正式决定。
+
+== R9：Deployment & Security Hardening（planned）
 
 - #strong[Scope]：最后再处理部署、认证鉴权、transport / storage security、KMS、key rotation、运维和企业级 hardening。
 
@@ -213,4 +175,4 @@
 
 `R5 Core Workflow Complete` 已关闭。该 release 已把#strong[开发代码提取、分析、审查主流程]收口为当前版本最清晰、最可信、最可演示的业务闭环。
 
-`R6 Single-Machine Registry Baseline` 已关闭。下一步进入 `R7` 处理 trust / verifier 议题，再进入 `R8` 处理 deployment / security / ops 收口。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
+`R6 Single-Machine Registry Baseline` 已关闭。`R7 Provider Matrix Coverage` 现已完成：Go / Rust / Terraform / OpenAPI 的 provider 能力矩阵已冻结为 repo 级证据。下一步进入 `R8` 处理 trust / verifier，再进入 `R9` 处理 deployment / security / ops 收口。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
