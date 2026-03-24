@@ -202,12 +202,12 @@
   "artifacts": [
     {
       "path": "declarations.ndjson.zst",
-      "sha256": "6cf3453666ff87c9eced2c3c439e631afcc9133ec73af9c810df00a48ba3308c",
+      "sha256": "02f63911ef9948abf310d2f0a6c1f40f5c9908d7d23a2e21f6b36f1ca4fb24e2",
       "compression": "zstd"
     },
     {
       "path": "symbols.ndjson.zst",
-      "sha256": "e7be644fca6757eeb7fc9bb8e03b40ae6454a67bb357813ba160a15d159dd39c",
+      "sha256": "9611913748491ec343464113b9dfe70e319932a800d683feeeb2abade9397a0c",
       "compression": "zstd"
     }
   ]
