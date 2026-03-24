@@ -1,4 +1,6 @@
+/// Public module doc sample.
 pub mod inner {
+    /// InnerStruct doc comment.
     pub struct InnerStruct {
         pub value: i32,
     }
@@ -8,6 +10,7 @@ pub use crate::inner::InnerStruct as ExposedStruct;
 pub(crate) use crate::inner::InnerStruct as CrateStruct;
 
 #[deprecated(note = "use ApiItem::new")]
+/// ApiItem doc comment.
 pub struct ApiItem<T>
 where
     T: Clone,
@@ -26,6 +29,7 @@ pub union Number {
     pub float_value: f64,
 }
 
+/// Service trait doc comment.
 pub trait Service<T>
 where
     T: Clone,
@@ -42,11 +46,13 @@ impl<T> ApiItem<T>
 where
     T: Clone,
 {
+    /// Constructor doc comment.
     pub fn new(field: T) -> Self {
         Self { field, hidden: 0 }
     }
 }
 
+/// Public alias doc comment.
 pub type Id = u64;
 
 #[macro_export]
