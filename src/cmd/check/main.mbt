@@ -94,6 +94,11 @@ fn rules_from_policy_results(policy_results : Array[Json]) -> Array[Json] {
       "shortDescription": {
         "text": "Compatibility change requires policy review",
       },
+      "fullDescription": {
+        "text": "Maps declaration-level compatibility diff entries to SARIF diagnostics.",
+      },
+      "helpUri": "https://github.com/yufeiminds/codeiq/blob/main/spec/proposal.typ",
+      "properties": { "source": "codeiq-diff", "category": "compatibility" },
     },
   ]
   let seen : Map[String, Unit] = { "compat.changed": () }
@@ -107,7 +112,19 @@ fn rules_from_policy_results(policy_results : Array[Json]) -> Array[Json] {
       Some(String(text)) => text
       _ => "Policy rule triggered"
     }
-    rules.push({ "id": rule_id, "shortDescription": { "text": message } })
+    let docs = match policy.get("docs") {
+      Some(String(value)) if value != "" => value
+      _ => "https://github.com/yufeiminds/codeiq/blob/main/spec/proposal.typ"
+    }
+    rules.push({
+      "id": rule_id,
+      "shortDescription": { "text": message },
+      "fullDescription": {
+        "text": "Policy decision produced by OPA evaluation for CIQ diff entries.",
+      },
+      "helpUri": docs,
+      "properties": { "source": "opa-policy", "category": "policy" },
+    })
     seen[rule_id] = ()
   }
   rules
@@ -170,7 +187,7 @@ fn evaluate_policy_with_opa(
   }
 
   let command = "opa eval --bundle \{shell_escape(policy_bundle)} --input \{shell_escape(diff_file)} --format json data.codeiq.compat.deny"
-  let (exit_code, stdout, stderr) = @process.run_command_capture(command)
+  let (exit_code, stdout, stderr) = @shell.run_command_capture(command)
   if exit_code != 0 {
     let details = if stderr != "" { stderr } else { stdout }
     return Err(check_error("opa eval failed (exit \{exit_code}): \{details}"))

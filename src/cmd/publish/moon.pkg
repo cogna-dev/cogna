@@ -1,8 +1,16 @@
 import {
   "moonbitlang/core/json" @json,
+  "moonbitlang/x/sys" @sys,
   "moonbitlang/x/fs" @fs,
   "shu-kitamura/sha256" @sha256,
+  "yufeiminds/codeiq/lib/shell" @shell,
   "yufeiminds/codeiq/cmd/registry" @registry,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
 }
+
+options(
+  targets: {
+    "main_test.mbt": [ "wasm" ],
+  },
+)

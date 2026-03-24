@@ -63,6 +63,53 @@ fn query_repo(query : Json) -> String {
 }
 
 ///|
+fn decode_utf8(bytes : Bytes, path : String) -> Result[String, String] {
+  let text = @utf8.decode(bytes) catch {
+    _ => return Err("invalid utf-8 bytes in \{path}")
+  }
+  Ok(text)
+}
+
+///|
+fn read_ndjson(path : String) -> Result[Array[Json], String] {
+  let file_bytes = @fs.read_file_to_bytes(path) catch {
+    _ => return Err("cannot read ndjson \{path}")
+  }
+  let text_out = if path.has_suffix(".zst") {
+    let decompressed = @zstd.decompress(file_bytes) catch {
+      _ => return Err("cannot decompress ndjson \{path}")
+    }
+    decode_utf8(decompressed, path)
+  } else {
+    decode_utf8(file_bytes, path)
+  }
+  guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
+  if text == "" {
+    return Ok([])
+  }
+
+  let lines = text.split("\n").to_array()
+  let records : Array[Json] = []
+  for i in 0..<lines.length() {
+    let line = lines[i].to_string().trim().to_string()
+    if line == "" {
+      continue
+    }
+    let parsed = try? @json.parse(line)
+    guard parsed is Ok(value) else {
+      return Err("invalid ndjson line in \{path} at \{i + 1}")
+    }
+    records.push(value)
+  }
+  Ok(records)
+}
+
+///|
+fn query_deadline_exceeded(cancelled : () -> Bool) -> Bool {
+  cancelled()
+}
+
+///|
 fn parent_dir(path : String) -> String {
   let parts = path.split("/").to_array()
   if parts.length() <= 1 {
@@ -137,11 +184,56 @@ fn append_records(
 }
 
 ///|
+fn read_repo_records(repo : String, name : String) -> Result[Array[Json], String] {
+  let zst_path = "\{repo}/dist/\{name}.ndjson.zst"
+  let plain_path = "\{repo}/dist/\{name}.ndjson"
+  if @fs.path_exists(zst_path) {
+    read_ndjson(zst_path)
+  } else if @fs.path_exists(plain_path) {
+    read_ndjson(plain_path)
+  } else {
+    Err("cannot read ndjson \{zst_path}")
+  }
+}
+
+///|
 fn all_bundle_records(repo : String) -> Array[Json] {
   let records : Array[Json] = []
-  append_records(records, @bundle.read_bundle_declarations(repo))
-  append_records(records, @bundle.read_bundle_symbols(repo))
+  append_records(records, read_repo_records(repo, "declarations"))
+  append_records(records, read_repo_records(repo, "symbols"))
   records
+}
+
+///|
+fn all_bundle_records_with_cancel(
+  repo : String,
+  cancelled : () -> Bool,
+) -> Result[Array[Json], String] {
+  if query_deadline_exceeded(cancelled) {
+    return Err("request cancelled")
+  }
+  let declarations = match read_repo_records(repo, "declarations") {
+    Ok(values) => values
+    Err(_) => []
+  }
+  if query_deadline_exceeded(cancelled) {
+    return Err("request cancelled")
+  }
+  let symbols = match read_repo_records(repo, "symbols") {
+    Ok(values) => values
+    Err(_) => []
+  }
+  if query_deadline_exceeded(cancelled) {
+    return Err("request cancelled")
+  }
+  let records : Array[Json] = []
+  for i in 0..<declarations.length() {
+    records.push(declarations[i])
+  }
+  for i in 0..<symbols.length() {
+    records.push(symbols[i])
+  }
+  Ok(records)
 }
 
 ///|
@@ -209,6 +301,37 @@ pub fn query_matches(
     }
   }
   selected
+}
+
+///|
+pub fn query_matches_with_cancel(
+  repo : String,
+  selector_path : String,
+  selector_kind : String,
+  cancelled : () -> Bool,
+) -> Result[Array[Json], String] {
+  let records_out = all_bundle_records_with_cancel(repo, cancelled)
+  guard records_out is Ok(records) else { return Err(records_out.unwrap_err()) }
+  let selected : Array[Json] = []
+  let seen : Map[String, Bool] = {}
+  for i in 0..<records.length() {
+    if query_deadline_exceeded(cancelled) {
+      return Err("request cancelled")
+    }
+    let match_out = record_matches_selector(
+      records[i],
+      selector_path,
+      selector_kind,
+    )
+    guard match_out is Some(found) else { continue }
+    guard found is Object(found_object) else { continue }
+    guard found_object.get("id") is Some(String(id)) else { continue }
+    if !seen.contains(id) {
+      seen[id] = true
+      selected.push(found)
+    }
+  }
+  Ok(selected)
 }
 
 ///|
@@ -282,6 +405,69 @@ pub fn query_outlines(
     (page, Some("cursor:\{end}"))
   } else {
     (page, None)
+  }
+}
+
+///|
+pub fn query_outlines_with_cancel(
+  repo : String,
+  purl : String,
+  limit : Int,
+  cursor : String?,
+  cancelled : () -> Bool,
+) -> Result[(Array[Json], String?), String] {
+  let records_out = all_bundle_records_with_cancel(repo, cancelled)
+  guard records_out is Ok(records) else { return Err(records_out.unwrap_err()) }
+  let outlines : Array[Json] = []
+  let seen : Map[String, Bool] = {}
+  for i in 0..<records.length() {
+    if query_deadline_exceeded(cancelled) {
+      return Err("request cancelled")
+    }
+    let path = match record_string(records[i], "path") {
+      Some(value) => value
+      None => continue
+    }
+    let kind = match record_string(records[i], "kind") {
+      Some(value) => value
+      None => continue
+    }
+    let signature = match record_string(records[i], "signature") {
+      Some(value) => value
+      None => continue
+    }
+    let key = "\{path}::\{kind}::\{signature}"
+    if seen.contains(key) {
+      continue
+    }
+    seen[key] = true
+    outlines.push({
+      "purl": purl,
+      "path": path,
+      "kind": kind,
+      "summary": signature,
+    })
+  }
+
+  let start = parse_cursor(cursor)
+  let max_limit = if limit <= 0 { 20 } else { limit }
+  let end = if start + max_limit > outlines.length() {
+    outlines.length()
+  } else {
+    start + max_limit
+  }
+
+  let page : Array[Json] = []
+  for i in start..<end {
+    if query_deadline_exceeded(cancelled) {
+      return Err("request cancelled")
+    }
+    page.push(outlines[i])
+  }
+  if end < outlines.length() {
+    Ok((page, Some("cursor:\{end}")))
+  } else {
+    Ok((page, None))
   }
 }
 

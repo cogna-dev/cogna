@@ -8,7 +8,9 @@ import {
   "yufeiminds/codeiq/cmd/check" @check_cmd,
   "yufeiminds/codeiq/cmd/query" @query_cmd,
   "yufeiminds/codeiq/cmd/publish" @publish_cmd,
+  "yufeiminds/codeiq/cmd/registry" @registry_cmd,
   "yufeiminds/codeiq/cmd/mcp" @mcp_cmd,
+  "yufeiminds/codeiq/cmd/mcp/core" @mcp_core,
   "yufeiminds/codeiq/cli" @cli,
 }
 

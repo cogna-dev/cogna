@@ -1,6 +1,24 @@
 import {
+  "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
+  "yufeiminds/codeiq/cmd/bundle" @bundle,
+  "yufeiminds/codeiq/lib/shell" @shell,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
 }
+
+import {
+  "Milky2018/zstd" @zstd,
+  "gmlewis/gzip" @gzip,
+  "gmlewis/io" @gio,
+  "moonbitlang/core/encoding/utf8" @utf8,
+} for "test"
+
+options(
+  targets: {
+    "main_test.mbt": [ "wasm" ],
+    "download_bundle_test.mbt": [ "wasm" ],
+  },
+)

@@ -2,7 +2,7 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
-  "yufeiminds/codeiq/lib/process" @process,
+  "yufeiminds/codeiq/lib/shell" @shell,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
 }

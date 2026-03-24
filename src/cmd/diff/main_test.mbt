@@ -229,3 +229,78 @@ test "diff includes since and test changes fields when requested" {
 
   cleanup_tmp_repo(repo)
 }
+
+///|
+test "diff computes go test changes when requested" {
+  let repo = "src/cmd/diff/tmp_diff_go_test_changes"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+  @fs.create_dir("\{repo}/dist/base")
+  @fs.create_dir("\{repo}/dist/target")
+
+  write_manifest(
+    "\{repo}/dist/base/manifest.json",
+    "pkg:golang/example/demo@0.1.0",
+    "go-module",
+  )
+  write_manifest(
+    "\{repo}/dist/target/manifest.json",
+    "pkg:golang/example/demo@0.2.0",
+    "go-module",
+  )
+
+  let base_declarations =
+    #|{"id":"decl:go-module:demo::math_test.go::TestAdd","kind":"function","name":"TestAdd","path":"math_test.go","signature":"func TestAdd(t *testing.T)","language":"go","location":{"uri":"math_test.go","startLine":12,"endLine":12}}
+    #|{"id":"decl:go-module:demo::math_test.go::TestRemoved","kind":"function","name":"TestRemoved","path":"math_test.go","signature":"func TestRemoved(t *testing.T)","language":"go","location":{"uri":"math_test.go","startLine":28,"endLine":28}}
+    #|
+  let target_declarations =
+    #|{"id":"decl:go-module:demo::math_test.go::TestAdd","kind":"function","name":"TestAdd","path":"math_test.go","signature":"func TestAdd(t *testing.T) // v2","language":"go","location":{"uri":"math_test.go","startLine":14,"endLine":14}}
+    #|{"id":"decl:go-module:demo::math_test.go::TestAdded","kind":"function","name":"TestAdded","path":"math_test.go","signature":"func TestAdded(t *testing.T)","language":"go","location":{"uri":"math_test.go","startLine":40,"endLine":40}}
+    #|
+
+  write_records("\{repo}/dist/base/declarations.ndjson.zst", base_declarations)
+  write_records("\{repo}/dist/base/symbols.ndjson.zst", "")
+  write_records(
+    "\{repo}/dist/target/declarations.ndjson.zst",
+    target_declarations,
+  )
+  write_records("\{repo}/dist/target/symbols.ndjson.zst", "")
+
+  let out = run({
+    repo,
+    since: Some("2026-03-01T00:00:00Z"),
+    include_test_changes: true,
+  })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("diff should compute go test changes")
+  }
+
+  let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("diff output should exist")
+      ""
+    }
+  }
+
+  assert_true(diff_text.contains("\"includeTestChanges\": true"))
+  assert_true(diff_text.contains("\"testSummary\": {"))
+  assert_true(diff_text.contains("\"added\": 1"))
+  assert_true(diff_text.contains("\"modified\": 1"))
+  assert_true(diff_text.contains("\"removed\": 1"))
+  assert_true(
+    diff_text.contains(
+      "\"id\": \"test:go-module:demo::math_test.go::TestAdded\"",
+    ),
+  )
+  assert_true(
+    diff_text.contains(
+      "\"id\": \"test:go-module:demo::math_test.go::TestRemoved\"",
+    ),
+  )
+  assert_true(diff_text.contains("\"kind\": \"modified\""))
+
+  cleanup_tmp_repo(repo)
+}

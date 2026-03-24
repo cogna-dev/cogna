@@ -19,8 +19,9 @@ pub fn ciq_bundle_v1_schema() -> @json_schema.JsonSchema {
           "version": { "type": "string", "const": "ciq-declarations/v1" },
           "format": { "type": "string", "const": "ndjson.zst" },
           "model": { "type": "string", "minLength": 1 },
+          "schema": { "type": "object" },
         },
-        "additionalProperties": false,
+        "additionalProperties": true,
       },
       "source": {
         "type": "object",
@@ -93,6 +94,58 @@ pub fn ciq_diff_v1_schema() -> @json_schema.JsonSchema {
           "additionalProperties": true,
         },
       },
+      "includeTestChanges": { "type": "boolean" },
+      "testSummary": {
+        "type": "object",
+        "required": ["added", "modified", "removed"],
+        "properties": {
+          "added": { "type": "integer" },
+          "modified": { "type": "integer" },
+          "removed": { "type": "integer" },
+        },
+        "additionalProperties": false,
+      },
+      "testChanges": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "kind", "language", "id", "path", "signature", "location",
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["added", "modified", "removed"],
+            },
+            "language": { "type": "string", "enum": ["go", "rust", "unknown"] },
+            "id": { "type": "string", "minLength": 1 },
+            "path": { "type": "string", "minLength": 1 },
+            "signature": { "type": "string", "minLength": 1 },
+            "location": {
+              "type": "object",
+              "required": ["uri", "startLine", "endLine"],
+              "properties": {
+                "uri": { "type": "string", "minLength": 1 },
+                "startLine": { "type": "integer" },
+                "endLine": { "type": "integer" },
+              },
+              "additionalProperties": false,
+            },
+            "tracking": {
+              "type": "object",
+              "properties": {
+                "traceabilityKey": { "type": "string", "minLength": 1 },
+                "externalIds": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                },
+              },
+              "additionalProperties": true,
+            },
+          },
+          "additionalProperties": false,
+        },
+      },
     },
     "additionalProperties": true,
   }
@@ -162,7 +215,9 @@ pub fn ciq_result_v1_schema() -> @json_schema.JsonSchema {
 pub fn ciq_opa_bundle_v1_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
-    "required": ["schemaVersion", "purl", "profile", "source", "artifacts"],
+    "required": [
+      "schemaVersion", "purl", "profile", "source", "artifacts", "provenance",
+    ],
     "properties": {
       "schemaVersion": { "type": "string", "const": "ciq-opa-bundle/v1" },
       "purl": { "type": "string", "minLength": 1 },
@@ -183,6 +238,28 @@ pub fn ciq_opa_bundle_v1_schema() -> @json_schema.JsonSchema {
         "properties": {
           "entrypoint": { "type": "string", "minLength": 1 },
           "format": { "type": "string", "const": "opa-bundle.tar.gz" },
+        },
+        "additionalProperties": false,
+      },
+      "provenance": {
+        "type": "object",
+        "required": ["checksums", "signature"],
+        "properties": {
+          "checksums": { "type": "string", "const": "checksums.txt" },
+          "signature": {
+            "type": "object",
+            "required": ["status", "algorithm"],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["unsigned", "verified", "untrusted"],
+              },
+              "algorithm": { "type": "string", "const": "sha256" },
+              "keyId": { "type": "string", "minLength": 1 },
+              "value": { "type": "string", "minLength": 1 },
+            },
+            "additionalProperties": false,
+          },
         },
         "additionalProperties": false,
       },
@@ -227,6 +304,20 @@ pub fn codeiq_registry_upload_v1_schema() -> @json_schema.JsonSchema {
       "purl": { "type": "string", "minLength": 1 },
       "digest": { "type": "string", "minLength": 1 },
       "size": { "type": "integer" },
+      "signature": {
+        "type": "object",
+        "required": ["status", "algorithm"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["unsigned", "verified", "untrusted"],
+          },
+          "algorithm": { "type": "string", "const": "sha256" },
+          "keyId": { "type": "string", "minLength": 1 },
+          "value": { "type": "string", "minLength": 1 },
+        },
+        "additionalProperties": false,
+      },
     },
     "additionalProperties": false,
   }
@@ -238,7 +329,7 @@ pub fn codeiq_publish_receipt_v1_schema() -> @json_schema.JsonSchema {
     "type": "object",
     "required": [
       "schemaVersion", "publishId", "bundleId", "purl", "digest", "bundleType", "downloadUrl",
-      "status",
+      "status", "provenance",
     ],
     "properties": {
       "schemaVersion": {
@@ -255,6 +346,73 @@ pub fn codeiq_publish_receipt_v1_schema() -> @json_schema.JsonSchema {
       },
       "downloadUrl": { "type": "string", "minLength": 1 },
       "status": { "type": "string", "enum": ["published", "already-exists"] },
+      "provenance": {
+        "type": "object",
+        "required": ["source", "digestVerified"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["local-registry", "remote-registry", "publish-cache"],
+          },
+          "digestVerified": { "type": "boolean" },
+          "etag": { "type": "string", "minLength": 1 },
+          "signature": {
+            "type": "object",
+            "required": ["status", "algorithm"],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["unsigned", "verified", "untrusted"],
+              },
+              "algorithm": { "type": "string", "const": "sha256" },
+              "keyId": { "type": "string", "minLength": 1 },
+              "value": { "type": "string", "minLength": 1 },
+            },
+            "additionalProperties": false,
+          },
+        },
+        "additionalProperties": false,
+      },
+    },
+    "additionalProperties": false,
+  }
+}
+
+///|
+pub fn codeiq_registry_download_v1_schema() -> @json_schema.JsonSchema {
+  {
+    "type": "object",
+    "required": [
+      "schemaVersion", "status", "purl", "bundleId", "digest", "etag", "downloadUrl",
+      "notModified",
+    ],
+    "properties": {
+      "schemaVersion": {
+        "type": "string",
+        "const": "codeiq-registry-download/v1",
+      },
+      "status": { "type": "integer", "enum": [200, 304] },
+      "purl": { "type": "string", "minLength": 1 },
+      "bundleId": { "type": "string", "minLength": 1 },
+      "digest": { "type": "string", "minLength": 1 },
+      "etag": { "type": "string", "minLength": 1 },
+      "downloadUrl": { "type": "string", "minLength": 1 },
+      "notModified": { "type": "boolean" },
+      "contentLength": { "type": "integer" },
+      "signature": {
+        "type": "object",
+        "required": ["status", "algorithm"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["unsigned", "verified", "untrusted"],
+          },
+          "algorithm": { "type": "string", "const": "sha256" },
+          "keyId": { "type": "string", "minLength": 1 },
+          "value": { "type": "string", "minLength": 1 },
+        },
+        "additionalProperties": false,
+      },
     },
     "additionalProperties": false,
   }
@@ -387,6 +545,13 @@ pub fn validate_codeiq_publish_receipt_v1(
   instance : Json,
 ) -> Result[Unit, @json_schema.SchemaError] {
   @json_schema.validate_json(codeiq_publish_receipt_v1_schema(), instance)
+}
+
+///|
+pub fn validate_codeiq_registry_download_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(codeiq_registry_download_v1_schema(), instance)
 }
 
 ///|

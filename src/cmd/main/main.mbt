@@ -6,7 +6,11 @@ pub(all) enum CliInvocation {
   Check(@check_cmd.CheckParams)
   Query(@query_cmd.QueryParams)
   Publish(@publish_cmd.PublishParams)
+  RegistryUploadLocal(@registry_cmd.RegistryUploadParams)
+  RegistryDownloadLocal(@registry_cmd.RegistryDownloadParams)
+  RegistryDownloadBundle(@registry_cmd.RegistryDownloadBundleParams)
   McpStart(@mcp_cmd.McpStartParams)
+  McpServe(@mcp_core.McpServeParams)
   McpStatus
   McpStop
 } derive(Show, Eq)
@@ -20,6 +24,7 @@ fn is_known_subcommand(name : String) -> Bool {
     | "check"
     | "query"
     | "publish"
+    | "registry"
     | "mcp"
     | "help" => true
     _ => false
@@ -112,6 +117,51 @@ fn parse_invocation(
         ),
       ]),
       @argparse.Command::new(
+        "registry",
+        about="Run local registry operations",
+        subcommands=[
+          @argparse.Command::new(
+            "upload-local",
+            about="Upload bundle into local registry",
+            positionals=[
+              @argparse.PositionArg::new(
+                "upload_request_file",
+                num_args=@argparse.ValueRange::single(),
+              ),
+            ],
+          ),
+          @argparse.Command::new(
+            "download-local",
+            about="Download local registry metadata by purl",
+            positionals=[
+              @argparse.PositionArg::new(
+                "purl",
+                num_args=@argparse.ValueRange::single(),
+              ),
+            ],
+          ),
+          @argparse.Command::new(
+            "download",
+            about="Download and materialize bundle by purl",
+            positionals=[
+              @argparse.PositionArg::new(
+                "purl",
+                num_args=@argparse.ValueRange::single(),
+              ),
+            ],
+            options=[
+              @argparse.OptionArg::new(
+                "output",
+                long="output",
+                action=@argparse.OptionAction::Set,
+                default_values=["./dist"],
+              ),
+            ],
+          ),
+        ],
+        subcommand_required=true,
+      ),
+      @argparse.Command::new(
         "mcp",
         about="Run local MCP agent",
         subcommands=[
@@ -127,6 +177,14 @@ fn parse_invocation(
               long="stdio",
               action=@argparse.OptionAction::Set,
               default_values=["true"],
+            ),
+          ]),
+          @argparse.Command::new("serve", about="Run MCP agent foreground loop", options=[
+            @argparse.OptionArg::new(
+              "port",
+              long="port",
+              action=@argparse.OptionAction::Set,
+              default_values=["3000"],
             ),
           ]),
           @argparse.Command::new("status", about="Show MCP agent status"),
@@ -186,6 +244,36 @@ fn parse_invocation(
       let bundle_file = bundle_values[0]
       Ok(Publish(@publish_cmd.PublishParams::{ bundle_file, }))
     }
+    Some(("registry", registry_matches)) =>
+      match registry_matches.subcommand {
+        Some(("upload-local", upload_matches)) => {
+          let values = upload_matches.values["upload_request_file"]
+          Ok(
+            RegistryUploadLocal(@registry_cmd.RegistryUploadParams::{
+              upload_request_file: values[0],
+            }),
+          )
+        }
+        Some(("download-local", download_matches)) => {
+          let values = download_matches.values["purl"]
+          Ok(
+            RegistryDownloadLocal(@registry_cmd.RegistryDownloadParams::{
+              purl: values[0],
+            }),
+          )
+        }
+        Some(("download", download_matches)) => {
+          let purl_values = download_matches.values["purl"]
+          let output_values = download_matches.values["output"]
+          Ok(
+            RegistryDownloadBundle(@registry_cmd.RegistryDownloadBundleParams::{
+              purl: purl_values[0],
+              output_dir: output_values[0],
+            }),
+          )
+        }
+        _ => Err(@cli.usage_error(command.render_help()))
+      }
     Some(("mcp", mcp_matches)) =>
       match mcp_matches.subcommand {
         Some(("start", start_matches)) => {
@@ -197,6 +285,14 @@ fn parse_invocation(
           let stdio_values = start_matches.values["stdio"]
           let stdio = stdio_values[0] == "true"
           Ok(McpStart(@mcp_cmd.McpStartParams::{ port, stdio }))
+        }
+        Some(("serve", serve_matches)) => {
+          let port_values = serve_matches.values["port"]
+          let parsed_port = try? @strconv.parse_int(port_values[0])
+          guard parsed_port is Ok(port) else {
+            return Err(@cli.usage_error("--port must be an integer"))
+          }
+          Ok(McpServe(@mcp_core.McpServeParams::{ port }))
         }
         Some(("status", _)) => Ok(McpStatus)
         Some(("stop", _)) => Ok(McpStop)
@@ -246,9 +342,29 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
+    RegistryUploadLocal(params) =>
+      match @registry_cmd.run_upload_local(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    RegistryDownloadLocal(params) =>
+      match @registry_cmd.run_download_local(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    RegistryDownloadBundle(params) =>
+      match @registry_cmd.run_download_bundle(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
     McpStart(params) =>
       match @mcp_cmd.run_start(params) {
         Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    McpServe(params) =>
+      match @mcp_core.run_serve(params) {
+        Ok(_) => Ok("")
         Err(error) => Err(error)
       }
     McpStatus =>

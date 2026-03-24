@@ -71,7 +71,8 @@ test "check generates sarif from diff and policy" {
       #|              "rule_id": "compat.removed-public-api",
       #|              "level": "error",
       #|              "message": "Public API removal blocked by policy",
-      #|              "path": "manifest.purl"
+      #|              "path": "manifest.purl",
+      #|              "docs": "https://example.dev/policy/compat.removed-public-api"
       #|            }
       #|          ]
       #|        }
@@ -105,6 +106,12 @@ test "check generates sarif from diff and policy" {
   assert_true(sarif.contains("\"ruleId\": \"compat.changed\""))
   assert_true(sarif.contains("\"ruleId\": \"compat.removed-public-api\""))
   assert_true(sarif.contains("Public API removal blocked by policy"))
+  assert_true(sarif.contains("\"fullDescription\""))
+  assert_true(sarif.contains("\"helpUri\""))
+  assert_true(
+    sarif.contains("https://example.dev/policy/compat.removed-public-api"),
+  )
+  assert_true(sarif.contains("\"source\": \"opa-policy\""))
 
   cleanup_tmp_repo(repo)
 }

@@ -6,9 +6,9 @@ order: 6
 
 # CodeIQ 开发进度看板
 
-> 最后更新时间：2026-03-23（Asia/Shanghai）
+> 最后更新时间：2026-03-24（Asia/Shanghai）
 
-此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步：上一版 `R1-R4` 已关闭，新的一版只保留一个 active release——`R5 Registry Boundary & Trust Hardening`。
+此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步：当前 roadmap 已重新排序，优先关闭主业务流程，再做单机 registry 基线，最后再处理 trust / deployment / security。
 
 ## 当前总览（唯一状态面板）
 
@@ -17,139 +17,148 @@ order: 6
 | R1 | Local Governance Baseline | ✅ Completed | 本地治理 baseline 已冻结 |
 | R2 | Extractor v1 Trustworthy | ✅ Completed | extractor v1 baseline 已冻结，Terraform 已转向 `lib/hcl` |
 | R3 | Distribution Beta（repo-local / inproc） | ✅ Completed | repo-local / inproc 分发 beta 已形成可回归闭环 |
-| R4 | Externalization Hardening | ✅ Completed | process lifecycle hardening 已交付；registry localhost HTTP 边界与 non-shell verifier 已移入下一版 |
-| R5 | Registry Boundary & Trust Hardening | 🟡 Active | 当前唯一 active release，聚焦 registry 真实 HTTP 边界与 signature path 的阶段性收口 |
+| R4 | Externalization Hardening | ✅ Completed | process lifecycle hardening 已交付 |
+| R5 | Core Workflow Complete | ✅ Completed | 主业务流程闭环已完成并完成收口 |
+| R6 | Single-Machine Registry Baseline | 🟡 Active | 当前唯一 active release，收口单机/免认证 registry + publish baseline |
+| R7 | Registry Trust & Verifier | ⚪ Planned | 再处理 signature path、shared verifier 与 trust 议题 |
+| R8 | Deployment & Security Hardening | ⚪ Planned | 最后处理部署、auth、security、ops 与企业级 hardening |
 
-## R5 · Registry Boundary & Trust Hardening（Active）
+## 已完成阶段（摘要）
+
+- `R1-R4` 已完成并冻结为当前 repo 基线；
+- `R5` 已完成，主业务流程 `init → build → diff → check → query → MCP review` 已形成稳定闭环；
+- 当前看板不再保留 `R5` 的执行清单，只保留当前 active release（`R6`）的唯一执行清单。
+
+## R6 · Single-Machine Registry Baseline（Active）
 
 **Scope**
 
-- 只覆盖上一版明确顺延的两类问题：
-  - registry remote 主证明仍主要依赖 env stub；
-  - signature path 仍停留在 shell OpenSSL CLI 路径，non-shell verifier 需要正式阶段结论。
+- 收口单机、免认证 registry baseline，聚焦本地 artifact movement：
+  - `publish` 写入本地 registry；
+  - `registry upload-local / download-local / download(materialize)` 可回归；
+  - upload/download/receipt contract 与命令行为保持一致。
 
 **Done when**
 
-- registry remote path 具备 localhost HTTP fixture e2e，且不再把 `CODEIQ_REGISTRY_REMOTE_*_RESPONSE_JSON` 作为主证明；
-- shell OpenSSL CLI 的当前地位、non-shell verifier 的后续决策、以及 `publish / registry` 的 verify 口径在 docs / plan / tests 中保持一致；
-- `spec/plan.typ` 与本页对 R5 状态、verify、carry-forward 保持同步。
-
-**Repo evidence（当前已可复用的基础）**
-
-- `src/cmd/registry/main_test.mbt`
-- `src/cmd/registry/download_bundle_test.mbt`
-- `src/cmd/publish/main_test.mbt`
-- `src/cmd/registry/main.mbt`
-- `src/cmd/publish/main.mbt`
-- `spec/verify.typ`
+- `publish ↔ registry(upload-local/download-local/download)` 单机闭环稳定；
+- `codeiq-registry-upload/v1`、`codeiq-registry-download/v1`、`codeiq-publish-receipt/v1` contract 与实现一致；
+- R6 对外文档（plan/progress/CLI）和验证命令保持一致。
 
 **Verify**
 
-- `moon test src/e2e/registry_remote_test.mbt`
-- `moon test src/cmd/registry/main_test.mbt`
-- `moon test src/cmd/publish/main_test.mbt`
+- `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+- `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v`
+- `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+- `moon test src/e2e/registry_test.mbt --target wasm -v`
+- `moon test src/schema/contracts_test.mbt --target native -v`
 - `pnpm build`（在 `docs/` 下）
 
-**Non-goals**
+**Out of scope**
 
-- 认证鉴权、生产 registry 部署、多租户、KMS / key rotation 平台、完整企业化运维。
+- registry HTTP server productization、shared verifier、hosted deployment、KMS/key rotation。
 
-**Carries forward**
+## R6 执行清单（唯一执行清单）
 
-- 若 R5 后仍要继续推进 shared non-shell verifier implementation、trust root、enterprise ops，统一进入下一版 release。
+### R6-1 · Registry command contract freeze
 
-## R5 收口任务（唯一执行清单）
+**状态：🟡 In Progress**
 
-### R5-1 · Registry localhost HTTP fixture e2e
-
-- **Goal**：补上 repo 内真实 HTTP boundary 的主证明，让 remote registry path 不再主要依赖 env stub。
-- **Main touchpoints**：`src/cmd/registry/main.mbt`、`src/cmd/registry/main_test.mbt`、`src/cmd/registry/download_bundle_test.mbt`、`src/e2e/registry_remote_test.mbt`
-- **Depends on**：无
+- **Goal**：固定 `registry upload-local / download-local / download(materialize)` 的本地 contract、ETag/304 语义与输出产物。
+- **Main touchpoints**：`src/cmd/registry/main.mbt`、`src/cmd/registry/main_test.mbt`、`src/cmd/registry/download_bundle_test.mbt`、`src/schema/contracts_test.mbt`、`docs/src/content/docs/cli.mdx`
+- **Depends on**：`R5`
 - **Done when**：
-  - upload / resolve / `304 Not Modified` / cache replay 通过 localhost HTTP fixture e2e；
-  - env stub tests 继续保留，但不再承担主证明；
-  - docs 与 plan 的 verify 清单统一引用 `src/e2e/registry_remote_test.mbt`。
+  - `codeiq-registry-upload/v1`、`codeiq-registry-download/v1` 的字段、状态码与 materialize 行为稳定；
+  - `upload-local` / `download-local` / `download --output` 的 CLI 文档与测试一致；
+  - 本地 index/bundles 布局被视为当前单机 baseline 真值源。
 - **Verify**：
-  - `moon test src/e2e/registry_remote_test.mbt`
-  - `moon test src/cmd/registry/main_test.mbt`
-- **Out of scope**：替换 `curl` transport、引入 auth、部署真实外部 registry。
+  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+  - `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v`
+  - `moon test src/schema/contracts_test.mbt --target native -v`
+- **Out of scope**：HTTP server、远端 registry productization。
 
-### R5-2 · Signature path decision record
+### R6-2 · Publish local-registry path stabilization
 
-- **Goal**：把“当前继续使用 shell OpenSSL CLI，non-shell verifier 以后再考虑”升级为正式的阶段性设计记录。
-- **Main touchpoints**：`spec/verify.typ`、`spec/plan.typ`、`docs/src/content/docs/progress.mdx`、`src/cmd/registry/main.mbt`、`src/cmd/publish/main.mbt`
-- **Depends on**：无
+**状态：⏳ Pending**
+
+- **Goal**：固定 `publish` 写入本地 registry 的路径、receipt 语义与 already-exists 语义。
+- **Main touchpoints**：`src/cmd/publish/main.mbt`、`src/cmd/publish/main_test.mbt`、`src/cmd/registry/main.mbt`、`docs/src/content/docs/cli.mdx`
+- **Depends on**：`R6-1`
 - **Done when**：
-  - 文档中明确区分当前 shipped path 与后续 shared verifier 议题；
-  - `publish / registry` 的 verify 口径在文档和测试语义里一致；
-  - `verify.typ` 对 trusted publishing / hash / signature / 当前选择的解释与 release plan 保持一致。
+  - `codeiq-publish-receipt/v1` 与 registry 返回值在本地 baseline 上保持一致；
+  - `publish` 的 `published` / `already-exists` 语义稳定；
+  - 当前 no-auth baseline 的 signature metadata 行为在文档中明确表达为“记录但不产品化 trust”。
 - **Verify**：
-  - `moon test src/cmd/registry/main_test.mbt`
-  - `moon test src/cmd/publish/main_test.mbt`
-  - `typst compile spec/verify.typ /tmp/codeiq-verify.pdf`
-- **Out of scope**：本轮必须落地 non-shell verifier 实现。
+  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+  - `moon test src/schema/contracts_test.mbt --target native -v`
+- **Out of scope**：shared verifier、trust root、key rotation。
 
-### R5-3 · Shared verifier feasibility checkpoint
+### R6-3 · Single-machine end-to-end registry proof
 
-- **Goal**：在真正开做 non-shell verifier 前，先把实现前提收敛成可执行或可放弃的 checkpoint。
-- **Main touchpoints**：`spec/verify.typ`、相关依赖调研记录、必要时 `src/lib/signature/*` 设计草案
-- **Depends on**：`R5-2`
+**状态：⏳ Pending**
+
+- **Goal**：把 `build → registry upload-local → registry download-local → publish → registry download(materialize)` 固定为单机 e2e 证据链。
+- **Main touchpoints**：`src/e2e/registry_test.mbt`、`src/e2e/moon.pkg`、`src/cmd/build/*`、`src/cmd/registry/*`、`src/cmd/publish/*`
+- **Depends on**：`R6-1`、`R6-2`
 - **Done when**：
-  - 明确列出可行实现路线、依赖来源、测试前提与风险；
-  - 若结论是否定的，也要把“为什么本轮不做”写成正式记录；
-  - 结果可以直接支持下一版是否新开 shared verifier implementation release。
+  - e2e 测试覆盖 build bundle、写入 registry、解析 metadata、生成 publish receipt、materialize bundle；
+  - 该链路成为单机 registry baseline 的主证据，而不是散落在命令级测试中；
+  - dashboard/CLI 文档都引用该 e2e 证据链。
 - **Verify**：
-  - `typst compile spec/verify.typ /tmp/codeiq-verify.pdf`
+  - `moon test src/e2e/registry_test.mbt --target wasm -v`
+- **Out of scope**：跨机器共享、auth、hosted operations。
+
+### R6-4 · Dashboard / docs / release closeout
+
+**状态：⏳ Pending**
+
+- **Goal**：让 progress / CLI / plan 对 R6 范围、验证矩阵和已知限制保持一致，并为关闭 R6 做准备。
+- **Main touchpoints**：`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx`、`spec/plan.typ`
+- **Depends on**：`R6-1`、`R6-2`、`R6-3`
+- **Done when**：
+  - 当前看板只保留 R6 执行清单，不再保留 R5 与 R7+ 的执行清单；
+  - R6 验证命令、已知限制（native large-graph ICE → wasm target workaround）与 out-of-scope 叙述一致；
+  - docs build 继续通过。
+- **Verify**：
+  - `moon check`
   - `pnpm build`（在 `docs/` 下）
-- **Out of scope**：在没有明确依赖与验证策略前直接硬写 `src/lib/signature/*`。
+- **Out of scope**：R7/R8 的具体实施计划。
 
-### R5-4 · Release closeout
+## 当前验证状态（R6相关）
 
-- **Goal**：在 `R5-1` 到 `R5-3` 完成后关闭本版计划，而不是继续在同一 release 中追加横向能力。
-- **Main touchpoints**：`spec/plan.typ`、`docs/src/content/docs/progress.mdx`
-- **Depends on**：`R5-1`、`R5-2`、`R5-3`
-- **Done when**：
-  - `spec/plan.typ` 与本页都把 R5 标成 completed；
-  - verify 清单只引用本轮真实完成的 HTTP / signature-decision 证据；
-  - 剩余事项全部移入 backlog / 下一版 plan。
-- **Verify**：
-  - `pnpm build`（在 `docs/` 下）
-  - 相关 MoonBit tests 通过
-- **Out of scope**：继续延长当前 release 生命周期。
-
-## 当前验证状态
-
-以下结果是当前 repo 可继续复用的基线证据：
+以下结果是当前 `R6` 可继续复用的基线证据：
 
 | 验证项 | 结果 | 备注 |
 | --- | --- | --- |
-| `moon test src/lib/process/main_test.mbt` | ✅ 已有证据 | detached child spawn / liveness / terminate |
-| `moon test src/cmd/mcp/main_test.mbt` | ✅ 已有证据 | PID-backed MCP lifecycle 单测 |
-| `moon test src/e2e/mcp_lifecycle_test.mbt` | ✅ 已有证据 | detached lifecycle e2e |
-| `moon test src/cmd/registry/main_test.mbt` | ✅ 已有证据 | registry local/inproc/stub verify baseline |
-| `moon test src/cmd/publish/main_test.mbt` | ✅ 已有证据 | publish receipt / signature baseline |
+| `moon test src/cmd/registry/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 registry upload/download/inproc/signature/digest contract |
+| `moon test src/cmd/registry/download_bundle_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 registry download materialize 产物 |
+| `moon test src/cmd/publish/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 publish local/remote-stub receipt contract |
+| `moon test src/e2e/registry_test.mbt --target wasm -v` | ✅ 通过（本轮） | 覆盖 build→registry upload/download→publish→materialize 单机闭环 |
+| `moon test src/schema/contracts_test.mbt --target native -v` | ✅ 通过（本轮） | 覆盖 registry/upload/download/receipt schema contract |
+| `moon check` | ✅ 通过（本轮） | 当前为 warnings only（0 errors） |
 | `pnpm build`（`docs/`） | ✅ 通过 | 当前文档站可构建 |
 
-## Proposal Backlog（不阻塞当前 release 变绿）
+**环境说明**
 
-- shared non-shell verifier implementation；
-- 真实外部 Registry 产品化：认证、部署、运维、版本治理；
-- trust root / key rotation / KMS；
-- MCP runtime further hardening：supervision、崩溃恢复、多会话控制；
-- SARIF / governance productization：更强 provenance、平台特定字段、运营闭环。
+- 当前大图 native 测试仍会触发 MoonBit 编译器 ICE（`Invalid_argument("Moonc.Basic_lst.iter2")`），因此 `registry/publish/e2e registry` 的主验证目标暂固定为 `wasm`；
+- 该 workaround 只影响验证 target，不改变当前单机 registry baseline 的功能语义。
+
+## 非当前执行项（只保留方向）
+
+- `R7`：处理 signature path、shared verifier feasibility、trust 模型；
+- `R8`：处理 deployment、auth、security、ops 与企业级 hardening；
+- 它们不是当前 release 的执行清单，不在本页继续展开。
 
 ## 本轮补充文档
 
-- `spec/verify.typ`：继续作为 signature path 的技术说明真值源。
-- `spec/plan.typ`：已切换到下一阶段的 `R5` release plan。
-- `AGENTS.md`：保留“禁止修改系统级配置”的约束。
+- `docs/src/content/docs/progress.mdx`：已改成只保留当前 active release（R6）的执行清单；
+- `docs/src/content/docs/cli.mdx`：已补充 `registry upload-local/download-local/download` 命令文档并与 R6 语义对齐。
+- `src/e2e/registry_test.mbt`：新增 R6 单机 registry/publish 闭环 e2e 证据（build→upload-local→download-local→publish→download materialize）。
 
-## 下一步（严格按 R5-1 → R5-4 执行）
+## 下一步（按 R6 收口任务执行）
 
-1. 先完成 `R5-1`：建立 `src/e2e/registry_remote_test.mbt` 并把 registry remote 主证明迁到 localhost HTTP fixture。
-2. 再完成 `R5-2`：把当前 shell OpenSSL CLI 路径的阶段性决策写成正式记录，并确保 `publish / registry / verify.typ` 一致。
-3. 然后完成 `R5-3`：收敛 shared verifier feasibility checkpoint，明确下一版是否值得真正实现。
-4. 最后执行 `R5-4`：同步计划 / 进度文档，跑 verify，并关闭 R5。
+1. 先关闭 `R6-1`：固定 registry command contract 与 materialize 行为。
+2. 然后关闭 `R6-2` / `R6-3`：稳定 publish 语义并巩固单机 e2e 证据。
+3. 最后完成 `R6-4`：统一 dashboard / CLI / plan 口径，并准备关闭 R6。
 
 ## 相关文档
 
@@ -158,3 +167,4 @@ order: 6
 - [索引与紧凑上下文](/docs/indexing)
 - [MCP 工作流](/docs/mcp)
 - [CLI 参考](/docs/cli)
+- [Provider 覆盖率报告](/docs/providers)

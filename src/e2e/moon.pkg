@@ -6,12 +6,20 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
+  "shu-kitamura/sha256" @sha256,
   "yufeiminds/codeiq/cmd/build" @build_cmd,
   "yufeiminds/codeiq/cmd/check" @check_cmd,
   "yufeiminds/codeiq/cmd/diff" @diff_cmd,
   "yufeiminds/codeiq/cmd/init" @init_cmd,
-  "yufeiminds/codeiq/cmd/mcp" @mcp_cmd,
   "yufeiminds/codeiq/cmd/main" @main_cmd,
   "yufeiminds/codeiq/cmd/publish" @publish_cmd,
   "yufeiminds/codeiq/cmd/query" @query_cmd,
+  "yufeiminds/codeiq/cmd/registry" @registry_cmd,
 } for "test"
+
+options(
+  targets: {
+    "init_test.mbt": [ "wasm" ],
+    "registry_test.mbt": [ "wasm" ],
+  },
+)

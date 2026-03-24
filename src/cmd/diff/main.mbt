@@ -23,8 +23,6 @@ fn diff_error(message : String) -> @cli.CliError {
 
 ///|
 fn read_manifest(path : String) -> Result[Json, @cli.CliError] {
-  let out = @bundle.read_manifest(path)
-  guard out is Ok(manifest) else { return Err(diff_error(out.unwrap_err())) }
   let text = @fs.read_file_to_string(path) catch {
     err =>
       return Err(diff_error("cannot read manifest \{path}: \{err.to_string()}"))
@@ -33,8 +31,49 @@ fn read_manifest(path : String) -> Result[Json, @cli.CliError] {
   guard parsed is Ok(value) else {
     return Err(diff_error("invalid manifest json in \\{path}"))
   }
-  ignore(manifest)
   Ok(value)
+}
+
+///|
+fn decode_utf8(bytes : Bytes, path : String) -> Result[String, @cli.CliError] {
+  let text = @utf8.decode(bytes) catch {
+    _ => return Err(diff_error("invalid utf-8 bytes in \{path}"))
+  }
+  Ok(text)
+}
+
+///|
+fn read_ndjson(path : String) -> Result[Array[Json], @cli.CliError] {
+  let file_bytes = @fs.read_file_to_bytes(path) catch {
+    _ => return Err(diff_error("cannot read ndjson \{path}"))
+  }
+  let text_out = if path.has_suffix(".zst") {
+    let decompressed = @zstd.decompress(file_bytes) catch {
+      _ => return Err(diff_error("cannot decompress ndjson \{path}"))
+    }
+    decode_utf8(decompressed, path)
+  } else {
+    decode_utf8(file_bytes, path)
+  }
+  guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
+  if text == "" {
+    return Ok([])
+  }
+
+  let lines = text.split("\n").to_array()
+  let records : Array[Json] = []
+  for i in 0..<lines.length() {
+    let line = lines[i].to_string().trim().to_string()
+    if line == "" {
+      continue
+    }
+    let parsed = try? @json.parse(line)
+    guard parsed is Ok(value) else {
+      return Err(diff_error("invalid ndjson line in \{path} at \{i + 1}"))
+    }
+    records.push(value)
+  }
+  Ok(records)
 }
 
 ///|
@@ -90,15 +129,30 @@ fn record_bool(record : Json, field : String) -> Bool {
 
 ///|
 fn artifact_records(root : String) -> Result[Array[Json], @cli.CliError] {
-  let decl_path = "\{root}/declarations.ndjson.zst"
-  let decl_out = @bundle.read_ndjson(decl_path)
-  guard decl_out is Ok(declarations) else {
-    return Err(diff_error(decl_out.unwrap_err()))
+  let decl_path_zst = "\{root}/declarations.ndjson.zst"
+  let decl_path_plain = "\{root}/declarations.ndjson"
+  let decl_out = if @fs.path_exists(decl_path_zst) {
+    read_ndjson(decl_path_zst)
+  } else if @fs.path_exists(decl_path_plain) {
+    read_ndjson(decl_path_plain)
+  } else {
+    Err(diff_error("cannot read ndjson \{decl_path_zst}"))
   }
-  let symbol_path = "\{root}/symbols.ndjson.zst"
-  let symbol_out = @bundle.read_ndjson(symbol_path)
+  guard decl_out is Ok(declarations) else {
+    return Err(decl_out.unwrap_err())
+  }
+
+  let symbol_path_zst = "\{root}/symbols.ndjson.zst"
+  let symbol_path_plain = "\{root}/symbols.ndjson"
+  let symbol_out = if @fs.path_exists(symbol_path_zst) {
+    read_ndjson(symbol_path_zst)
+  } else if @fs.path_exists(symbol_path_plain) {
+    read_ndjson(symbol_path_plain)
+  } else {
+    Err(diff_error("cannot read ndjson \{symbol_path_zst}"))
+  }
   guard symbol_out is Ok(symbols) else {
-    return Err(diff_error(symbol_out.unwrap_err()))
+    return Err(symbol_out.unwrap_err())
   }
 
   let records : Array[Json] = []
@@ -128,6 +182,222 @@ fn record_path(record : Json) -> String {
     Some(value) => value
     None => "unknown"
   }
+}
+
+///|
+fn record_location(record : Json, path_fallback : String) -> Json {
+  guard record is Object(object) else {
+    return { "uri": path_fallback, "startLine": 1, "endLine": 1 }
+  }
+  match object.get("location") {
+    Some(Object(location_object)) => {
+      let uri = match location_object.get("uri") {
+        Some(String(value)) if value != "" => value
+        _ => path_fallback
+      }
+      let start_line = match location_object.get("startLine") {
+        Some(Number(value, ..)) => value.to_int()
+        _ => 1
+      }
+      let end_line = match location_object.get("endLine") {
+        Some(Number(value, ..)) => value.to_int()
+        _ => start_line
+      }
+      { "uri": uri, "startLine": start_line, "endLine": end_line }
+    }
+    _ => { "uri": path_fallback, "startLine": 1, "endLine": 1 }
+  }
+}
+
+///|
+fn location_key(record : Json) -> String {
+  let fallback = record_path(record)
+  let location = record_location(record, fallback)
+  guard location is Object(location_object) else { return fallback }
+  let uri = match location_object.get("uri") {
+    Some(String(value)) if value != "" => value
+    _ => fallback
+  }
+  let start_line = match location_object.get("startLine") {
+    Some(Number(value, ..)) => value.to_int()
+    _ => 1
+  }
+  let end_line = match location_object.get("endLine") {
+    Some(Number(value, ..)) => value.to_int()
+    _ => start_line
+  }
+  "\{uri}:\{start_line}:\{end_line}"
+}
+
+///|
+fn record_language(record : Json) -> String {
+  match record_string(record, "language") {
+    Some(value) if value != "" => value
+    _ => {
+      let path = record_path(record)
+      if path.has_suffix(".go") {
+        "go"
+      } else if path.has_suffix(".rs") {
+        "rust"
+      } else {
+        let id = record_string(record, "id").unwrap_or("")
+        if id.contains("go-module") {
+          "go"
+        } else if id.contains("rust-crate") {
+          "rust"
+        } else {
+          "unknown"
+        }
+      }
+    }
+  }
+}
+
+///|
+fn is_go_test_name(name : String) -> Bool {
+  name.has_prefix("Test") ||
+  name.has_prefix("Benchmark") ||
+  name.has_prefix("Fuzz") ||
+  name.has_prefix("Example")
+}
+
+///|
+fn is_go_test_signature(signature : String) -> Bool {
+  signature.has_prefix("func Test") ||
+  signature.has_prefix("func Benchmark") ||
+  signature.has_prefix("func Fuzz") ||
+  signature.has_prefix("func Example")
+}
+
+///|
+fn is_rust_test_signature(signature : String) -> Bool {
+  signature.contains("#[test]") || signature.contains("# [test]")
+}
+
+///|
+fn is_rust_test_name(name : String) -> Bool {
+  name.has_prefix("test_") || name.has_suffix("_test")
+}
+
+///|
+fn is_test_record(record : Json) -> Bool {
+  let id = record_string(record, "id").unwrap_or("")
+  if !id.has_prefix("decl:") {
+    return false
+  }
+  let path = record_path(record)
+  let signature = record_string(record, "signature").unwrap_or("")
+  let name = record_string(record, "name").unwrap_or("")
+  match record_language(record) {
+    "go" =>
+      path.has_suffix("_test.go") ||
+      is_go_test_signature(signature) ||
+      is_go_test_name(name)
+    "rust" =>
+      path.has_prefix("tests/") ||
+      path.contains("/tests/") ||
+      path.has_suffix("_test.rs") ||
+      is_rust_test_signature(signature) ||
+      is_rust_test_name(name)
+    _ => false
+  }
+}
+
+///|
+fn test_change_id(record : Json) -> String {
+  let id = record_string(record, "id").unwrap_or("")
+  if id.has_prefix("decl:") {
+    "test:\{id[5:].to_string()}"
+  } else if id.has_prefix("sym:") {
+    "test:\{id[4:].to_string()}"
+  } else {
+    "test:\{id}"
+  }
+}
+
+///|
+fn test_change_path(record : Json) -> String {
+  match record_string(record, "canonical_name") {
+    Some(value) => value
+    None => record_path(record)
+  }
+}
+
+///|
+fn test_change_record(kind : String, record : Json) -> Json {
+  let fallback = record_path(record)
+  {
+    "kind": kind,
+    "language": record_language(record),
+    "id": test_change_id(record),
+    "path": test_change_path(record),
+    "signature": record_string(record, "signature").unwrap_or("unknown"),
+    "location": record_location(record, fallback),
+  }
+}
+
+///|
+fn test_change_sort_key(change : Json) -> String {
+  guard change is Object(change_object) else { return "" }
+  match change_object.get("id") {
+    Some(String(id)) => id
+    _ => ""
+  }
+}
+
+///|
+fn test_record_index(records : Array[Json]) -> Map[String, Json] {
+  let index : Map[String, Json] = {}
+  for i in 0..<records.length() {
+    let record = records[i]
+    if !is_test_record(record) {
+      continue
+    }
+    let key = test_change_id(record)
+    if key != "" && key != "test:" {
+      index[key] = record
+    }
+  }
+  index
+}
+
+///|
+fn has_test_change(base : Json, target : Json) -> Bool {
+  if has_shape_change(base, target) {
+    return true
+  }
+  location_key(base) != location_key(target)
+}
+
+///|
+fn test_changes(
+  base_records : Array[Json],
+  target_records : Array[Json],
+) -> Array[Json] {
+  let changes : Array[Json] = []
+  let base_index = test_record_index(base_records)
+  let target_index = test_record_index(target_records)
+
+  for id, target in target_index {
+    match base_index.get(id) {
+      Some(base) =>
+        if has_test_change(base, target) {
+          changes.push(test_change_record("modified", target))
+        }
+      None => changes.push(test_change_record("added", target))
+    }
+  }
+
+  for id, base in base_index {
+    if !target_index.contains(id) {
+      changes.push(test_change_record("removed", base))
+    }
+  }
+
+  changes.sort_by((a, b) => {
+    test_change_sort_key(a).compare(test_change_sort_key(b))
+  })
+  changes
 }
 
 ///|
@@ -296,9 +566,14 @@ pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
     diff_object["since"] = Json::string(since)
   }
   if params.include_test_changes {
+    let all_test_changes = test_changes(base_records, target_records)
     diff_object["includeTestChanges"] = true
-    diff_object["testSummary"] = { "added": 0, "modified": 0, "removed": 0 }
-    diff_object["testChanges"] = []
+    diff_object["testSummary"] = {
+      "added": count_changes(all_test_changes, "added"),
+      "modified": count_changes(all_test_changes, "modified"),
+      "removed": count_changes(all_test_changes, "removed"),
+    }
+    diff_object["testChanges"] = Json::array(all_test_changes)
   }
   let diff_schema_out = @schema.validate_ciq_diff_v1(diff)
   guard diff_schema_out is Ok(_) else {

@@ -35,6 +35,45 @@ test "parse invocation supports publish positional bundle" {
 }
 
 ///|
+test "parse invocation supports registry upload-local" {
+  let argv = ["codeiq", "registry", "upload-local", "./dist/upload.json"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(RegistryUploadLocal(params)) else {
+    fail("expected registry upload-local invocation to parse")
+  }
+
+  inspect(params.upload_request_file, content="./dist/upload.json")
+}
+
+///|
+test "parse invocation supports registry download-local" {
+  let argv = [
+    "codeiq", "registry", "download-local", "pkg:generic/acme/demo@0.1.0",
+  ]
+  let out = parse_cli_args(argv)
+  guard out is Ok(RegistryDownloadLocal(params)) else {
+    fail("expected registry download-local invocation to parse")
+  }
+
+  inspect(params.purl, content="pkg:generic/acme/demo@0.1.0")
+}
+
+///|
+test "parse invocation supports registry download with output" {
+  let argv = [
+    "codeiq", "registry", "download", "pkg:generic/acme/demo@0.1.0", "--output",
+    "./cache/demo",
+  ]
+  let out = parse_cli_args(argv)
+  guard out is Ok(RegistryDownloadBundle(params)) else {
+    fail("expected registry download invocation to parse")
+  }
+
+  inspect(params.purl, content="pkg:generic/acme/demo@0.1.0")
+  inspect(params.output_dir, content="./cache/demo")
+}
+
+///|
 test "parse invocation supports mcp start with custom port" {
   let argv = ["codeiq", "mcp", "start", "--port", "9090"]
   let out = parse_cli_args(argv)

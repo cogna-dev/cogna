@@ -1,13 +1,18 @@
 import {
   "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/strconv" @strconv,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cmd/bundle" @bundle,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
+  "Milky2018/zstd" @zstd,
 }
 
 import {
-  "Milky2018/zstd" @zstd,
-  "moonbitlang/core/encoding/utf8" @utf8,
 } for "test"
+
+options(
+  targets: {
+    "main_test.mbt": [ "wasm" ],
+  },
+)
