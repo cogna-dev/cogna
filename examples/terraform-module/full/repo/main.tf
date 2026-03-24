@@ -31,6 +31,10 @@ variable "subnets" {
   type = map(string)
 }
 
+variable "settings" {
+  type = object({ env = string, retries = number })
+}
+
 module "network_labels" {
   source = "./modules/labels"
 }
