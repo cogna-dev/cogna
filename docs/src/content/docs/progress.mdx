@@ -19,7 +19,7 @@ order: 6
 | R3 | Distribution Beta（repo-local / inproc） | ✅ Completed | repo-local / inproc 分发 beta 已形成可回归闭环 |
 | R4 | Externalization Hardening | ✅ Completed | process lifecycle hardening 已交付 |
 | R5 | Core Workflow Complete | ✅ Completed | 主业务流程闭环已完成并完成收口 |
-| R6 | Single-Machine Registry Baseline | 🟡 Active | 当前唯一 active release，收口单机/免认证 registry + publish baseline |
+| R6 | Single-Machine Registry Baseline | ✅ Completed | 单机/免认证 registry + publish baseline 已完成并关闭 |
 | R7 | Registry Trust & Verifier | ⚪ Planned | 再处理 signature path、shared verifier 与 trust 议题 |
 | R8 | Deployment & Security Hardening | ⚪ Planned | 最后处理部署、auth、security、ops 与企业级 hardening |
 
@@ -29,7 +29,7 @@ order: 6
 - `R5` 已完成，主业务流程 `init → build → diff → check → query → MCP review` 已形成稳定闭环；
 - 当前看板不再保留 `R5` 的执行清单，只保留当前 active release（`R6`）的唯一执行清单。
 
-## R6 · Single-Machine Registry Baseline（Active）
+## R6 · Single-Machine Registry Baseline（Completed）
 
 **Scope**
 
@@ -61,7 +61,7 @@ order: 6
 
 ### R6-1 · Registry command contract freeze
 
-**状态：🟡 In Progress**
+**状态：✅ Completed**
 
 - **Goal**：固定 `registry upload-local / download-local / download(materialize)` 的本地 contract、ETag/304 语义与输出产物。
 - **Main touchpoints**：`src/cmd/registry/main.mbt`、`src/cmd/registry/main_test.mbt`、`src/cmd/registry/download_bundle_test.mbt`、`src/schema/contracts_test.mbt`、`docs/src/content/docs/cli.mdx`
@@ -78,7 +78,7 @@ order: 6
 
 ### R6-2 · Publish local-registry path stabilization
 
-**状态：⏳ Pending**
+**状态：✅ Completed**
 
 - **Goal**：固定 `publish` 写入本地 registry 的路径、receipt 语义与 already-exists 语义。
 - **Main touchpoints**：`src/cmd/publish/main.mbt`、`src/cmd/publish/main_test.mbt`、`src/cmd/registry/main.mbt`、`docs/src/content/docs/cli.mdx`
@@ -94,7 +94,7 @@ order: 6
 
 ### R6-3 · Single-machine end-to-end registry proof
 
-**状态：⏳ Pending**
+**状态：✅ Completed**
 
 - **Goal**：把 `build → registry upload-local → registry download-local → publish → registry download(materialize)` 固定为单机 e2e 证据链。
 - **Main touchpoints**：`src/e2e/registry_test.mbt`、`src/e2e/moon.pkg`、`src/cmd/build/*`、`src/cmd/registry/*`、`src/cmd/publish/*`
@@ -109,7 +109,7 @@ order: 6
 
 ### R6-4 · Dashboard / docs / release closeout
 
-**状态：⏳ Pending**
+**状态：✅ Completed**
 
 - **Goal**：让 progress / CLI / plan 对 R6 范围、验证矩阵和已知限制保持一致，并为关闭 R6 做准备。
 - **Main touchpoints**：`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx`、`spec/plan.typ`
@@ -150,15 +150,15 @@ order: 6
 
 ## 本轮补充文档
 
-- `docs/src/content/docs/progress.mdx`：已改成只保留当前 active release（R6）的执行清单；
+- `docs/src/content/docs/progress.mdx`：已完成 R6 收口并将状态更新为 completed；
 - `docs/src/content/docs/cli.mdx`：已补充 `registry upload-local/download-local/download` 命令文档并与 R6 语义对齐。
 - `src/e2e/registry_test.mbt`：新增 R6 单机 registry/publish 闭环 e2e 证据（build→upload-local→download-local→publish→download materialize）。
 
 ## 下一步（按 R6 收口任务执行）
 
-1. 先关闭 `R6-1`：固定 registry command contract 与 materialize 行为。
-2. 然后关闭 `R6-2` / `R6-3`：稳定 publish 语义并巩固单机 e2e 证据。
-3. 最后完成 `R6-4`：统一 dashboard / CLI / plan 口径，并准备关闭 R6。
+1. 进入 `R7`：处理 signature path、shared verifier feasibility 与 trust 议题。
+2. 在 `R7` 完成后进入 `R8`：处理 deployment / auth / security / ops 收口。
+3. 继续保持 MoonBit 工具链回归跟踪，待上游修复后恢复更多 native/js 全量回归。
 
 ## 相关文档
 

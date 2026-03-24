@@ -81,7 +81,7 @@ codeiq publish ./dist/tokio@1.43.0.ciq.tgz
 
 `publish` 当前会把本地构建好的 bundle 上传到本地 registry stub（`.codeiq/registry`）。当检测到同一 PURL 且 `If-None-Match` 命中时，会返回 `304` 语义并产出 `status = "already-exists"` 的 receipt；否则正常上传并返回 `published`。返回结果是 `codeiq-publish-receipt/v1`，包含 `publishId`、`bundleId`、`purl`、`digest`、`bundleType`、`downloadUrl` 与 `status`。
 
-当前产品主线工作流是 `init → build → diff → check → query → MCP review`。当前阶段（R6）正在收口 `publish ↔ registry` 的单机、免认证 baseline：先保证本地 artifact movement 与 receipt/download contract 稳定，再把 trust / hosted deployment 放到后续 release。
+当前产品主线工作流是 `init → build → diff → check → query → MCP review`。`publish ↔ registry` 的单机、免认证 baseline 已在 R6 收口完成；后续 trust / hosted deployment 进入 R7/R8。
 
 ## `codeiq registry upload-local <upload-request-file>`
 

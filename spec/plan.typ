@@ -147,7 +147,7 @@
   - 验证清单聚焦主业务流程闭环证据（含 `src/e2e/review/main_test.mbt` 与 `src/e2e/review/lifecycle_test.mbt`）；
   - registry / publish / trust / deployment 统一顺延到 `R6-R8`。
 
-== R6：Single-Machine Registry Baseline（active）
+== R6：Single-Machine Registry Baseline（completed）
 
 - #strong[Scope]：在 R5 关闭后，交付单机 registry + 免认证 baseline，聚焦本地 artifact movement 与 publish/registry 可回归语义，不提前承诺 trust / deployment / auth。
 - #strong[Includes]：
@@ -169,7 +169,7 @@
 
 === R6 收口任务（唯一执行清单）
 
-==== R6-1：Single-machine registry loop freeze（active）
+==== R6-1：Single-machine registry loop freeze（completed）
 
 - #strong[Goal]：把 `publish ↔ registry(upload-local/download-local/download)` 的单机闭环固定为当前 release 的回归基线。
 - #strong[Main touchpoints]：`src/cmd/registry/*`、`src/cmd/publish/*`、`src/e2e/registry_test.mbt`、`src/schema/contracts_test.mbt`、`docs/src/content/docs/cli.mdx`、`docs/src/content/docs/progress.mdx`。
@@ -186,6 +186,11 @@
   - `moon test src/schema/contracts_test.mbt --target native -v`
   - `pnpm build`（在 `docs/` 下）
 - #strong[Out of scope]：registry HTTP server productization、shared verifier、hosted deployment、KMS/key rotation。
+
+- #strong[Result]：已完成。
+  - `registry upload-local / download-local / download(materialize)` 与 `publish` 单机闭环已稳定；
+  - `codeiq-registry-upload/v1`、`codeiq-registry-download/v1`、`codeiq-publish-receipt/v1` contract 与命令行为一致；
+  - `spec/plan.typ`、`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx` 已统一 R6 语义与验证命令。
 
 == R7：Registry Trust & Verifier（planned）
 
@@ -208,4 +213,4 @@
 
 `R5 Core Workflow Complete` 已关闭。该 release 已把#strong[开发代码提取、分析、审查主流程]收口为当前版本最清晰、最可信、最可演示的业务闭环。
 
-当前 active release 已进入 `R6`，用于收口单机 registry + 免认证 baseline；R6 关闭后再进入 `R7` 和 `R8` 处理 trust / verifier / deployment / security。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
+`R6 Single-Machine Registry Baseline` 已关闭。下一步进入 `R7` 处理 trust / verifier 议题，再进入 `R8` 处理 deployment / security / ops 收口。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
