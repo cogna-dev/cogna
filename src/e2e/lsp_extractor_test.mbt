@@ -120,6 +120,8 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
 
   let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
   assert_true(declarations.contains("\"kind\":\"operation\""))
+  assert_true(declarations.contains("\"kind\":\"path\""))
+  assert_true(declarations.contains("\"name\":\"Payment.discriminator\""))
   assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
   assert_true(declarations.contains("\"shape\":{\"kind\":"))
   assert_true(declarations.contains("\"relations\":[{\"kind\":\"declared_in\""))
@@ -185,6 +187,11 @@ test "e2e go extractor includes richer relations" {
 
   let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
   assert_true(declarations.contains("\"kind\":\"function\""))
+  assert_true(declarations.contains("Package sample exposes provider coverage fixtures."))
+  assert_true(declarations.contains("\"name\":\"Box\""))
+  assert_true(declarations.contains("\"kind\":\"embedded_field\""))
+  assert_true(declarations.contains("\"name\":\"MapValue\""))
+  assert_true(declarations.contains("Deprecated: use Hello instead."))
   assert_true(declarations.contains("\"relations\":[{"))
   assert_true(declarations.contains("\"kind\":\"declared_in\""))
   assert_true(
@@ -192,6 +199,91 @@ test "e2e go extractor includes richer relations" {
     declarations.contains("\"kind\":\"returns\"") ||
     declarations.contains("\"kind\":\"references_type\""),
   )
+
+  cleanup_lsp_e2e(path)
+}
+
+///|
+fn write_fixture_repo(path : String, fixture_root : String) -> Unit {
+  @fs.create_dir(path) catch {
+    _ => abort("failed to create fixture repo")
+  }
+  let source = @fs.read_file_to_string(fixture_root) catch {
+    _ => abort("failed to read fixture source")
+  }
+  let target = match fixture_root {
+    "examples/rust-crate/full/repo/lib.rs" => "lib.rs"
+    "examples/terraform-module/full/repo/main.tf" => "main.tf"
+    _ => abort("unexpected fixture root")
+  }
+  @fs.write_string_to_file("\{path}/\{target}", source) catch {
+    _ => abort("failed to write fixture source")
+  }
+}
+
+///|
+fn write_profile_config(path : String, profile : String, include_glob : String, purl : String) -> Unit {
+  let content =
+    #|schemaVersion: ciq-config/v1
+    #|profile: 
+    #|purl: 
+    #|source:
+    #|  repo: https://github.com/example/demo
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - 
+    #|checks:
+    #|  format: sarif
+    #|  policy: default-compat
+    #|
+  let normalized = content
+    .replace(old="profile: ", new="profile: \{profile}")
+    .replace(old="purl: ", new="purl: \{purl}")
+    .replace(old="    - ", new="    - \{include_glob}")
+  @fs.write_string_to_file("\{path}/codeiq.yaml", normalized) catch {
+    _ => abort("failed to write profile config")
+  }
+}
+
+///|
+test "e2e rust extractor carries doc comments" {
+  let path = "src/e2e/tmp_lsp_extractor_rust"
+  cleanup_lsp_e2e(path)
+  write_fixture_repo(path, "examples/rust-crate/full/repo/lib.rs")
+  write_profile_config(path, "rust-crate", "**/*.rs", "pkg:cargo/example/demo@0.1.0")
+
+  let out = @build_cmd.run({ repo: path })
+  guard out is Ok(_) else {
+    cleanup_lsp_e2e(path)
+    fail("rust build should succeed")
+  }
+
+  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  assert_true(declarations.contains("Public module doc sample."))
+  assert_true(declarations.contains("ApiItem doc comment.\\nDeprecated"))
+  assert_true(declarations.contains("Constructor doc comment."))
+
+  cleanup_lsp_e2e(path)
+}
+
+///|
+test "e2e terraform extractor covers data source and object type" {
+  let path = "src/e2e/tmp_lsp_extractor_terraform"
+  cleanup_lsp_e2e(path)
+  write_fixture_repo(path, "examples/terraform-module/full/repo/main.tf")
+  write_profile_config(path, "terraform-module", "**/*.tf", "pkg:terraform/example/demo@0.1.0")
+
+  let out = @build_cmd.run({ repo: path })
+  guard out is Ok(_) else {
+    cleanup_lsp_e2e(path)
+    fail("terraform build should succeed")
+  }
+
+  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  assert_true(declarations.contains("\"kind\":\"data\""))
+  assert_true(declarations.contains("\"name\":\"aws_caller_identity.current\""))
+  assert_true(declarations.contains("type = object({ env = string, retries = number })"))
 
   cleanup_lsp_e2e(path)
 }
