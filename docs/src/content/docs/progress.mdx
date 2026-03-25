@@ -1,6 +1,6 @@
 ---
 title: 开发进度看板
-description: 与 spec/plan.typ 对齐的当前 release ledger、验证状态与下一步执行重点。
+description: 与 spec/plan.typ 对齐的当前 release ledger、proposal gap 与下一步执行重点。
 order: 6
 ---
 
@@ -8,7 +8,7 @@ order: 6
 
 > 最后更新时间：2026-03-25（Asia/Shanghai）
 
-此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步：当前 roadmap 已重新排序，先完成主业务流程与单机 registry 基线，再优先关闭 provider 能力矩阵覆盖，最后再处理 trust / deployment / security。
+此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步。当前 `R5-R9` baseline 已完成，当前 active release 为 #strong[`R10 Server Capability & Shared Framework Extraction`]：Registry 三层拆分、async HTTP runtime 与 zstd 移除已经落地，本轮剩余重点是把 MCP / Registry 的 server 化边界与验证证据完整收口到 docs/spec/dashboard。
 
 ## 当前总览（唯一状态面板）
 
@@ -22,106 +22,107 @@ order: 6
 | R6 | Single-Machine Registry Baseline | ✅ Completed | 单机/免认证 registry + publish baseline 已完成并关闭 |
 | R7 | Provider Matrix Coverage | ✅ Completed | Go / Rust / Terraform / OpenAPI provider 证据面已完成收口 |
 | R8 | Registry Trust & Verifier | ✅ Completed | shell verifier + downgrade + local/no-auth trust baseline 已完成收口 |
-| R9 | Deployment & Security Hardening | ✅ Completed | remote auth、transport security 与 deployment / ops baseline 已完成收口 |
+| R9 | Deployment & Security Hardening | ✅ Completed | remote auth、transport security 与 TLS env baseline 已完成收口 |
+| R10 | Server Capability & Shared Framework Extraction | 🟡 Active | MCP / Registry server capability 已跑通，`moon test` 全量通过；当前聚焦 release 收口与下一阶段排序 |
 
 ## 已完成阶段（摘要）
 
 - `R1-R6` 已完成并冻结为当前 repo 基线；
-- `R5` 已完成，主业务流程 `init → build → diff → check → query → MCP review` 已形成稳定闭环；
-- `R6` 已完成，单机/免认证 registry + publish baseline 已关闭；
-- 当前看板记录最新完成阶段：`R7`、`R8`、`R9` 已完成；当前 active release 已回到 backlog / 下一阶段待定状态。
+- `R7` 已把 Go / Rust / Terraform / OpenAPI provider evidence 收口为 repo 级证据；
+- `R8` 已把 shell verifier + downgrade + local/no-auth trust baseline 固化；
+- `R9` 已把 remote auth header、HTTPS gate、curl transport env 与 TLS material env contract 固化；
+- 当前唯一 active release 为 `R10`，本页只对 `R10` 保留详细执行清单。
 
-## R7 · Provider Matrix Coverage（Completed）
+## proposal gap 快照（与 `spec/proposal.typ` 对照）
 
-- 已把 Go / Rust / Terraform / OpenAPI provider 能力矩阵冻结为 repo 证据；
-- `examples/*`、extractor、e2e tests 与 `providers / progress / plan` 文档已完成收口；
-- 详细执行清单不再保留在本页；当前没有 active release，后续只保留 backlog / 下一阶段摘要。
+- #strong[MCP gap]：`mcp start / status / stop / serve` 已切到真实 HTTP runtime，`src/lib/mcp-sdk/*` 也已回到 transport-agnostic parser/runtime 边界；`src/cmd/mcp/main_test.mbt`、`src/e2e/review/lifecycle_test.mbt` 与全量 `moon test` 已跑通，当前剩余 gap 主要是 release 收口与下一阶段规划，而不是 runtime 正确性。
+- #strong[Registry gap]：本地 / loopback HTTP server 已具备 publish / resolve / versions / bundle detail / bundle download 最小真实 API；`src/lib/registry/*`、`src/registry/*`、`src/cmd/registry/*` 的三层边界与 async HTTP transport 已落地，当前剩余 gap 主要是把 proposal/plan/docs wording 与验证证据完全对齐。
+- #strong[框架拆分 gap]：Registry 边界已经固定为 `src/lib/registry` / `src/registry` / `src/cmd/registry`；当前剩余工作主要是 MCP runtime 的文档/测试收口，以及统一 dashboard 对外叙述。
+- #strong[ops gap]：MCP / Registry 都已有 health contract；剩余 ops gap 主要是更系统化的 session / supervision / hosted deployment，而这些不阻塞当前 R10 最小目标。
 
-## R8 · Registry Trust & Verifier（Completed）
+## R10 · Server Capability & Shared Framework Extraction（Active）
 
-- 已统一 `build → publish → registry` 的 signature metadata 语义，并把 `verified / untrusted / unsigned` 的 downgrade 边界冻结为 repo baseline；
-- 已正式确认 shell OpenSSL CLI 继续作为当前 verifier baseline，继续依赖 `CODEIQ_SIGNATURE_PUBLIC_KEY_FILE`；
-- 已确认 local registry、`inproc://registry` 与 loopback/开发场景允许免认证 / 降级运行，非本地 remote registry 继续执行 stricter trust enforcement；
-- shared non-shell verifier、trust root、KMS / key rotation、hosted deployment 继续保留在 backlog，不阻塞当前阶段。
+**Scope**
 
-## R9 · Deployment & Security Hardening（Completed）
+- 把 MCP / Registry 从 “命令可用 + local/inproc/stdio workaround” 推进到 #strong[真实 server capability]；
+- 把 client / server 公共框架抽到 `src/lib/*`，而不是继续混在 `src/cmd/*`；
+- 保持 CLI entry 继续留在 `src/cmd/*`，同时把 Registry server/storage concrete implementation 固定在 `src/registry/*`；
+- 用 proposal gap 作为本轮规划输入，统一 proposal / plan / progress 的下一阶段边界。
 
-- 已为 remote registry 固化 `CODEIQ_REGISTRY_HEADER_*` header/token 注入边界；
-- 已为 remote endpoint / `downloadUrl` 固化 transport security baseline：默认要求 `https://`，只有显式设置 `CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true` 时才允许非本地 `http://`；
-- 已为 curl transport 固化可配置 env：`CODEIQ_REGISTRY_CURL_MAX_TIME`、`CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT`、`CODEIQ_REGISTRY_CURL_RETRY`、`CODEIQ_REGISTRY_CURL_INSECURE_TLS`；
-- 已为 optional TLS 材料固化 env：`CODEIQ_REGISTRY_TLS_CA_FILE`、`CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE`、`CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE`；
-- 详细执行清单不再保留在本页，后续只把 backlog / 下一阶段保留为摘要方向。
+**Done when**
 
-## 当前验证状态（R8 / R9 已完成）
+- `mcp start / status / stop / serve` 管理的已经是 #strong[真实 server runtime]，而不是 detached-stdio workaround；
+- `registry` 已提供 proposal 级别的最小真实 API / runtime 证据，而不是只依赖 env stub / inproc shortcut；
+- Registry 已完成 `src/lib/registry`（shared contracts/helpers + generic async client）、`src/registry`（server/storage implementation）、`src/cmd/registry`（thin CLI wiring）三层边界；
+- build/query/diff/bundle reader 主链路已完全删除 zstd，统一只消费/产出 plain `*.ndjson`；
+- `spec/proposal.typ`、`spec/plan.typ`、`progress.mdx` 对当前 active release 的边界一致。
 
-以下结果是当前 repo 在 `R8` 收口后继续复用的基线证据：
+**Verify**
 
-| 验证项 | 结果 | 备注 |
-| --- | --- | --- |
-| `moon test src/cmd/build/snapshot_test.mbt` | ✅ 通过（本轮） | 覆盖四类 provider snapshots 与 metadata |
-| `moon test src/e2e/lsp_extractor_test.mbt` | ✅ 通过（本轮） | 新增 Go / Rust / Terraform / OpenAPI provider evidence assertions |
-| `moon check` | ✅ 通过（本轮） | 当前为 warnings only（0 errors） |
-| `moon check --target native` | ✅ 通过（本轮） | warnings only，0 errors |
-| `moon build --target native` | ✅ 通过（本轮） | native build 当前可通过 |
-| `moon test --target native -v` | ✅ 通过（本轮） | 100 passed, 0 failed |
-| `moon test src/cmd/registry/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | trust / receipt / signature propagation baseline 通过 |
-| `moon test src/cmd/publish/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | publish-side verifier / downgrade / reject / local-loopback allow / remote-http gate 语义通过 |
-| `moon test src/e2e/registry_test.mbt --target wasm -v` | ✅ 通过（本轮） | e2e registry loop 与 remote-http opt-in gate 通过 |
-| `pnpm build`（`docs/`） | ✅ 通过（本轮） | 当前文档站可构建 |
+- `moon test src/cmd/mcp/main_test.mbt --target native -v`
+- `moon test src/cmd/mcp/core/main_test.mbt --target llvm -v`
+- `moon test src/e2e/review/lifecycle_test.mbt --target native -v`
+- `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+- `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+- `moon test src/e2e/registry_test.mbt --target wasm -v`
+- `moon test src/e2e/registry_server_test.mbt --target native -v`
+- `moon check`
+- `pnpm build`（在 `docs/` 下）
 
-**环境说明**
+**Out of scope**
 
-- main repo 已落地 #strong[plain NDJSON intermediate artifact workaround]：`build` 不再在主链路中调用 zstd 压缩；
-- 当前 main repo native 大图已恢复通过，但独立最小 repro `repro/moonbit-link-core-ice/` 仍可稳定触发 MoonBit `link-core` ICE；
-- 当前 trust baseline 并非空白：`build` / `publish` / `registry` 已携带 signature metadata 与 OpenSSL shell verify path；
-- `moon check` / `moon check --target native` 仍为当前 MoonBit 代码修改的主错误门槛，warnings 为既有基线。
+- shared non-shell verifier；
+- trust root / key rotation / KMS；
+- multi-node hosted registry productization、HA、enterprise observability；
+- 把 `build / diff / check / publish` 迁移进 MCP。
+
+## R10 执行清单（当前唯一执行清单）
+
+### R10-4 · proposal / docs / dashboard 收口
+
+**状态：🟡 Active（当前阶段）**
+
+- **Goal**：让 `proposal / plan / progress` 对当前 active release 与 server 化边界保持一致，并补齐移除 zstd 之后的用户可见文档。
+- **Main touchpoints**：`spec/proposal.typ`、`spec/plan.typ`、`spec/A001-lsp-extractor.typ`、`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/quickstart.mdx`、`docs/src/content/docs/mcp.mdx`、`docs/src/content/docs/cli.mdx`。
+- **Done when**：
+  - proposal/docs 统一写明 Registry 三层边界与 async transport 现状；
+  - 所有对外文档与 spec 不再描述 `.ndjson.zst` / zstd 为主线格式；
+  - dashboard 只保留当前 active stage 的详细执行清单。
+- **当前进展**：
+  - Registry refactor 已落地到 `src/lib/registry/*`、`src/registry/*`、`src/cmd/registry/*`；
+  - query/diff/bundle reader/runtime tests 已完成 `.zst` / zstd surface 清理，并统一回到 plain `*.ndjson`；
+  - 当前已完成 docs/spec wording 同步，并已补齐 `moon check`、docs build 与 Typst compile 证据。
+- **Verify**：
+  - `moon check`
+  - `moon test`
+  - `pnpm build`（在 `docs/` 下）
+  - `typst compile spec/plan.typ /tmp/codeiq-plan-r10.pdf`
+
+## 当前可复用证据（R10 起步输入）
+
+- MCP query framework：`src/lib/mcp-sdk/jsonrpc.mbt`、`context.mbt`、`server.mbt`、`tools.mbt`；
+- MCP command/runtime baseline：`src/cmd/mcp/main.mbt`、`src/cmd/mcp/core/main.mbt`、`src/cmd/mcp/main_test.mbt`、`src/e2e/review/lifecycle_test.mbt`；
+- Registry contract/business baseline：`src/cmd/registry/main.mbt`、`src/cmd/registry/main_test.mbt`、`src/e2e/registry_test.mbt`；
+- Publish-side integration baseline：`src/cmd/publish/main.mbt`、`src/cmd/publish/main_test.mbt`；
+- 当前文档/计划输入：`spec/proposal.typ`、`spec/plan.typ`、`docs/src/content/docs/mcp.mdx`、`docs/src/content/docs/cli.mdx`。
 
 ## 非当前执行项（只保留方向）
 
 - `shared non-shell verifier`、`trust root / key rotation / KMS`；
-- 更完整的 hosted registry productization、enterprise security hardening、ops/observability；
-- 它们不是当前 release 的执行清单，不在本页继续展开。
+- hosted registry 多节点 productization、enterprise observability / HA；
+- 更重的 SARIF / governance productization；
+- 它们不是当前 `R10` 的执行清单，不在本页继续展开。
 
-## 本轮补充文档
+## 下一阶段候选（摘要）
 
-- `docs/src/content/docs/providers.mdx`：已更新 provider 覆盖矩阵，纳入 Go/Rust/Terraform/OpenAPI 新证据；
-- `docs/src/content/docs/progress.mdx`：已完成 provider matrix dashboard 收口；
-- `spec/plan.typ`：当前 release 顺序已把 `R8` / `R9` 都作为 completed baseline 固化。
-
-## 下一步（当前有效顺序）
-
-1. 持续保留并跟踪 MoonBit native `link-core` ICE 的独立最小 repro：`repro/moonbit-link-core-ice/`。
-2. 当前已确认最小触发条件仍为 native blackbox test 中的 live `@zstd.compress(b"")` 调用；但 main workflow 已通过 plain artifact workaround 绕开该触发器。
-3. 继续保持 MoonBit 工具链回归跟踪；若上游修复，再评估是否恢复 `.zst` 作为默认中间格式。
-4. 下一轮只在 backlog 中择机推进 shared verifier、KMS、hosted deployment productization。
-
-## 本轮 workaround 结论
-
-- `src/cmd/build/main.mbt` 已将中间产物切换为：
-  - `declarations.ndjson`
-  - `symbols.ndjson`
-- `src/cmd/bundle/reader.mbt` 已支持 plain-first + `.zst` backward compatibility；
-- `src/schema/contracts.mbt` 已允许 `declarationSchema.format` 为 `ndjson` 或 `ndjson.zst`；
-- `src/cmd/build/main_test.mbt --target native` 与 `src/cmd/bundle/reader_test.mbt --target native` 已恢复通过；
-- `moon test --target native -v` 当前全量通过，说明主项目已不再被该 ICE 阻塞。
-
-## 当前 trust baseline 结论
-
-- 当前 repo 已经不是“尚未开始 trust/verifier / deployment baseline”状态，而是 #strong[R8 / R9 baseline 已完成并冻结]：
-  - `build` 已携带 signature provenance；
-  - `registry` / `publish` 已有 OpenSSL shell verify path；
-  - schema / tests 已覆盖 verified / untrusted / downgrade / remote propagation 语义；
-- `R8` 当前正式决定：继续保留 shell verifier，并以 OpenSSL CLI + downgrade 作为当前 baseline，而不是在本轮切换到 shared non-shell verifier；
-- `local registry`、`inproc://registry` 与 loopback 开发场景允许免认证运行；非本地 remote registry 仍维持 stricter trust enforcement；
-- `R8` 的重点不是从零开始发明 trust model，而是把现有 baseline 收敛成清晰、稳定、可决策的实现边界；
-- 当前外部参考可作为术语基线：`OCI Distribution` 的 digest verification、`cosign` 的 detached signature / bundle、`TUF/Rekor` 的 trust metadata / transparency；但这些并不自动意味着本轮就实现完整 shared verifier；
-- `shared non-shell verifier`、`trust root`、`KMS / key rotation`、更完整的 `hosted deployment` 仍保持 backlog，不反向阻塞当前已完成基线。
+1. `shared non-shell verifier`：把当前 shell OpenSSL verifier 逐步替换为 repo 内可复用实现，并补齐 trust-root / key material 的最小接口。
+2. `MCP supervision`：补齐多 session、crash recovery、descriptor 之外的运行态管理与 health/supervision contract。
+3. `hosted registry productization`：把当前单机/loopback runtime 继续推进到 hosted deployment、HA 与 observability backlog。
 
 ## 相关文档
 
 - [概览](/docs/introduction)
 - [快速开始](/docs/quickstart)
-- [索引与紧凑上下文](/docs/indexing)
 - [MCP 工作流](/docs/mcp)
 - [CLI 参考](/docs/cli)
 - [Provider 覆盖率报告](/docs/providers)

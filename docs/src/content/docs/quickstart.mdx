@@ -14,7 +14,7 @@ order: 2
 4. 按需做一次性查询或启动 MCP。
 5. 如果需要团队共享，再发布到 Registry。
 
-> 下面命令与行为基于当前已落地实现（含 OPA CLI 执行、本地 registry stub 上传、diff 可选参数）。
+> 下面命令与行为基于当前已落地实现（含 OPA CLI 执行、Registry 本地/remote 发布链路、MCP HTTP runtime、diff 可选参数）。
 
 ## 1. 初始化
 
@@ -88,7 +88,7 @@ codeiq mcp stop
 codeiq publish ./dist/tokio@1.43.0.ciq.tgz
 ```
 
-如果你希望同一份 bundle 被多人、多个工具或多台机器复用，那么可以把它发布到 Registry。当前默认链路会先写入本地 stub（`.codeiq/registry`），并生成不可变 publish receipt。
+如果你希望同一份 bundle 被多人、多个工具或多台机器复用，那么可以把它发布到 Registry。当前默认链路会先写入本地 registry 存储（`.codeiq/registry`）；如果配置 `CODEIQ_REGISTRY_BASE_URL`，则会走 remote / loopback HTTP Registry 路径，并生成不可变 publish receipt。
 
 ## 推荐的第一条验证路径
 

@@ -8,7 +8,7 @@ order: 4
 
 CodeIQ 的 MCP Agent 是一个本地常驻内存查询代理。它的作用不是构建 bundle，也不是执行差异比较或策略检查，而是在 bundle 已经准备好的前提下，为 AI 客户端提供高频查询能力。
 
-在当前 R5 主线里，它更准确的角色是：#strong[review consumption surface]。也就是先由 CLI 生成 bundle、diff、SARIF、query result，再由 MCP 为审查者或 Agent 暴露稳定的查询入口。
+在当前实现中，它更准确的角色仍是：#strong[review consumption surface]。也就是先由 CLI 生成 bundle、diff、SARIF、query result，再由 MCP 为审查者或 Agent 暴露稳定的查询入口；`R10` 已把这条查询入口从 stdio / detached-stdio baseline 推进到真实 server runtime，并继续把 transport/runtime 公共框架收口到 `src/lib/mcp-sdk/*`。
 
 在这个模型里：
 
@@ -86,13 +86,18 @@ codeiq mcp stop
 - `status`：检查当前服务是否可用，适合排查连接问题或自动化探活。
 - `stop`：在本地开发或脚本收尾阶段关闭服务。
 
-如果需要以前台 stdio 方式直接与 MCP 客户端对接，可使用：
+如果需要以前台方式直接运行 MCP server，可使用：
 
 ```bash
 codeiq mcp serve
 ```
 
-该模式会直接进入 stdio request/response loop，不再走 detached lifecycle。
+该模式当前会启动真实的本地 HTTP JSON-RPC runtime，提供：
+
+- `GET /health`
+- `POST /rpc`
+
+`codeiq mcp start` / `status` / `stop` 管理的也是同一套 runtime state 与 health contract；兼容参数 `--stdio` 仍被接受，但不再切回旧的 detached stdio baseline。
 
 ## 本地 MCP 与 CLI 的边界
 
