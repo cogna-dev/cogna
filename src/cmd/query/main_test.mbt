@@ -146,10 +146,7 @@ test "query uses symbols when declaration kind does not match" {
   let symbols =
     #|{"id":"sym:openapi:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
     #|
-  @fs.write_string_to_file(
-    "\{repo}/dist/declarations.ndjson",
-    declarations,
-  ) catch {
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
     _ => abort("failed to write declarations fixture")
   }
   @fs.write_string_to_file("\{repo}/dist/symbols.ndjson", symbols) catch {

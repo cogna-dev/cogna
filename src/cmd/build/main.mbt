@@ -552,10 +552,7 @@ fn write_bundle_skeleton(
     declarations_artifact,
   )
   guard decl_out is Ok(_) else { return Err(decl_out.unwrap_err()) }
-  let symbols_out = write_bytes(
-    "\{dist_dir}/symbols.ndjson",
-    symbols_artifact,
-  )
+  let symbols_out = write_bytes("\{dist_dir}/symbols.ndjson", symbols_artifact)
   guard symbols_out is Ok(_) else { return Err(symbols_out.unwrap_err()) }
   let metadata_out = write_text("\{dist_dir}/metadata.json", metadata)
   guard metadata_out is Ok(_) else { return Err(metadata_out.unwrap_err()) }

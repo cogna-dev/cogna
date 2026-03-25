@@ -32,7 +32,10 @@ fn decode_utf8(bytes : Bytes, path : String) -> Result[String, String] {
 }
 
 ///|
-fn validate_manifest_shape(path : String, manifest : Json) -> Result[String, String] {
+fn validate_manifest_shape(
+  path : String,
+  manifest : Json,
+) -> Result[String, String] {
   guard manifest is Object(object) else {
     return Err("manifest \{path} must be object")
   }
@@ -42,9 +45,10 @@ fn validate_manifest_shape(path : String, manifest : Json) -> Result[String, Str
   let out = match schema_version {
     "ciq-bundle/v1" => @schema.validate_ciq_bundle_v1(manifest)
     "ciq-opa-bundle/v1" => @schema.validate_ciq_opa_bundle_v1(manifest)
-    _ => {
-      return Err("manifest \{path} has unsupported schemaVersion \{schema_version}")
-    }
+    _ =>
+      return Err(
+        "manifest \{path} has unsupported schemaVersion \{schema_version}",
+      )
   }
   guard out is Ok(_) else {
     return Err(
@@ -115,14 +119,7 @@ pub fn read_ndjson(path : String) -> Result[Array[Json], String] {
   let file_bytes = @fs.read_file_to_bytes(path) catch {
     _ => return Err("cannot read ndjson \{path}")
   }
-  let text_out = if path.has_suffix(".zst") {
-    let decompressed = @zstd.decompress(file_bytes) catch {
-      _ => return Err("cannot decompress ndjson \{path}")
-    }
-    decode_utf8(decompressed, path)
-  } else {
-    decode_utf8(file_bytes, path)
-  }
+  let text_out = decode_utf8(file_bytes, path)
   guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
   if text == "" {
     return Ok([])
@@ -147,11 +144,7 @@ pub fn read_ndjson(path : String) -> Result[Array[Json], String] {
 fn bundle_ndjson_path(repo : String, name : String) -> Result[String, String] {
   let plain_path = "\{repo}/dist/\{name}.ndjson"
   if @fs.path_exists(plain_path) {
-    return Ok(plain_path)
-  }
-  let zst_path = "\{repo}/dist/\{name}.ndjson.zst"
-  if @fs.path_exists(zst_path) {
-    Ok(zst_path)
+    Ok(plain_path)
   } else {
     Err("cannot read ndjson \{plain_path}")
   }
@@ -307,11 +300,10 @@ pub fn materialize_bundle_tar_gz(
       return Err("bundle missing required entry \{required[i]}")
     }
   }
-  if !entries.contains("declarations.ndjson") &&
-    !entries.contains("declarations.ndjson.zst") {
+  if !entries.contains("declarations.ndjson") {
     return Err("bundle missing required entry declarations.ndjson")
   }
-  if !entries.contains("symbols.ndjson") && !entries.contains("symbols.ndjson.zst") {
+  if !entries.contains("symbols.ndjson") {
     return Err("bundle missing required entry symbols.ndjson")
   }
 

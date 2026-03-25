@@ -190,7 +190,9 @@ test "e2e go extractor includes richer relations" {
 
   let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("\"kind\":\"function\""))
-  assert_true(declarations.contains("Package sample exposes provider coverage fixtures."))
+  assert_true(
+    declarations.contains("Package sample exposes provider coverage fixtures."),
+  )
   assert_true(declarations.contains("\"name\":\"Box\""))
   assert_true(declarations.contains("\"kind\":\"embedded_field\""))
   assert_true(declarations.contains("\"name\":\"MapValue\""))
@@ -225,7 +227,12 @@ fn write_fixture_repo(path : String, fixture_root : String) -> Unit {
 }
 
 ///|
-fn write_profile_config(path : String, profile : String, include_glob : String, purl : String) -> Unit {
+fn write_profile_config(
+  path : String,
+  profile : String,
+  include_glob : String,
+  purl : String,
+) -> Unit {
   let content =
     #|schemaVersion: ciq-config/v1
     #|profile: 
@@ -254,7 +261,9 @@ test "e2e rust extractor carries doc comments" {
   let path = "src/e2e/tmp_lsp_extractor_rust"
   cleanup_lsp_e2e(path)
   write_fixture_repo(path, "examples/rust-crate/full/repo/lib.rs")
-  write_profile_config(path, "rust-crate", "**/*.rs", "pkg:cargo/example/demo@0.1.0")
+  write_profile_config(
+    path, "rust-crate", "**/*.rs", "pkg:cargo/example/demo@0.1.0",
+  )
 
   let out = @build_cmd.run({ repo: path })
   guard out is Ok(_) else {
@@ -275,7 +284,9 @@ test "e2e terraform extractor covers data source and object type" {
   let path = "src/e2e/tmp_lsp_extractor_terraform"
   cleanup_lsp_e2e(path)
   write_fixture_repo(path, "examples/terraform-module/full/repo/main.tf")
-  write_profile_config(path, "terraform-module", "**/*.tf", "pkg:terraform/example/demo@0.1.0")
+  write_profile_config(
+    path, "terraform-module", "**/*.tf", "pkg:terraform/example/demo@0.1.0",
+  )
 
   let out = @build_cmd.run({ repo: path })
   guard out is Ok(_) else {
@@ -286,7 +297,9 @@ test "e2e terraform extractor covers data source and object type" {
   let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("\"kind\":\"data\""))
   assert_true(declarations.contains("\"name\":\"aws_caller_identity.current\""))
-  assert_true(declarations.contains("type = object({ env = string, retries = number })"))
+  assert_true(
+    declarations.contains("type = object({ env = string, retries = number })"),
+  )
 
   cleanup_lsp_e2e(path)
 }

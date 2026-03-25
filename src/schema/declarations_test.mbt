@@ -122,6 +122,8 @@ test "declaration schema rejects unknown top-level field" {
 
   let out = validate_ciq_declaration_v1(record)
   guard out is Err(_) else {
-    fail("declaration with unknown top-level field should fail schema validation")
+    fail(
+      "declaration with unknown top-level field should fail schema validation",
+    )
   }
 }

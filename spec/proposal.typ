@@ -128,8 +128,8 @@ checks:
 ```text
 pkg:cargo/tokio@1.43.0.ciq.tgz
 ├── manifest.json
-├── declarations.ndjson.zst
-├── symbols.ndjson.zst
+├── declarations.ndjson
+├── symbols.ndjson
 ├── metadata.json
 └── checksums.txt
 ```
@@ -140,8 +140,8 @@ pkg:cargo/tokio@1.43.0.ciq.tgz
   stroke: 0.4pt,
   [*文件*], [*格式*], [*用途*],
   [`manifest.json`], [JSON], [描述 bundle 元数据、PURL、profile、输入文件摘要、schema 版本],
-  [`declarations.ndjson.zst`], [NDJSON + zstd], [逐行记录结构化声明信息：原始签名 + 待演进的抽象 shape + 语言特化 tagged union],
-  [`symbols.ndjson.zst`], [NDJSON + zstd], [索引声明到逻辑名、路径、父级作用域、唯一 ID],
+  [`declarations.ndjson`], [NDJSON], [逐行记录结构化声明信息：原始签名 + 待演进的抽象 shape + 语言特化 tagged union],
+  [`symbols.ndjson`], [NDJSON], [索引声明到逻辑名、路径、父级作用域、唯一 ID],
   [`metadata.json`], [JSON], [构建时间、工具版本、语言统计、输入文件列表与摘要],
   [`checksums.txt`], [文本], [bundle 内每个文件的 SHA-256 摘要],
 )
@@ -155,7 +155,7 @@ pkg:cargo/tokio@1.43.0.ciq.tgz
   "profile": "rust-crate",
   "declarationSchema": {
     "version": "ciq-declarations/v1",
-    "format": "ndjson.zst",
+    "format": "ndjson",
     "model": "signature + shape + language_specific tagged union"
   },
   "source": {
@@ -164,13 +164,13 @@ pkg:cargo/tokio@1.43.0.ciq.tgz
     "commit": "<git-sha>"
   },
   "artifacts": [
-    {"path": "declarations.ndjson.zst", "sha256": "<digest>", "compression": "zstd"},
-    {"path": "symbols.ndjson.zst", "sha256": "<digest>", "compression": "zstd"}
+    {"path": "declarations.ndjson", "sha256": "<digest>", "compression": "none"},
+    {"path": "symbols.ndjson", "sha256": "<digest>", "compression": "none"}
   ]
 }
 ```
 
-`declarations.ndjson.zst` 的单条记录遵循统一声明模型，但这个“统一”并不意味着抹平语言差异，而是采用 #strong[`signature` + `shape` + `language_specific` tagged union] 的方式，逐步设计一个能够跨 Go、Rust、Terraform、OpenAPI 读取的结构化声明超集。
+`declarations.ndjson` 的单条记录遵循统一声明模型，但这个“统一”并不意味着抹平语言差异，而是采用 #strong[`signature` + `shape` + `language_specific` tagged union] 的方式，逐步设计一个能够跨 Go、Rust、Terraform、OpenAPI 读取的结构化声明超集。
 
 这组字段当前建议收敛为：
 

@@ -20,23 +20,19 @@ test "bundle reader parses valid manifest" {
   let manifest : Json = {
     "schemaVersion": "ciq-bundle/v1",
     "purl": "pkg:openapi/acme/payment-api@2026.03.01",
-      "profile": "openapi-spec",
-      "declarationSchema": {
-        "version": "ciq-declarations/v1",
-        "format": "ndjson",
-        "model": "signature + shape + language_specific tagged union",
-      },
+    "profile": "openapi-spec",
+    "declarationSchema": {
+      "version": "ciq-declarations/v1",
+      "format": "ndjson",
+      "model": "signature + shape + language_specific tagged union",
+    },
     "source": {
       "repo": "https://github.com/acme/payment-api",
       "ref": "main",
       "commit": "abc",
     },
     "artifacts": [
-      {
-        "path": "declarations.ndjson",
-        "sha256": "x",
-        "compression": "none",
-      },
+      { "path": "declarations.ndjson", "sha256": "x", "compression": "none" },
     ],
   }
   @fs.write_string_to_file(
@@ -90,23 +86,13 @@ test "bundle reader parses valid opa manifest" {
       "ref": "main",
       "commit": "abc",
     },
-    "opa": {
-      "entrypoint": "codeiq/compat/deny",
-      "format": "opa-bundle.tar.gz",
-    },
+    "opa": { "entrypoint": "codeiq/compat/deny", "format": "opa-bundle.tar.gz" },
     "provenance": {
       "checksums": "checksums.txt",
-      "signature": {
-        "status": "unsigned",
-        "algorithm": "sha256",
-      },
+      "signature": { "status": "unsigned", "algorithm": "sha256" },
     },
     "artifacts": [
-      {
-        "path": "declarations.ndjson",
-        "sha256": "x",
-        "compression": "none",
-      },
+      { "path": "declarations.ndjson", "sha256": "x", "compression": "none" },
       { "path": "opa-bundle.tar.gz", "sha256": "y", "compression": "gzip" },
     ],
   }
@@ -362,11 +348,7 @@ test "bundle reader materializes bundle tar.gz into dist" {
       "commit": "abc",
     },
     "artifacts": [
-      {
-        "path": "declarations.ndjson",
-        "sha256": "x",
-        "compression": "none",
-      },
+      { "path": "declarations.ndjson", "sha256": "x", "compression": "none" },
       { "path": "symbols.ndjson", "sha256": "y", "compression": "none" },
     ],
   }

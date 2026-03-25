@@ -253,8 +253,12 @@ fn run_snapshot_case(
   }
   let normalized_manifest = normalize_snapshot_text(manifest)
   let normalized_metadata = normalize_snapshot_text(metadata)
-  let expected_manifest = read_snapshot(manifest_snapshot_path, normalized_manifest)
-  let expected_metadata = read_snapshot(metadata_snapshot_path, normalized_metadata)
+  let expected_manifest = read_snapshot(
+    manifest_snapshot_path, normalized_manifest,
+  )
+  let expected_metadata = read_snapshot(
+    metadata_snapshot_path, normalized_metadata,
+  )
   let expected_checksums = read_snapshot(checksums_snapshot_path, checksums)
   let missing_snapshots = !@fs.path_exists(dec_snapshot_path) ||
     !@fs.path_exists(sym_snapshot_path) ||
@@ -292,19 +296,17 @@ fn run_snapshot_case(
     expected_metadata == normalized_metadata &&
     expected_checksums == checksums {
     ()
+  } else if update {
+    persist_snapshot(dec_snapshot_path, declarations)
+    persist_snapshot(sym_snapshot_path, symbols)
+    persist_snapshot(manifest_snapshot_path, normalized_manifest)
+    persist_snapshot(metadata_snapshot_path, normalized_metadata)
+    persist_snapshot(checksums_snapshot_path, checksums)
   } else {
-    if update {
-      persist_snapshot(dec_snapshot_path, declarations)
-      persist_snapshot(sym_snapshot_path, symbols)
-      persist_snapshot(manifest_snapshot_path, normalized_manifest)
-      persist_snapshot(metadata_snapshot_path, normalized_metadata)
-      persist_snapshot(checksums_snapshot_path, checksums)
-    } else {
-      cleanup_case(repo, source_file)
-      fail(
-        "snapshot mismatch for \{title}; rerun with `moon test --update src/cmd/build/snapshot_test.mbt` to refresh examples",
-      )
-    }
+    cleanup_case(repo, source_file)
+    fail(
+      "snapshot mismatch for \{title}; rerun with `moon test --update src/cmd/build/snapshot_test.mbt` to refresh examples",
+    )
   }
   assert_true(metadata.contains("\"role\": \"baseline\""))
 

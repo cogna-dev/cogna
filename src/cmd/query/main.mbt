@@ -75,14 +75,7 @@ fn read_ndjson(path : String) -> Result[Array[Json], String] {
   let file_bytes = @fs.read_file_to_bytes(path) catch {
     _ => return Err("cannot read ndjson \{path}")
   }
-  let text_out = if path.has_suffix(".zst") {
-    let decompressed = @zstd.decompress(file_bytes) catch {
-      _ => return Err("cannot decompress ndjson \{path}")
-    }
-    decode_utf8(decompressed, path)
-  } else {
-    decode_utf8(file_bytes, path)
-  }
+  let text_out = decode_utf8(file_bytes, path)
   guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
   if text == "" {
     return Ok([])
@@ -184,15 +177,15 @@ fn append_records(
 }
 
 ///|
-fn read_repo_records(repo : String, name : String) -> Result[Array[Json], String] {
-  let zst_path = "\{repo}/dist/\{name}.ndjson.zst"
+fn read_repo_records(
+  repo : String,
+  name : String,
+) -> Result[Array[Json], String] {
   let plain_path = "\{repo}/dist/\{name}.ndjson"
-  if @fs.path_exists(zst_path) {
-    read_ndjson(zst_path)
-  } else if @fs.path_exists(plain_path) {
+  if @fs.path_exists(plain_path) {
     read_ndjson(plain_path)
   } else {
-    Err("cannot read ndjson \{zst_path}")
+    Err("cannot read ndjson \{plain_path}")
   }
 }
 

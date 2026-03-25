@@ -112,15 +112,10 @@ test "e2e diff generates output from base and target manifests" {
   @fs.create_dir("\{dir}/dist/base")
   @fs.create_dir("\{dir}/dist/target")
   let manifest = @fs.read_file_to_string("\{dir}/dist/manifest.json")
-  let declarations = @fs.read_file_to_bytes(
-    "\{dir}/dist/declarations.ndjson",
-  )
+  let declarations = @fs.read_file_to_bytes("\{dir}/dist/declarations.ndjson")
   let symbols = @fs.read_file_to_bytes("\{dir}/dist/symbols.ndjson")
   @fs.write_string_to_file("\{dir}/dist/base/manifest.json", manifest)
-  @fs.write_bytes_to_file(
-    "\{dir}/dist/base/declarations.ndjson",
-    declarations,
-  )
+  @fs.write_bytes_to_file("\{dir}/dist/base/declarations.ndjson", declarations)
   @fs.write_bytes_to_file("\{dir}/dist/base/symbols.ndjson", symbols)
   let target_manifest = manifest.replace(
     old="pkg:openapi/acme/payment-api@2026.03.01",
@@ -210,15 +205,10 @@ test "e2e check generates sarif from diff and policy bundle" {
   @fs.create_dir("\{dir}/dist/base")
   @fs.create_dir("\{dir}/dist/target")
   let manifest = @fs.read_file_to_string("\{dir}/dist/manifest.json")
-  let declarations = @fs.read_file_to_bytes(
-    "\{dir}/dist/declarations.ndjson",
-  )
+  let declarations = @fs.read_file_to_bytes("\{dir}/dist/declarations.ndjson")
   let symbols = @fs.read_file_to_bytes("\{dir}/dist/symbols.ndjson")
   @fs.write_string_to_file("\{dir}/dist/base/manifest.json", manifest)
-  @fs.write_bytes_to_file(
-    "\{dir}/dist/base/declarations.ndjson",
-    declarations,
-  )
+  @fs.write_bytes_to_file("\{dir}/dist/base/declarations.ndjson", declarations)
   @fs.write_bytes_to_file("\{dir}/dist/base/symbols.ndjson", symbols)
   let target_manifest = manifest.replace(
     old="pkg:openapi/acme/payment-api@2026.03.01",

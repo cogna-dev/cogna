@@ -47,14 +47,7 @@ fn read_ndjson(path : String) -> Result[Array[Json], @cli.CliError] {
   let file_bytes = @fs.read_file_to_bytes(path) catch {
     _ => return Err(diff_error("cannot read ndjson \{path}"))
   }
-  let text_out = if path.has_suffix(".zst") {
-    let decompressed = @zstd.decompress(file_bytes) catch {
-      _ => return Err(diff_error("cannot decompress ndjson \{path}"))
-    }
-    decode_utf8(decompressed, path)
-  } else {
-    decode_utf8(file_bytes, path)
-  }
+  let text_out = decode_utf8(file_bytes, path)
   guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
   if text == "" {
     return Ok([])
@@ -129,31 +122,21 @@ fn record_bool(record : Json, field : String) -> Bool {
 
 ///|
 fn artifact_records(root : String) -> Result[Array[Json], @cli.CliError] {
-  let decl_path_zst = "\{root}/declarations.ndjson.zst"
   let decl_path_plain = "\{root}/declarations.ndjson"
-  let decl_out = if @fs.path_exists(decl_path_zst) {
-    read_ndjson(decl_path_zst)
-  } else if @fs.path_exists(decl_path_plain) {
+  let decl_out = if @fs.path_exists(decl_path_plain) {
     read_ndjson(decl_path_plain)
   } else {
-    Err(diff_error("cannot read ndjson \{decl_path_zst}"))
+    Err(diff_error("cannot read ndjson \{decl_path_plain}"))
   }
-  guard decl_out is Ok(declarations) else {
-    return Err(decl_out.unwrap_err())
-  }
+  guard decl_out is Ok(declarations) else { return Err(decl_out.unwrap_err()) }
 
-  let symbol_path_zst = "\{root}/symbols.ndjson.zst"
   let symbol_path_plain = "\{root}/symbols.ndjson"
-  let symbol_out = if @fs.path_exists(symbol_path_zst) {
-    read_ndjson(symbol_path_zst)
-  } else if @fs.path_exists(symbol_path_plain) {
+  let symbol_out = if @fs.path_exists(symbol_path_plain) {
     read_ndjson(symbol_path_plain)
   } else {
-    Err(diff_error("cannot read ndjson \{symbol_path_zst}"))
+    Err(diff_error("cannot read ndjson \{symbol_path_plain}"))
   }
-  guard symbol_out is Ok(symbols) else {
-    return Err(symbol_out.unwrap_err())
-  }
+  guard symbol_out is Ok(symbols) else { return Err(symbol_out.unwrap_err()) }
 
   let records : Array[Json] = []
   for i in 0..<declarations.length() {

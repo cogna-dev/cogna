@@ -111,8 +111,8 @@ fn segment_after(value : String, marker : String) -> String? {
 ///|
 fn normalize_reference_target(value : String) -> String {
   segment_after(value, "$ref:")
-    .map(target => trim_quotes(trim_spaces(target)))
-    .unwrap_or(value |> trim_spaces |> trim_quotes)
+  .map(target => trim_quotes(trim_spaces(target)))
+  .unwrap_or(value |> trim_spaces |> trim_quotes)
 }
 
 ///|
@@ -772,11 +772,7 @@ fn extract_go_struct_field(
   }
 
   let is_embedded = !clean.contains(" ") && !clean.contains("\t")
-  let raw_name = if is_embedded {
-    clean
-  } else {
-    first_token(clean)
-  }
+  let raw_name = if is_embedded { clean } else { first_token(clean) }
   let name = raw_name.strip_prefix("*").unwrap_or(raw_name).to_string()
   if name == "" {
     return
@@ -790,7 +786,11 @@ fn extract_go_struct_field(
     "go",
     path,
     line_no,
-    if is_embedded { "embedded_field" } else { "field" },
+    if is_embedded {
+      "embedded_field"
+    } else {
+      "field"
+    },
     "\{owner}.\{name}",
     clean,
     docs,
@@ -977,14 +977,7 @@ fn extract_go_file(
       }
       if active_struct != "" && active_struct_depth > 0 {
         extract_go_struct_field(
-          declarations,
-          symbols,
-          profile,
-          server,
-          path,
-          line_no,
-          active_struct,
-          line,
+          declarations, symbols, profile, server, path, line_no, active_struct, line,
           docs,
         )
       }
@@ -994,7 +987,9 @@ fn extract_go_file(
         extract_go_record(
           declarations, symbols, profile, server, path, line_no, synthetic, docs,
         )
-        if group_kind == "type" && line.contains("struct") && line.has_suffix("{") {
+        if group_kind == "type" &&
+          line.contains("struct") &&
+          line.has_suffix("{") {
           active_struct = go_struct_name(group_line, grouped=true)
           active_struct_depth = 0
         }
@@ -1031,14 +1026,7 @@ fn extract_go_file(
     }
     if active_struct != "" && active_struct_depth > 0 {
       extract_go_struct_field(
-        declarations,
-        symbols,
-        profile,
-        server,
-        path,
-        line_no,
-        active_struct,
-        line,
+        declarations, symbols, profile, server, path, line_no, active_struct, line,
         docs,
       )
     }
@@ -1046,7 +1034,9 @@ fn extract_go_file(
       extract_go_record(
         declarations, symbols, profile, server, path, line_no, line, docs,
       )
-      if line.has_prefix("type ") && line.contains("struct") && line.has_suffix("{") {
+      if line.has_prefix("type ") &&
+        line.contains("struct") &&
+        line.has_suffix("{") {
         active_struct = go_struct_name(line, grouped=false)
         active_struct_depth = 0
       }

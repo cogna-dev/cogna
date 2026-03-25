@@ -15,11 +15,11 @@ fn remove_dir_if_exists(path : String) -> Unit {
 ///|
 fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/base/manifest.json")
-  remove_file_if_exists("\{repo}/dist/base/declarations.ndjson.zst")
-  remove_file_if_exists("\{repo}/dist/base/symbols.ndjson.zst")
+  remove_file_if_exists("\{repo}/dist/base/declarations.ndjson")
+  remove_file_if_exists("\{repo}/dist/base/symbols.ndjson")
   remove_file_if_exists("\{repo}/dist/target/manifest.json")
-  remove_file_if_exists("\{repo}/dist/target/declarations.ndjson.zst")
-  remove_file_if_exists("\{repo}/dist/target/symbols.ndjson.zst")
+  remove_file_if_exists("\{repo}/dist/target/declarations.ndjson")
+  remove_file_if_exists("\{repo}/dist/target/symbols.ndjson")
   remove_file_if_exists("\{repo}/dist/diff.json")
   remove_dir_if_exists("\{repo}/dist/base")
   remove_dir_if_exists("\{repo}/dist/target")
@@ -36,7 +36,7 @@ fn write_manifest(path : String, purl : String, profile : String) -> Unit {
     "profile": profile,
     "declarationSchema": {
       "version": "ciq-declarations/v1",
-      "format": "ndjson.zst",
+      "format": "ndjson",
       "model": "signature + shape + language_specific tagged union",
     },
     "source": {
@@ -45,11 +45,7 @@ fn write_manifest(path : String, purl : String, profile : String) -> Unit {
       "commit": "1234567890abcdef1234567890abcdef12345678",
     },
     "artifacts": [
-      {
-        "path": "declarations.ndjson.zst",
-        "sha256": sha,
-        "compression": "zstd",
-      },
+      { "path": "declarations.ndjson", "sha256": sha, "compression": "none" },
     ],
   }
   @fs.write_string_to_file(path, content.stringify(indent=2)) catch {
@@ -59,10 +55,7 @@ fn write_manifest(path : String, purl : String, profile : String) -> Unit {
 
 ///|
 fn write_records(path : String, lines : String) -> Unit {
-  let compressed = @zstd.compress(@utf8.encode(lines)) catch {
-    _ => abort("failed to compress records fixture")
-  }
-  @fs.write_bytes_to_file(path, compressed) catch {
+  @fs.write_string_to_file(path, lines) catch {
     _ => abort("failed to write records fixture")
   }
 }
@@ -102,13 +95,10 @@ test "diff generates skeleton diff output" {
     #|{"id":"sym:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
     #|
 
-  write_records("\{repo}/dist/base/declarations.ndjson.zst", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson.zst", base_symbols)
-  write_records(
-    "\{repo}/dist/target/declarations.ndjson.zst",
-    target_declarations,
-  )
-  write_records("\{repo}/dist/target/symbols.ndjson.zst", target_symbols)
+  write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
+  write_records("\{repo}/dist/base/symbols.ndjson", base_symbols)
+  write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
+  write_records("\{repo}/dist/target/symbols.ndjson", target_symbols)
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(result) else {
@@ -199,10 +189,10 @@ test "diff includes since and test changes fields when requested" {
   let records =
     #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|
-  write_records("\{repo}/dist/base/declarations.ndjson.zst", records)
-  write_records("\{repo}/dist/base/symbols.ndjson.zst", records)
-  write_records("\{repo}/dist/target/declarations.ndjson.zst", records)
-  write_records("\{repo}/dist/target/symbols.ndjson.zst", records)
+  write_records("\{repo}/dist/base/declarations.ndjson", records)
+  write_records("\{repo}/dist/base/symbols.ndjson", records)
+  write_records("\{repo}/dist/target/declarations.ndjson", records)
+  write_records("\{repo}/dist/target/symbols.ndjson", records)
 
   let out = run({
     repo,
@@ -259,13 +249,10 @@ test "diff computes go test changes when requested" {
     #|{"id":"decl:go-module:demo::math_test.go::TestAdded","kind":"function","name":"TestAdded","path":"math_test.go","signature":"func TestAdded(t *testing.T)","language":"go","location":{"uri":"math_test.go","startLine":40,"endLine":40}}
     #|
 
-  write_records("\{repo}/dist/base/declarations.ndjson.zst", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson.zst", "")
-  write_records(
-    "\{repo}/dist/target/declarations.ndjson.zst",
-    target_declarations,
-  )
-  write_records("\{repo}/dist/target/symbols.ndjson.zst", "")
+  write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
+  write_records("\{repo}/dist/base/symbols.ndjson", "")
+  write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
+  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({
     repo,
