@@ -56,7 +56,7 @@ fn write_bytes(path : String, content : Bytes) -> Result[Unit, @cli.CliError] {
 fn declaration_schema_json() -> Json {
   {
     "version": "ciq-declarations/v1",
-    "format": "ndjson.zst",
+    "format": "ndjson",
     "model": "signature + shape + language_specific tagged union",
     "schema": @schema.ciq_declaration_v1_schema(),
   }
@@ -115,8 +115,8 @@ fn manifest_json(
   policy_rules_sha : String?,
 ) -> Json {
   let base_artifacts : Array[Json] = [
-    artifact_with_sha("declarations.ndjson.zst", "zstd", declarations_sha),
-    artifact_with_sha("symbols.ndjson.zst", "zstd", symbols_sha),
+    artifact_with_sha("declarations.ndjson", "none", declarations_sha),
+    artifact_with_sha("symbols.ndjson", "none", symbols_sha),
   ]
   if config.profile == "policy-bundle" {
     match opa_bundle_sha {
@@ -200,8 +200,8 @@ fn checksums_text(
   policy_rules_sha : String?,
 ) -> String {
   let base = "manifest.json  \{manifest_sha}\n" +
-    "declarations.ndjson.zst  \{declarations_sha}\n" +
-    "symbols.ndjson.zst  \{symbols_sha}\n" +
+    "declarations.ndjson  \{declarations_sha}\n" +
+    "symbols.ndjson  \{symbols_sha}\n" +
     "metadata.json  \{metadata_sha}\n"
   let with_opa = match opa_bundle_sha {
     Some(sha) => base + "opa-bundle.tar.gz  \{sha}\n"
@@ -368,8 +368,8 @@ fn tar_archive(entries : Array[(String, Bytes)]) -> Bytes {
 ///|
 fn build_tar_payload(
   manifest_text : String,
-  declarations_compressed : Bytes,
-  symbols_compressed : Bytes,
+  declarations_artifact : Bytes,
+  symbols_artifact : Bytes,
   metadata_text : String,
   checksums : String,
   opa_bundle : Bytes?,
@@ -377,8 +377,8 @@ fn build_tar_payload(
 ) -> Bytes {
   let entries : Array[(String, Bytes)] = [
     ("manifest.json", utf8_bytes(manifest_text)),
-    ("declarations.ndjson.zst", declarations_compressed),
-    ("symbols.ndjson.zst", symbols_compressed),
+    ("declarations.ndjson", declarations_artifact),
+    ("symbols.ndjson", symbols_artifact),
     ("metadata.json", utf8_bytes(metadata_text)),
     ("checksums.txt", utf8_bytes(checksums)),
   ]
@@ -483,17 +483,11 @@ fn write_bundle_skeleton(
   let extract_out = extract_lsp_baseline(config, repo)
   guard extract_out is Ok(extract) else { return Err(extract_out.unwrap_err()) }
 
-  let declarations_plain = utf8_bytes(extract.declarations_text)
-  let symbols_plain = utf8_bytes(extract.symbols_text)
-  let declarations_compressed = @zstd.compress(declarations_plain) catch {
-    _ => return Err(build_error("cannot compress declarations for \{repo}"))
-  }
-  let symbols_compressed = @zstd.compress(symbols_plain) catch {
-    _ => return Err(build_error("cannot compress symbols for \{repo}"))
-  }
+  let declarations_artifact = utf8_bytes(extract.declarations_text)
+  let symbols_artifact = utf8_bytes(extract.symbols_text)
 
-  let declarations_sha = sha256_hex(declarations_compressed)
-  let symbols_sha = sha256_hex(symbols_compressed)
+  let declarations_sha = sha256_hex(declarations_artifact)
+  let symbols_sha = sha256_hex(symbols_artifact)
   let mut policy_rules_out : String? = None
   let opa_bundle_out = if config.profile == "policy-bundle" {
     let built = build_opa_bundle_tar_gz(config, repo)
@@ -554,13 +548,13 @@ fn write_bundle_skeleton(
   let manifest_out = write_text("\{dist_dir}/manifest.json", manifest)
   guard manifest_out is Ok(_) else { return Err(manifest_out.unwrap_err()) }
   let decl_out = write_bytes(
-    "\{dist_dir}/declarations.ndjson.zst",
-    declarations_compressed,
+    "\{dist_dir}/declarations.ndjson",
+    declarations_artifact,
   )
   guard decl_out is Ok(_) else { return Err(decl_out.unwrap_err()) }
   let symbols_out = write_bytes(
-    "\{dist_dir}/symbols.ndjson.zst",
-    symbols_compressed,
+    "\{dist_dir}/symbols.ndjson",
+    symbols_artifact,
   )
   guard symbols_out is Ok(_) else { return Err(symbols_out.unwrap_err()) }
   let metadata_out = write_text("\{dist_dir}/metadata.json", metadata)
@@ -577,7 +571,7 @@ fn write_bundle_skeleton(
   }
 
   let tar_payload = build_tar_payload(
-    manifest, declarations_compressed, symbols_compressed, metadata, checksums, opa_bundle_out,
+    manifest, declarations_artifact, symbols_artifact, metadata, checksums, opa_bundle_out,
     policy_rules_out,
   )
   let gz = @gio.Buffer::new()

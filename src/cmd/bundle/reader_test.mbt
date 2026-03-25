@@ -20,12 +20,12 @@ test "bundle reader parses valid manifest" {
   let manifest : Json = {
     "schemaVersion": "ciq-bundle/v1",
     "purl": "pkg:openapi/acme/payment-api@2026.03.01",
-    "profile": "openapi-spec",
-    "declarationSchema": {
-      "version": "ciq-declarations/v1",
-      "format": "ndjson.zst",
-      "model": "signature + shape + language_specific tagged union",
-    },
+      "profile": "openapi-spec",
+      "declarationSchema": {
+        "version": "ciq-declarations/v1",
+        "format": "ndjson",
+        "model": "signature + shape + language_specific tagged union",
+      },
     "source": {
       "repo": "https://github.com/acme/payment-api",
       "ref": "main",
@@ -33,9 +33,9 @@ test "bundle reader parses valid manifest" {
     },
     "artifacts": [
       {
-        "path": "declarations.ndjson.zst",
+        "path": "declarations.ndjson",
         "sha256": "x",
-        "compression": "zstd",
+        "compression": "none",
       },
     ],
   }
@@ -103,9 +103,9 @@ test "bundle reader parses valid opa manifest" {
     },
     "artifacts": [
       {
-        "path": "declarations.ndjson.zst",
+        "path": "declarations.ndjson",
         "sha256": "x",
-        "compression": "zstd",
+        "compression": "none",
       },
       { "path": "opa-bundle.tar.gz", "sha256": "y", "compression": "gzip" },
     ],
@@ -137,7 +137,7 @@ test "bundle reader parses valid opa manifest" {
 ///|
 test "bundle reader parses ndjson" {
   let repo = "src/cmd/bundle/tmp_bundle_reader_ndjson"
-  @fs.remove_file("\{repo}/dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
     _ => ()
   }
   @fs.remove_dir("\{repo}/dist") catch {
@@ -157,10 +157,7 @@ test "bundle reader parses ndjson" {
     #|{"id":"decl:a","kind":"function","path":"a.go","signature":"fn a","location":{"uri":"a.go","startLine":1,"endLine":1}}
     #|{"id":"decl:b","kind":"function","path":"b.go","signature":"fn b","location":{"uri":"b.go","startLine":2,"endLine":2}}
     #|
-  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => fail("failed to compress declarations")
-  }
-  @fs.write_bytes_to_file("\{repo}/dist/declarations.ndjson.zst", compressed) catch {
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
     _ => fail("failed to write declarations")
   }
 
@@ -168,7 +165,7 @@ test "bundle reader parses ndjson" {
   guard out is Ok(records) else { fail("expected records") }
   inspect(records.length(), content="2")
 
-  @fs.remove_file("\{repo}/dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
     _ => ()
   }
   @fs.remove_dir("\{repo}/dist") catch {
@@ -328,10 +325,10 @@ test "bundle reader materializes bundle tar.gz into dist" {
   @fs.remove_file("\{repo}/out/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("\{repo}/out/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{repo}/out/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{repo}/out/symbols.ndjson.zst") catch {
+  @fs.remove_file("\{repo}/out/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("\{repo}/out/metadata.json") catch {
@@ -356,7 +353,7 @@ test "bundle reader materializes bundle tar.gz into dist" {
     "profile": "openapi-spec",
     "declarationSchema": {
       "version": "ciq-declarations/v1",
-      "format": "ndjson.zst",
+      "format": "ndjson",
       "model": "signature + shape + language_specific tagged union",
     },
     "source": {
@@ -366,29 +363,23 @@ test "bundle reader materializes bundle tar.gz into dist" {
     },
     "artifacts": [
       {
-        "path": "declarations.ndjson.zst",
+        "path": "declarations.ndjson",
         "sha256": "x",
-        "compression": "zstd",
+        "compression": "none",
       },
-      { "path": "symbols.ndjson.zst", "sha256": "y", "compression": "zstd" },
+      { "path": "symbols.ndjson", "sha256": "y", "compression": "none" },
     ],
   }
   let declarations_text =
     #|{"id":"decl:a","kind":"function","path":"a.go","signature":"fn a","location":{"uri":"a.go","startLine":1,"endLine":1}}
     #|
-  let declarations = @zstd.compress(@utf8.encode(declarations_text)) catch {
-    _ => fail("failed to compress declarations")
-  }
   let symbols_text =
     #|{"id":"decl:a","selector":"pkg:generic/acme/demo@0.5.0#a.go#fn:a","name":"a","kind":"function"}
     #|
-  let symbols = @zstd.compress(@utf8.encode(symbols_text)) catch {
-    _ => fail("failed to compress symbols")
-  }
   let tar_payload = tar_archive([
     ("manifest.json", @utf8.encode(manifest.stringify(indent=2))),
-    ("declarations.ndjson.zst", declarations),
-    ("symbols.ndjson.zst", symbols),
+    ("declarations.ndjson", @utf8.encode(declarations_text)),
+    ("symbols.ndjson", @utf8.encode(symbols_text)),
     ("metadata.json", @utf8.encode("{}\n")),
     ("checksums.txt", @utf8.encode("manifest.json  x\n")),
   ])
@@ -401,8 +392,8 @@ test "bundle reader materializes bundle tar.gz into dist" {
   let materialize_out = materialize_bundle_tar_gz(bundle_path, "\{repo}/out")
   guard materialize_out is Ok(_) else { fail("materialize should succeed") }
   assert_true(@fs.path_exists("\{repo}/out/manifest.json"))
-  assert_true(@fs.path_exists("\{repo}/out/declarations.ndjson.zst"))
-  assert_true(@fs.path_exists("\{repo}/out/symbols.ndjson.zst"))
+  assert_true(@fs.path_exists("\{repo}/out/declarations.ndjson"))
+  assert_true(@fs.path_exists("\{repo}/out/symbols.ndjson"))
   assert_true(@fs.path_exists("\{repo}/out/metadata.json"))
   assert_true(@fs.path_exists("\{repo}/out/checksums.txt"))
 
@@ -412,10 +403,10 @@ test "bundle reader materializes bundle tar.gz into dist" {
   @fs.remove_file("\{repo}/out/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("\{repo}/out/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{repo}/out/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{repo}/out/symbols.ndjson.zst") catch {
+  @fs.remove_file("\{repo}/out/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("\{repo}/out/metadata.json") catch {

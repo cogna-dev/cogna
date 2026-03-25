@@ -10,8 +10,6 @@ import {
 
 import {
   "moonbitlang/core/json" @json,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "Milky2018/zstd" @zstd,
 } for "test"
 
 options(

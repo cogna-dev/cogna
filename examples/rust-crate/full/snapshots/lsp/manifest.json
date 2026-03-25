@@ -4,7 +4,7 @@
   "profile": "rust-crate",
   "declarationSchema": {
     "version": "ciq-declarations/v1",
-    "format": "ndjson.zst",
+    "format": "ndjson",
     "model": "signature + shape + language_specific tagged union",
     "schema": {
       "type": "object",
@@ -201,14 +201,14 @@
   },
   "artifacts": [
     {
-      "path": "declarations.ndjson.zst",
-      "sha256": "02f63911ef9948abf310d2f0a6c1f40f5c9908d7d23a2e21f6b36f1ca4fb24e2",
-      "compression": "zstd"
+      "path": "declarations.ndjson",
+      "sha256": "1aca4b52cd4604d48afc73760312a70a3f2378cba5a791aba0b4cbc6b44243f9",
+      "compression": "none"
     },
     {
-      "path": "symbols.ndjson.zst",
-      "sha256": "9611913748491ec343464113b9dfe70e319932a800d683feeeb2abade9397a0c",
-      "compression": "zstd"
+      "path": "symbols.ndjson",
+      "sha256": "64dbc37f59103e23f390e8364b4f83f382e87c22ecd4334a49ec2d91a8fbb923",
+      "compression": "none"
     }
   ]
 }

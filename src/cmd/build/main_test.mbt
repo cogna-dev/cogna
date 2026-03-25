@@ -16,9 +16,11 @@ fn ensure_dir_removed(path : String) -> Unit {
 fn cleanup_tmp_repo(repo : String) -> Unit {
   ensure_file_removed("\{repo}/codeiq.yaml")
   ensure_file_removed("\{repo}/policy.rego")
+  ensure_file_removed("\{repo}/main.go")
+  ensure_file_removed("\{repo}/lib.rs")
   ensure_file_removed("\{repo}/dist/manifest.json")
-  ensure_file_removed("\{repo}/dist/declarations.ndjson.zst")
-  ensure_file_removed("\{repo}/dist/symbols.ndjson.zst")
+  ensure_file_removed("\{repo}/dist/declarations.ndjson")
+  ensure_file_removed("\{repo}/dist/symbols.ndjson")
   ensure_file_removed("\{repo}/dist/metadata.json")
   ensure_file_removed("\{repo}/dist/checksums.txt")
   ensure_file_removed("\{repo}/dist/opa-bundle.tar.gz")
@@ -98,15 +100,9 @@ fn write_policy_config(path : String) -> Unit {
 }
 
 ///|
-fn decode_zstd_text_main(path : String, fail_message : String) -> String {
-  let compressed = @fs.read_file_to_bytes(path) catch {
+fn read_text_main(path : String, fail_message : String) -> String {
+  @fs.read_file_to_string(path) catch {
     _ => abort(fail_message)
-  }
-  let decompressed = @zstd.decompress(compressed) catch {
-    _ => abort("zstd decompression failed: \{path}")
-  }
-  @utf8.decode(decompressed) catch {
-    _ => abort("utf8 decode failed: \{path}")
   }
 }
 
@@ -162,18 +158,18 @@ test "build creates bundle skeleton files" {
     }
   }
   assert_true(has_64_hex(checksum_for(checksums, "manifest.json")))
-  assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson.zst")))
-  assert_true(has_64_hex(checksum_for(checksums, "symbols.ndjson.zst")))
+  assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson")))
+  assert_true(has_64_hex(checksum_for(checksums, "symbols.ndjson")))
   assert_true(has_64_hex(checksum_for(checksums, "metadata.json")))
 
-  let declarations = decode_zstd_text_main(
-    "\{repo}/dist/declarations.ndjson.zst",
+  let declarations = read_text_main(
+    "\{repo}/dist/declarations.ndjson",
     "declarations should exist",
   )
   assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
 
-  let symbols = decode_zstd_text_main(
-    "\{repo}/dist/symbols.ndjson.zst",
+  let symbols = read_text_main(
+    "\{repo}/dist/symbols.ndjson",
     "symbols should exist",
   )
   assert_true(symbols.contains("\"id\":\"sym:openapi-spec:"))

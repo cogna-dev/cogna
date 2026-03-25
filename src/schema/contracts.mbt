@@ -17,7 +17,7 @@ pub fn ciq_bundle_v1_schema() -> @json_schema.JsonSchema {
         "required": ["version", "format", "model"],
         "properties": {
           "version": { "type": "string", "const": "ciq-declarations/v1" },
-          "format": { "type": "string", "const": "ndjson.zst" },
+          "format": { "type": "string", "enum": ["ndjson", "ndjson.zst"] },
           "model": { "type": "string", "minLength": 1 },
           "schema": { "type": "object" },
         },

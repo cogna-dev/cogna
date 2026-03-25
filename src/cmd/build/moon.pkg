@@ -1,5 +1,4 @@
 import {
-  "Milky2018/zstd" @zstd,
   "gmlewis/gzip" @gzip,
   "gmlewis/io" @gio,
   "moonbitlang/core/encoding/utf8" @utf8,

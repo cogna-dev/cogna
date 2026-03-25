@@ -17,9 +17,11 @@
 
 == 复现命令（当前稳定复现）
 
-- `moon test src/cmd/bundle/reader_test.mbt --target native -v`
-- `moon test src/cmd/build/main_test.mbt --target native -v`
-- `moon test --target native -v`
+- #strike[`moon test src/cmd/bundle/reader_test.mbt --target native -v`]
+- #strike[`moon test src/cmd/build/main_test.mbt --target native -v`]
+- #strike[`moon test --target native -v`]
+
+上述命令曾是 main repo 内的稳定复现入口；在本轮 workaround 落地后，#strong[它们已不再复现 ICE]。
 
 在独立 repro module `repro/moonbit-link-core-ice/` 中，以下命令也可稳定复现：
 
@@ -45,6 +47,27 @@
 - `moon test src/zstd_decl/main_test.mbt --target native -v` ✅
 - `moon build src/zstd_compress --target native` ✅
 - `moon check --target native` ✅（warnings only）
+
+== Workaround 落地结果（2026-03-24）
+
+本轮已在主项目中落地最小 workaround：
+
+- `build` 主链路中间产物从 `*.ndjson.zst` 改为 #strong[plain `*.ndjson`]
+- `bundle reader` 改为 #strong[plain-first + `.zst` backward-compatible read]
+- `ciq-bundle` schema 中 `declarationSchema.format` 放宽为：
+  - `ndjson`
+  - `ndjson.zst`
+- 相关 unit / e2e / snapshot tests 已同步到 plain artifact workflow
+
+当前验证结果：
+
+- `moon test src/cmd/build/main_test.mbt --target native -v` ✅
+- `moon test src/cmd/bundle/reader_test.mbt --target native -v` ✅
+- `moon test --target native -v` ✅（100 passed, 0 failed）
+- `moon build --target native` ✅
+- `moon check --target native` ✅（warnings only）
+
+结论：#strong[主项目当前 native workflow 中的 ICE 已被 workaround 消除]；但独立最小 repro 仍保留并持续证明 MoonBit 编译器对 `@zstd.compress(...)` live call edge 的问题仍然存在。
 
 == 已失效的旧复现命令
 
@@ -127,11 +150,11 @@
 == 当前策略
 
 1. #strong[记录并隔离问题]：保持本 BUG 文档与 `repro/moonbit-link-core-ice/` 同步。
-2. #strong[继续开发]：在 `R8` 之前先完成上游可提交的最小复现与证据链。
-3. #strong[回归策略]：每轮 MoonBit / 依赖图相关改动后，重跑当前最小 repro 与 `cmd/bundle` / `cmd/build` 的 native 命令。
+2. #strong[workaround 继续开发]：主 workflow 保持 plain intermediate artifacts，避免在 native 主回归链路中引入 zstd live call。
+3. #strong[回归策略]：每轮 MoonBit / 依赖图相关改动后，重跑独立最小 repro 与 main repo `moon test --target native -v`。
 
 == 后续动作
 
 - 在 MoonBit 上游 issue 模板中提交 #strong[独立 repro]（含 `repro/moonbit-link-core-ice/` 命令、错误文本与编译器 permalink）。
 - 进一步验证 `@zstd.decompress(...)` / 其他 zstd live call 是否同样触发，以确认是 `compress` 特定路径还是更一般的 zstd codegen/link graph 问题。
-- 跟踪 MoonBit 工具链后续修复版本，待修复后恢复更多 native 全量回归。
+- 跟踪 MoonBit 工具链后续修复版本；若上游修复，可再评估是否恢复 `.zst` 作为主 workflow 中间格式。

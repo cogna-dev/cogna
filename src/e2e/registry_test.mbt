@@ -6,10 +6,10 @@ fn registry_cleanup_tmp_dir(dir : String) -> Unit {
   @fs.remove_file("\{dir}/dist/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("\{dir}/dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{dir}/dist/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{dir}/dist/symbols.ndjson.zst") catch {
+  @fs.remove_file("\{dir}/dist/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("\{dir}/dist/metadata.json") catch {
@@ -171,18 +171,18 @@ test "e2e registry loop covers upload resolve publish and materialize" {
   }
   assert_true(result.summary.contains("Downloaded and materialized bundle"))
   assert_true(@fs.path_exists("\{output_dir}/manifest.json"))
-  assert_true(@fs.path_exists("\{output_dir}/declarations.ndjson.zst"))
-  assert_true(@fs.path_exists("\{output_dir}/symbols.ndjson.zst"))
+  assert_true(@fs.path_exists("\{output_dir}/declarations.ndjson"))
+  assert_true(@fs.path_exists("\{output_dir}/symbols.ndjson"))
   assert_true(@fs.path_exists("\{output_dir}/metadata.json"))
   assert_true(@fs.path_exists("\{output_dir}/checksums.txt"))
 
   @fs.remove_file("\{output_dir}/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("\{output_dir}/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{output_dir}/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{output_dir}/symbols.ndjson.zst") catch {
+  @fs.remove_file("\{output_dir}/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("\{output_dir}/metadata.json") catch {

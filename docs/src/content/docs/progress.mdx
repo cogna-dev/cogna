@@ -6,7 +6,7 @@ order: 6
 
 # CodeIQ 开发进度看板
 
-> 最后更新时间：2026-03-24（Asia/Shanghai）
+> 最后更新时间：2026-03-25（Asia/Shanghai）
 
 此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步：当前 roadmap 已重新排序，先完成主业务流程与单机 registry 基线，再优先关闭 provider 能力矩阵覆盖，最后再处理 trust / deployment / security。
 
@@ -21,7 +21,7 @@ order: 6
 | R5 | Core Workflow Complete | ✅ Completed | 主业务流程闭环已完成并完成收口 |
 | R6 | Single-Machine Registry Baseline | ✅ Completed | 单机/免认证 registry + publish baseline 已完成并关闭 |
 | R7 | Provider Matrix Coverage | ✅ Completed | Go / Rust / Terraform / OpenAPI provider 证据面已完成收口 |
-| R8 | Registry Trust & Verifier | ⚪ Planned | Provider matrix 收口后再处理 signature path、shared verifier 与 trust 议题 |
+| R8 | Registry Trust & Verifier | 🟡 Active | provider matrix 与 native workaround 收口后，当前已切换到 signature path / verifier feasibility / trust baseline 阶段 |
 | R9 | Deployment & Security Hardening | ⚪ Planned | 最后处理部署、auth、security、ops 与企业级 hardening |
 
 ## 已完成阶段（摘要）
@@ -29,7 +29,7 @@ order: 6
 - `R1-R6` 已完成并冻结为当前 repo 基线；
 - `R5` 已完成，主业务流程 `init → build → diff → check → query → MCP review` 已形成稳定闭环；
 - `R6` 已完成，单机/免认证 registry + publish baseline 已关闭；
-- 当前看板记录最新完成阶段与下一阶段方向：`R7` 已完成，下一步进入 `R8`。
+- 当前看板记录最新完成阶段与当前 active release：`R7` 已完成，`R8` 已成为当前执行阶段。
 
 ## R7 · Provider Matrix Coverage（Completed）
 
@@ -107,7 +107,100 @@ order: 6
   - `pnpm build`（在 `docs/` 下）
 - **Out of scope**：同时展开 `R8+` 的 trust / deployment 实施细节。
 
-## 当前验证状态（R7相关）
+## R8 · Registry Trust & Verifier（Active）
+
+**Scope**
+
+- 在 provider matrix baseline 与 native workaround 都已稳定后，正式收口 `signature path`、`registry trust` 与 `verifier feasibility`；
+- 对齐 `build → publish → registry` 三条链路中的 signature metadata 语义，而不是继续停留在“只有 schema 与测试”的规划状态；
+- 明确当前 shell OpenSSL CLI 校验路径是否继续保留为过渡实现，以及 shared non-shell verifier 是否进入下一轮实施。
+- 用 `OCI digest verification`、detached signature / bundle、local / remote verification 等外部成熟术语约束 R8 表述，避免把 backlog trust 议题重新混入当前 release。
+
+**当前 repo 基线**
+
+- `src/cmd/build/main.mbt`
+  - 已通过 `runtime_signature_from_env()` 把 `CODEIQ_SIGNATURE_*` 注入 manifest provenance；
+- `src/cmd/registry/main.mbt`
+  - 已实现 `verify_signature_for_bundle_file(...)`，当前通过 shell 调用 OpenSSL 做 base64 decode + `openssl dgst -sha256 -verify`；
+- `src/cmd/publish/main.mbt`
+  - 已实现 `verify_signature_with_openssl(...)`，并在 receipt / remote download signature 上执行 trust downgrade / reject 语义；
+- `src/schema/contracts.mbt`
+  - 已把 upload / download / publish receipt 的 `signature` shape 固化为 repo contract；
+- `src/cmd/registry/main_test.mbt` 与 `src/cmd/publish/main_test.mbt`
+  - 已覆盖 verified / untrusted / missing-value downgrade / remote propagation 等 trust baseline 行为。
+
+**Done when**
+
+- `build` / `publish` / `registry` 对 signature status、algorithm、keyId、value 的行为边界有统一表述；
+- 当前 OpenSSL shell verifier 的保留范围、局限与替换条件被明确写入 docs / plan / progress；
+- shared verifier feasibility 被收敛为明确结论：
+  - 要么进入下一轮实现；
+  - 要么被正式降级到 backlog，并写清原因；
+- trust root / key rotation / KMS / hosted registry 不再混入当前 release，而是保持清晰 backlog 边界。
+
+**Verify**
+
+- `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+- `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+- `moon test src/schema/contracts_test.mbt --target native -v`
+- `pnpm build`（在 `docs/` 下）
+
+**Out of scope**
+
+- shared non-shell verifier 的完整实现；
+- trust root / key rotation / KMS；
+- hosted registry productization、auth、deployment、enterprise security。
+
+## R8 执行清单（当前唯一执行清单）
+
+### R8-1 · Signature path normalization
+
+**状态：🟡 Active**
+
+- **Goal**：统一 `build` provenance、`publish` receipt、`registry` upload/download` 的 signature metadata 语义，并把当前实现表述收敛到可验证的 digest / detached signature 路径。
+- **Main touchpoints**：`src/cmd/build/main.mbt`、`src/cmd/publish/main.mbt`、`src/cmd/registry/main.mbt`、`src/schema/contracts.mbt`
+- **Done when**：
+  - `status = unsigned / verified / untrusted` 的来源与 downgrade 条件在文档和测试中一致；
+  - `CODEIQ_SIGNATURE_*` 与 receipt/download payload 的覆盖关系被明确记录；
+  - 当前 repo 对 digest 校验、detached signature value 与 offline/local verification 的术语使用保持一致；
+  - 当前 trust baseline 不再依赖隐含语义。
+- **Verify**：
+  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+- **Out of scope**：非 shell verifier 实现、KMS。
+
+### R8-2 · Verifier feasibility decision
+
+**状态：🟡 Active**
+
+- **Goal**：确认当前 OpenSSL shell verifier 是继续保留为过渡实现，还是切换到 shared non-shell verifier 路线。
+- **Main touchpoints**：`src/cmd/registry/main.mbt`、`src/cmd/publish/main.mbt`、`spec/plan.typ`、`docs/src/content/docs/progress.mdx`
+- **Done when**：
+  - 当前 OpenSSL CLI path 的角色被明确：临时基线 / 长期保留 / 待替换；
+  - shared verifier feasibility 结论被记录为下一轮可执行事项，而不是模糊方向；
+  - 外部参考中的 `digest verification`、`detached signature/bundle`、`transparency / trust metadata` 被明确区分为“当前采用”与“继续 backlog 观察”的边界；
+  - backlog 边界（trust root / KMS / key rotation）被保持清晰。
+- **Verify**：
+  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+  - `pnpm build`（在 `docs/` 下）
+- **Out of scope**：直接实现完整 shared verifier。
+
+### R8-3 · Release docs / dashboard alignment
+
+**状态：🟡 Active**
+
+- **Goal**：让 `progress / plan / cli docs` 对当前 active release、trust baseline 与 verify 命令完全一致。
+- **Main touchpoints**：`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx`、`spec/plan.typ`
+- **Done when**：
+  - `R8` 被明确写为当前执行阶段，而不是泛化的 future placeholder；
+  - docs 说明当前 repo 已有 signature / verifier baseline，但 heavier trust work 仍在 backlog；
+  - docs build 继续通过。
+- **Verify**：
+  - `pnpm build`（在 `docs/` 下）
+- **Out of scope**：同时展开 `R9` 的部署与安全实现细节。
+
+## 当前验证状态（R7 基线 + R8 准备态）
 
 以下结果是当前 `R7` provider matrix 可继续复用的基线证据：
 
@@ -116,16 +209,22 @@ order: 6
 | `moon test src/cmd/build/snapshot_test.mbt` | ✅ 通过（本轮） | 覆盖四类 provider snapshots 与 metadata |
 | `moon test src/e2e/lsp_extractor_test.mbt` | ✅ 通过（本轮） | 新增 Go / Rust / Terraform / OpenAPI provider evidence assertions |
 | `moon check` | ✅ 通过（本轮） | 当前为 warnings only（0 errors） |
+| `moon check --target native` | ✅ 通过（本轮） | warnings only，0 errors |
+| `moon build --target native` | ✅ 通过（本轮） | native build 当前可通过 |
+| `moon test --target native -v` | ✅ 通过（本轮） | 100 passed, 0 failed |
+| `moon test src/cmd/registry/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | trust / receipt / signature propagation baseline 通过 |
+| `moon test src/cmd/publish/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | publish-side verifier / downgrade / reject 语义通过 |
 | `pnpm build`（`docs/`） | ✅ 通过（本轮） | 当前文档站可构建 |
 
 **环境说明**
 
-- 当前大图 native 测试仍会触发 MoonBit 编译器 ICE（`Invalid_argument("Moonc.Basic_lst.iter2")`），但本轮 provider coverage 验证主要落在 build snapshot / e2e extractor 路径；
-- `moon check` 仍为当前 MoonBit 代码修改的主错误门槛，warnings 为既有基线。
+- main repo 已落地 #strong[plain NDJSON intermediate artifact workaround]：`build` 不再在主链路中调用 zstd 压缩；
+- 当前 main repo native 大图已恢复通过，但独立最小 repro `repro/moonbit-link-core-ice/` 仍可稳定触发 MoonBit `link-core` ICE；
+- 当前 trust baseline 并非空白：`build` / `publish` / `registry` 已携带 signature metadata 与 OpenSSL shell verify path；
+- `moon check` / `moon check --target native` 仍为当前 MoonBit 代码修改的主错误门槛，warnings 为既有基线。
 
 ## 非当前执行项（只保留方向）
 
-- `R8`：处理 signature path、shared verifier feasibility、trust 模型；
 - `R9`：处理 deployment、auth、security、ops 与企业级 hardening；
 - 它们不是当前 release 的执行清单，不在本页继续展开。
 
@@ -133,15 +232,35 @@ order: 6
 
 - `docs/src/content/docs/providers.mdx`：已更新 provider 覆盖矩阵，纳入 Go/Rust/Terraform/OpenAPI 新证据；
 - `docs/src/content/docs/progress.mdx`：已完成 provider matrix dashboard 收口；
-- `spec/plan.typ`：已把下一阶段从 trust/verifier 调整为 provider matrix coverage，并完成本轮收口。
+- `spec/plan.typ`：当前 release 顺序仍以 `R8 → R9` 为准；本页已把 `R8` 从 placeholder 推进为 active execution view。
 
-## 下一步（按 R7 收口任务执行）
+## 下一步（当前有效顺序）
 
-1. 进入 `R8`：处理 signature path、shared verifier feasibility 与 trust 议题。
-2. 在 `R8` 开始实现前，先保留并跟踪当前 MoonBit native `link-core` ICE 的独立最小 repro：`repro/moonbit-link-core-ice/`。
-3. 当前已确认最小触发条件为 native blackbox test 中的 live `@zstd.compress(b"")` 调用；`plain_control` / `zstd import-only` / `dead declaration` / normal `build --target native` 均为对照通过。
-4. 在 `R8` 完成后进入 `R9`：处理 deployment / auth / security / ops 收口。
-5. 继续保持 MoonBit 工具链回归跟踪，待上游修复后恢复更多 native/js 全量回归。
+1. 在 `R8` 内优先完成 signature path normalization 与 verifier feasibility decision。
+2. 持续保留并跟踪 MoonBit native `link-core` ICE 的独立最小 repro：`repro/moonbit-link-core-ice/`。
+3. 当前已确认最小触发条件仍为 native blackbox test 中的 live `@zstd.compress(b"")` 调用；但 main workflow 已通过 plain artifact workaround 绕开该触发器。
+4. 在 `R8` 收口后进入 `R9`：处理 deployment / auth / security / ops 收口。
+5. 继续保持 MoonBit 工具链回归跟踪；若上游修复，再评估是否恢复 `.zst` 作为默认中间格式。
+
+## 本轮 workaround 结论
+
+- `src/cmd/build/main.mbt` 已将中间产物切换为：
+  - `declarations.ndjson`
+  - `symbols.ndjson`
+- `src/cmd/bundle/reader.mbt` 已支持 plain-first + `.zst` backward compatibility；
+- `src/schema/contracts.mbt` 已允许 `declarationSchema.format` 为 `ndjson` 或 `ndjson.zst`；
+- `src/cmd/build/main_test.mbt --target native` 与 `src/cmd/bundle/reader_test.mbt --target native` 已恢复通过；
+- `moon test --target native -v` 当前全量通过，说明主项目已不再被该 ICE 阻塞。
+
+## 当前 trust baseline 结论
+
+- 当前 repo 已经不是“尚未开始 trust/verifier”状态，而是 #strong[已有 baseline、尚未完成收口]：
+  - `build` 已携带 signature provenance；
+  - `registry` / `publish` 已有 OpenSSL shell verify path；
+  - schema / tests 已覆盖 verified / untrusted / downgrade / remote propagation 语义；
+- `R8` 的重点不是从零开始发明 trust model，而是把现有 baseline 收敛成清晰、稳定、可决策的实现边界；
+- 当前外部参考可作为术语基线：`OCI Distribution` 的 digest verification、`cosign` 的 detached signature / bundle、`TUF/Rekor` 的 trust metadata / transparency；但这些并不自动意味着本轮就实现完整 shared verifier；
+- `shared non-shell verifier`、`trust root`、`KMS / key rotation`、`hosted deployment` 仍保持 backlog，不反向阻塞当前 active release。
 
 ## 相关文档
 

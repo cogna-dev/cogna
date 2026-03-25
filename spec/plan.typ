@@ -154,9 +154,21 @@
   - `pnpm build`（在 `docs/` 下）
 - #strong[Out of scope]：同时展开 `R8+` 的 trust / deployment 实施细节。
 
-== R8：Registry Trust & Verifier（planned）
+== R8：Registry Trust & Verifier（active）
 
-- #strong[Scope]：等 provider matrix baseline 已稳定后，再处理 signature path、shared verifier feasibility、以及是否继续保留 shell OpenSSL CLI 的正式决定。
+- #strong[Scope]：provider matrix baseline 与 native workaround 已稳定，当前 active release 改为收口 signature path、shared verifier feasibility、以及是否继续保留 shell OpenSSL CLI 的正式决定。
+- #strong[当前 repo 基线]：`src/cmd/build/main.mbt` 已通过 `runtime_signature_from_env()` 注入 signature provenance；`src/cmd/registry/main.mbt` 与 `src/cmd/publish/main.mbt` 已通过 shell OpenSSL CLI 执行现有 verifier baseline；`src/schema/contracts.mbt` 与对应 tests 已覆盖 verified / untrusted / downgrade 等 trust baseline 语义。
+- #strong[Done when]：
+  - `build / publish / registry` 对 signature status、algorithm、keyId、value 的边界有统一表述；
+  - 当前 OpenSSL shell verifier 的保留范围、局限与替换条件在 docs / plan / progress 中一致；
+  - shared non-shell verifier 是否进入下一轮实现被明确记为结论，而不是继续保持模糊方向；
+  - trust root / key rotation / KMS / hosted registry 继续保持 backlog 边界，不反向阻塞当前 release。
+- #strong[Verify]：
+  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+  - `moon test src/schema/contracts_test.mbt --target native -v`
+  - `pnpm build`（在 `docs/` 下）
+- #strong[Explicitly excludes]：shared non-shell verifier 的完整实现、trust root / key rotation / KMS、hosted registry productization、auth、deployment、enterprise security。
 
 == R9：Deployment & Security Hardening（planned）
 
@@ -175,4 +187,4 @@
 
 `R5 Core Workflow Complete` 已关闭。该 release 已把#strong[开发代码提取、分析、审查主流程]收口为当前版本最清晰、最可信、最可演示的业务闭环。
 
-`R6 Single-Machine Registry Baseline` 已关闭。`R7 Provider Matrix Coverage` 现已完成：Go / Rust / Terraform / OpenAPI 的 provider 能力矩阵已冻结为 repo 级证据。下一步进入 `R8` 处理 trust / verifier，再进入 `R9` 处理 deployment / security / ops 收口。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
+`R6 Single-Machine Registry Baseline` 已关闭。`R7 Provider Matrix Coverage` 现已完成：Go / Rust / Terraform / OpenAPI 的 provider 能力矩阵已冻结为 repo 级证据。当前 active release 已切换为 `R8`，聚焦 trust / verifier baseline 收口；之后再进入 `R9` 处理 deployment / security / ops 收口。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。

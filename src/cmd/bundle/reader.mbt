@@ -144,8 +144,24 @@ pub fn read_ndjson(path : String) -> Result[Array[Json], String] {
 }
 
 ///|
+fn bundle_ndjson_path(repo : String, name : String) -> Result[String, String] {
+  let plain_path = "\{repo}/dist/\{name}.ndjson"
+  if @fs.path_exists(plain_path) {
+    return Ok(plain_path)
+  }
+  let zst_path = "\{repo}/dist/\{name}.ndjson.zst"
+  if @fs.path_exists(zst_path) {
+    Ok(zst_path)
+  } else {
+    Err("cannot read ndjson \{plain_path}")
+  }
+}
+
+///|
 pub fn read_bundle_declarations(repo : String) -> Result[Array[Json], String] {
-  let records_out = read_ndjson("\{repo}/dist/declarations.ndjson.zst")
+  let path_out = bundle_ndjson_path(repo, "declarations")
+  guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
+  let records_out = read_ndjson(path)
   guard records_out is Ok(records) else { return Err(records_out.unwrap_err()) }
   for i in 0..<records.length() {
     guard records[i] is Object(record_object) else { continue }
@@ -156,7 +172,7 @@ pub fn read_bundle_declarations(repo : String) -> Result[Array[Json], String] {
       let valid = @schema.validate_ciq_declaration_v1(records[i])
       guard valid is Ok(_) else {
         return Err(
-          "invalid declaration record at \{repo}/dist/declarations.ndjson.zst line \{i + 1}: \{valid.unwrap_err().to_string()}",
+          "invalid declaration record at \{path} line \{i + 1}: \{valid.unwrap_err().to_string()}",
         )
       }
     }
@@ -166,7 +182,9 @@ pub fn read_bundle_declarations(repo : String) -> Result[Array[Json], String] {
 
 ///|
 pub fn read_bundle_symbols(repo : String) -> Result[Array[Json], String] {
-  read_ndjson("\{repo}/dist/symbols.ndjson.zst")
+  let path_out = bundle_ndjson_path(repo, "symbols")
+  guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
+  read_ndjson(path)
 }
 
 ///|
@@ -283,14 +301,18 @@ pub fn materialize_bundle_tar_gz(
   let entries_out = read_gzip_tar(bundle_path)
   guard entries_out is Ok(entries) else { return Err(entries_out.unwrap_err()) }
 
-  let required = [
-    "manifest.json", "declarations.ndjson.zst", "symbols.ndjson.zst", "metadata.json",
-    "checksums.txt",
-  ]
+  let required = ["manifest.json", "metadata.json", "checksums.txt"]
   for i in 0..<required.length() {
     if !entries.contains(required[i]) {
       return Err("bundle missing required entry \{required[i]}")
     }
+  }
+  if !entries.contains("declarations.ndjson") &&
+    !entries.contains("declarations.ndjson.zst") {
+    return Err("bundle missing required entry declarations.ndjson")
+  }
+  if !entries.contains("symbols.ndjson") && !entries.contains("symbols.ndjson.zst") {
+    return Err("bundle missing required entry symbols.ndjson")
   }
 
   for name, content in entries {

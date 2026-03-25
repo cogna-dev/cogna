@@ -15,7 +15,7 @@ test "ciq-bundle schema validates minimal bundle" {
       #|  "profile": "openapi-spec",
       #|  "declarationSchema": {
       #|    "version": "ciq-declarations/v1",
-      #|    "format": "ndjson.zst",
+      #|    "format": "ndjson",
       #|    "model": "signature + shape + language_specific tagged union",
       #|    "schema": {
       #|      "type": "object",
@@ -29,7 +29,7 @@ test "ciq-bundle schema validates minimal bundle" {
       #|    "commit": "1234567890abcdef1234567890abcdef12345678"
       #|  },
       #|  "artifacts": [
-      #|    {"path":"declarations.ndjson.zst","sha256":"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd","compression":"zstd"}
+      #|    {"path":"declarations.ndjson","sha256":"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd","compression":"none"}
       #|  ]
       #|}
     ),
@@ -179,8 +179,8 @@ test "ciq-opa-bundle schema validates policy bundle" {
       #|    }
       #|  },
       #|  "artifacts": [
-      #|    {"path":"declarations.ndjson.zst","sha256":"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd","compression":"zstd"},
-      #|    {"path":"symbols.ndjson.zst","sha256":"bcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcde","compression":"zstd"},
+      #|    {"path":"declarations.ndjson","sha256":"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd","compression":"none"},
+      #|    {"path":"symbols.ndjson","sha256":"bcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcde","compression":"none"},
       #|    {"path":"opa-bundle.tar.gz","sha256":"cdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef","compression":"gzip"},
       #|    {"path":"policy.rules.json","sha256":"defabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefa","compression":"none"}
       #|  ]
@@ -218,9 +218,9 @@ test "ciq-opa-bundle schema accepts untrusted signature status" {
       #|  },
       #|  "artifacts": [
       #|    {
-      #|      "path": "declarations.ndjson.zst",
+      #|      "path": "declarations.ndjson",
       #|      "sha256": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-      #|      "compression": "zstd"
+      #|      "compression": "none"
       #|    }
       #|  ]
       #|}
@@ -258,9 +258,9 @@ test "ciq-opa-bundle schema accepts signature keyId" {
       #|  },
       #|  "artifacts": [
       #|    {
-      #|      "path": "declarations.ndjson.zst",
+      #|      "path": "declarations.ndjson",
       #|      "sha256": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-      #|      "compression": "zstd"
+      #|      "compression": "none"
       #|    }
       #|  ]
       #|}
@@ -299,9 +299,9 @@ test "ciq-opa-bundle schema accepts signature value" {
       #|  },
       #|  "artifacts": [
       #|    {
-      #|      "path": "declarations.ndjson.zst",
+      #|      "path": "declarations.ndjson",
       #|      "sha256": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-      #|      "compression": "zstd"
+      #|      "compression": "none"
       #|    }
       #|  ]
       #|}

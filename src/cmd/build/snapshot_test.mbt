@@ -16,8 +16,8 @@ fn remove_dir_if_exists(path : String) -> Unit {
 fn reset_repo(path : String) -> Unit {
   remove_if_exists("\{path}/codeiq.yaml")
   remove_if_exists("\{path}/dist/manifest.json")
-  remove_if_exists("\{path}/dist/declarations.ndjson.zst")
-  remove_if_exists("\{path}/dist/symbols.ndjson.zst")
+  remove_if_exists("\{path}/dist/declarations.ndjson")
+  remove_if_exists("\{path}/dist/symbols.ndjson")
   remove_if_exists("\{path}/dist/metadata.json")
   remove_if_exists("\{path}/dist/checksums.txt")
   remove_if_exists("\{path}/dist/bundle.ciq.tgz")
@@ -25,15 +25,9 @@ fn reset_repo(path : String) -> Unit {
 }
 
 ///|
-fn decode_zstd_text_snapshot(path : String, fail_message : String) -> String {
-  let compressed = @fs.read_file_to_bytes(path) catch {
+fn read_text_snapshot(path : String, fail_message : String) -> String {
+  @fs.read_file_to_string(path) catch {
     _ => abort(fail_message)
-  }
-  let decompressed = @zstd.decompress(compressed) catch {
-    _ => abort("zstd decompression failed: \{path}")
-  }
-  @utf8.decode(decompressed) catch {
-    _ => abort("utf8 decode failed: \{path}")
   }
 }
 
@@ -232,12 +226,12 @@ fn run_snapshot_case(
     fail("build should succeed for snapshot case \{title}")
   }
 
-  let declarations = decode_zstd_text_snapshot(
-    "\{repo}/dist/declarations.ndjson.zst",
+  let declarations = read_text_snapshot(
+    "\{repo}/dist/declarations.ndjson",
     "declarations output should exist",
   )
-  let symbols = decode_zstd_text_snapshot(
-    "\{repo}/dist/symbols.ndjson.zst",
+  let symbols = read_text_snapshot(
+    "\{repo}/dist/symbols.ndjson",
     "symbols output should exist",
   )
 

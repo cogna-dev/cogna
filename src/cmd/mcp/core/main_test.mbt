@@ -186,10 +186,7 @@ test "mcp tools call returns structured content" {
   let declarations =
     #|{"id":"decl:payment:create","kind":"operation","path":"payment::create","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|
-  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => fail("failed to compress declaration fixture")
-  }
-  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", compressed) catch {
+  @fs.write_string_to_file("./dist/declarations.ndjson", declarations) catch {
     _ => fail("failed to write declaration fixture")
   }
 
@@ -216,7 +213,7 @@ test "mcp tools call returns structured content" {
   assert_true(response.contains("\"source\": \"bundle\""))
   assert_true(response.contains("\"decl:payment:create\""))
 
-  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("./dist/declarations.ndjson") catch {
     _ => ()
   }
 }
@@ -313,10 +310,7 @@ test "mcp tools call outlines accepts limit and cursor" {
     #|{"id":"decl:1","kind":"operation","path":"openapi/payment.yaml","signature":"operation listPayments","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|{"id":"decl:2","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":21,"endLine":30}}
     #|
-  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => fail("failed to compress declaration fixture")
-  }
-  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", compressed) catch {
+  @fs.write_string_to_file("./dist/declarations.ndjson", declarations) catch {
     _ => fail("failed to write declaration fixture")
   }
 
@@ -341,7 +335,7 @@ test "mcp tools call outlines accepts limit and cursor" {
   assert_true(response.contains("\"Returned 1 outline\""))
   assert_true(response.contains("\"limit\": 1"))
 
-  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("./dist/declarations.ndjson") catch {
     _ => ()
   }
 }

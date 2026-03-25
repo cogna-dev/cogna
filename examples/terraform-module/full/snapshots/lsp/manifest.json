@@ -4,7 +4,7 @@
   "profile": "terraform-module",
   "declarationSchema": {
     "version": "ciq-declarations/v1",
-    "format": "ndjson.zst",
+    "format": "ndjson",
     "model": "signature + shape + language_specific tagged union",
     "schema": {
       "type": "object",
@@ -201,14 +201,14 @@
   },
   "artifacts": [
     {
-      "path": "declarations.ndjson.zst",
-      "sha256": "8368aab5a37b409066e397ee63887ae47bf9ddd8496cbb35bc00b6f8923ca09f",
-      "compression": "zstd"
+      "path": "declarations.ndjson",
+      "sha256": "c3fcb09820a1b15526e9a3fb808646a61977ead719d6f1e373d484c3d69a03fe",
+      "compression": "none"
     },
     {
-      "path": "symbols.ndjson.zst",
-      "sha256": "f0e68a3c38006285f4e3b26fa821ba0da443b7b1c187311391aa6d5183c68b24",
-      "compression": "zstd"
+      "path": "symbols.ndjson",
+      "sha256": "1f92dff7dfea170039a34f7889dc0ddd14703538b1d2052db14bdf55cb9e2c93",
+      "compression": "none"
     }
   ]
 }

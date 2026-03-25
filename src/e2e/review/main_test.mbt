@@ -3,13 +3,22 @@ fn cleanup_lsp_e2e(path : String) -> Unit {
   @fs.remove_file("\{path}/codeiq.yaml") catch {
     _ => ()
   }
+  @fs.remove_file("\{path}/main.go") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{path}/lib.rs") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{path}/main.tf") catch {
+    _ => ()
+  }
   @fs.remove_file("\{path}/dist/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("\{path}/dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{path}/dist/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{path}/dist/symbols.ndjson.zst") catch {
+  @fs.remove_file("\{path}/dist/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("\{path}/dist/metadata.json") catch {
@@ -79,10 +88,10 @@ fn cleanup_review_runtime_state() -> Unit {
   @fs.remove_file("./dist/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("./dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("./dist/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("./dist/symbols.ndjson.zst") catch {
+  @fs.remove_file("./dist/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("./dist/query.result.json") catch {
@@ -110,19 +119,19 @@ fn write_review_base_and_target(path : String) -> Unit {
   let manifest = @fs.read_file_to_string("\{path}/dist/manifest.json") catch {
     _ => abort("failed to read review manifest")
   }
-  let declarations = @fs.read_file_to_bytes("\{path}/dist/declarations.ndjson.zst") catch {
+  let declarations = @fs.read_file_to_bytes("\{path}/dist/declarations.ndjson") catch {
     _ => abort("failed to read review declarations")
   }
-  let symbols = @fs.read_file_to_bytes("\{path}/dist/symbols.ndjson.zst") catch {
+  let symbols = @fs.read_file_to_bytes("\{path}/dist/symbols.ndjson") catch {
     _ => abort("failed to read review symbols")
   }
   @fs.write_string_to_file("\{path}/dist/base/manifest.json", manifest) catch {
     _ => abort("failed to write review base manifest")
   }
-  @fs.write_bytes_to_file("\{path}/dist/base/declarations.ndjson.zst", declarations) catch {
+  @fs.write_bytes_to_file("\{path}/dist/base/declarations.ndjson", declarations) catch {
     _ => abort("failed to write review base declarations")
   }
-  @fs.write_bytes_to_file("\{path}/dist/base/symbols.ndjson.zst", symbols) catch {
+  @fs.write_bytes_to_file("\{path}/dist/base/symbols.ndjson", symbols) catch {
     _ => abort("failed to write review base symbols")
   }
   let target_manifest = manifest.replace(
@@ -132,10 +141,10 @@ fn write_review_base_and_target(path : String) -> Unit {
   @fs.write_string_to_file("\{path}/dist/target/manifest.json", target_manifest) catch {
     _ => abort("failed to write review target manifest")
   }
-  @fs.write_bytes_to_file("\{path}/dist/target/declarations.ndjson.zst", declarations) catch {
+  @fs.write_bytes_to_file("\{path}/dist/target/declarations.ndjson", declarations) catch {
     _ => abort("failed to write review target declarations")
   }
-  @fs.write_bytes_to_file("\{path}/dist/target/symbols.ndjson.zst", symbols) catch {
+  @fs.write_bytes_to_file("\{path}/dist/target/symbols.ndjson", symbols) catch {
     _ => abort("failed to write review target symbols")
   }
 }
@@ -173,10 +182,10 @@ fn copy_review_runtime_artifacts(path : String) -> Unit {
   let manifest = @fs.read_file_to_string("\{path}/dist/manifest.json") catch {
     _ => abort("failed to read runtime manifest")
   }
-  let declarations = @fs.read_file_to_bytes("\{path}/dist/declarations.ndjson.zst") catch {
+  let declarations = @fs.read_file_to_bytes("\{path}/dist/declarations.ndjson") catch {
     _ => abort("failed to read runtime declarations")
   }
-  let symbols = @fs.read_file_to_bytes("\{path}/dist/symbols.ndjson.zst") catch {
+  let symbols = @fs.read_file_to_bytes("\{path}/dist/symbols.ndjson") catch {
     _ => abort("failed to read runtime symbols")
   }
   let result = @fs.read_file_to_string("\{path}/query.result.json") catch {
@@ -188,10 +197,10 @@ fn copy_review_runtime_artifacts(path : String) -> Unit {
   @fs.write_string_to_file("./dist/manifest.json", manifest) catch {
     _ => abort("failed to copy runtime manifest")
   }
-  @fs.write_bytes_to_file("./dist/declarations.ndjson.zst", declarations) catch {
+  @fs.write_bytes_to_file("./dist/declarations.ndjson", declarations) catch {
     _ => abort("failed to copy runtime declarations")
   }
-  @fs.write_bytes_to_file("./dist/symbols.ndjson.zst", symbols) catch {
+  @fs.write_bytes_to_file("./dist/symbols.ndjson", symbols) catch {
     _ => abort("failed to copy runtime symbols")
   }
   @fs.write_string_to_file("./dist/query.result.json", result) catch {

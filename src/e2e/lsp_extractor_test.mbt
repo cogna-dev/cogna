@@ -3,13 +3,22 @@ fn cleanup_lsp_e2e(path : String) -> Unit {
   @fs.remove_file("\{path}/codeiq.yaml") catch {
     _ => ()
   }
+  @fs.remove_file("\{path}/main.go") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{path}/lib.rs") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{path}/main.tf") catch {
+    _ => ()
+  }
   @fs.remove_file("\{path}/dist/manifest.json") catch {
     _ => ()
   }
-  @fs.remove_file("\{path}/dist/declarations.ndjson.zst") catch {
+  @fs.remove_file("\{path}/dist/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{path}/dist/symbols.ndjson.zst") catch {
+  @fs.remove_file("\{path}/dist/symbols.ndjson") catch {
     _ => ()
   }
   @fs.remove_file("\{path}/dist/metadata.json") catch {
@@ -75,15 +84,9 @@ fn write_openapi_config(path : String) -> Unit {
 }
 
 ///|
-fn decode_zstd_text(path : String) -> String {
-  let compressed = @fs.read_file_to_bytes(path) catch {
-    _ => abort("cannot read compressed file: \{path}")
-  }
-  let decompressed = @zstd.decompress(compressed) catch {
-    _ => abort("cannot decompress file: \{path}")
-  }
-  @utf8.decode(decompressed) catch {
-    _ => abort("cannot decode utf8 file: \{path}")
+fn read_text(path : String) -> String {
+  @fs.read_file_to_string(path) catch {
+    _ => abort("cannot read file: \{path}")
   }
 }
 
@@ -118,7 +121,7 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   assert_true(checksums.contains("manifest.json  "))
   assert_true(checksums.contains("metadata.json  "))
 
-  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("\"kind\":\"operation\""))
   assert_true(declarations.contains("\"kind\":\"path\""))
   assert_true(declarations.contains("\"name\":\"Payment.discriminator\""))
@@ -126,7 +129,7 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   assert_true(declarations.contains("\"shape\":{\"kind\":"))
   assert_true(declarations.contains("\"relations\":[{\"kind\":\"declared_in\""))
 
-  let symbols = decode_zstd_text("\{path}/dist/symbols.ndjson.zst")
+  let symbols = read_text("\{path}/dist/symbols.ndjson")
   assert_true(symbols.contains("\"id\":\"sym:openapi-spec:"))
 
   let bundle = @fs.read_file_to_bytes("\{path}/dist/bundle.ciq.tgz")
@@ -185,7 +188,7 @@ test "e2e go extractor includes richer relations" {
   let metadata = @fs.read_file_to_string("\{path}/dist/metadata.json")
   assert_true(metadata.contains("\"server\": \"gopls\""))
 
-  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("\"kind\":\"function\""))
   assert_true(declarations.contains("Package sample exposes provider coverage fixtures."))
   assert_true(declarations.contains("\"name\":\"Box\""))
@@ -259,7 +262,7 @@ test "e2e rust extractor carries doc comments" {
     fail("rust build should succeed")
   }
 
-  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("Public module doc sample."))
   assert_true(declarations.contains("ApiItem doc comment.\\nDeprecated"))
   assert_true(declarations.contains("Constructor doc comment."))
@@ -280,7 +283,7 @@ test "e2e terraform extractor covers data source and object type" {
     fail("terraform build should succeed")
   }
 
-  let declarations = decode_zstd_text("\{path}/dist/declarations.ndjson.zst")
+  let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("\"kind\":\"data\""))
   assert_true(declarations.contains("\"name\":\"aws_caller_identity.current\""))
   assert_true(declarations.contains("type = object({ env = string, retries = number })"))

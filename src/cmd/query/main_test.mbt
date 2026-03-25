@@ -16,8 +16,8 @@ fn remove_dir_if_exists(path : String) -> Unit {
 fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/query.json")
   remove_file_if_exists("\{repo}/query.result.json")
-  remove_file_if_exists("\{repo}/dist/declarations.ndjson.zst")
-  remove_file_if_exists("\{repo}/dist/symbols.ndjson.zst")
+  remove_file_if_exists("\{repo}/dist/declarations.ndjson")
+  remove_file_if_exists("\{repo}/dist/symbols.ndjson")
   remove_file_if_exists("\{repo}/dist/manifest.json")
   remove_file_if_exists("\{repo}/dist/metadata.json")
   remove_file_if_exists("\{repo}/dist/checksums.txt")
@@ -98,10 +98,7 @@ test "query uses local declarations when repo is provided" {
   let declarations =
     #|{"id":"decl:openapi:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|
-  let compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => abort("failed to compress declarations fixture")
-  }
-  @fs.write_bytes_to_file("\{repo}/dist/declarations.ndjson.zst", compressed) catch {
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
     _ => abort("failed to write declarations fixture")
   }
 
@@ -149,19 +146,13 @@ test "query uses symbols when declaration kind does not match" {
   let symbols =
     #|{"id":"sym:openapi:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
     #|
-  let decl_compressed = @zstd.compress(@utf8.encode(declarations)) catch {
-    _ => abort("failed to compress declarations fixture")
-  }
-  let symbol_compressed = @zstd.compress(@utf8.encode(symbols)) catch {
-    _ => abort("failed to compress symbols fixture")
-  }
-  @fs.write_bytes_to_file(
-    "\{repo}/dist/declarations.ndjson.zst",
-    decl_compressed,
+  @fs.write_string_to_file(
+    "\{repo}/dist/declarations.ndjson",
+    declarations,
   ) catch {
     _ => abort("failed to write declarations fixture")
   }
-  @fs.write_bytes_to_file("\{repo}/dist/symbols.ndjson.zst", symbol_compressed) catch {
+  @fs.write_string_to_file("\{repo}/dist/symbols.ndjson", symbols) catch {
     _ => abort("failed to write symbols fixture")
   }
 
