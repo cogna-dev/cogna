@@ -34,12 +34,92 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
 
 ///|
 pub fn tool_definitions() -> Array[Json] {
-  @mcp_sdk.tool_definitions()
+  [
+    {
+      "name": "codeiq.query.outlines",
+      "title": "Browse public outlines",
+      "description": "Return public declaration outlines for a bundle PURL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purl": { "type": "string", "description": "Bundle package URL." },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum outline rows to return.",
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor from a previous outlines call.",
+          },
+        },
+        "required": ["purl"],
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "purl": { "type": "string" },
+          "limit": { "type": "integer" },
+          "cursor": { "type": ["string", "null"] },
+          "outlines": { "type": "array" },
+          "nextCursor": { "type": ["string", "null"] },
+          "runtime": { "type": "object" },
+        },
+        "required": ["purl", "outlines", "runtime"],
+      },
+    },
+    {
+      "name": "codeiq.query.symbol",
+      "title": "Resolve declaration details",
+      "description": "Return structured declaration details for a selector within a bundle.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purl": { "type": "string", "description": "Bundle package URL." },
+          "selector": {
+            "type": "string",
+            "description": "Canonical declaration selector or path.",
+          },
+          "kind": {
+            "type": "string",
+            "description": "Optional declaration kind hint.",
+          },
+          "intent": {
+            "type": "string",
+            "description": "Caller intent label for downstream consumers.",
+          },
+        },
+        "required": ["purl", "selector"],
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": { "type": "string" },
+          "purl": { "type": "string" },
+          "intent": { "type": "string" },
+          "source": { "type": "string" },
+          "matches": { "type": "array" },
+          "runtime": { "type": "object" },
+        },
+        "required": ["schemaVersion", "purl", "source", "matches", "runtime"],
+      },
+    },
+    {
+      "name": "codeiq.runtime.context",
+      "title": "Inspect runtime context",
+      "description": "Return the in-memory MCP runtime request snapshot.",
+      "inputSchema": { "type": "object", "properties": {} },
+      "outputSchema": {
+        "type": "object",
+        "properties": { "activeRequests": { "type": "array" } },
+        "required": ["activeRequests"],
+      },
+    },
+  ]
 }
 
 ///|
 pub fn sync_tools_state() -> Result[Bool, @cli.CliError] {
-  let out = @mcp_sdk.sync_tools_state()
+  let out = @mcp_sdk.sync_tools_state(tool_definitions())
   guard out is Ok(changed) else { return Err(mcp_error(out.unwrap_err())) }
   Ok(changed)
 }
@@ -234,28 +314,27 @@ fn handle_tool_call(
   context : @mcp_sdk.RequestContext,
   cancelled : () -> Bool,
 ) -> Result[Json, (Int, String)] {
-  guard params is Object(params_object) else {
-    return Err((-32602, "tools/call params must be an object"))
+  let parsed_out = @mcp_sdk.parse_tool_call(params)
+  guard parsed_out is Ok((name, args)) else {
+    return Err(parsed_out.unwrap_err())
   }
-  guard params_object.get("name") is Some(String(name)) else {
-    return Err((-32602, "tools/call missing tool name"))
-  }
-  if name == "codeiq.runtime.context" {
-    match run_runtime_context_tool() {
-      Ok(result) => Ok(result)
-      Err(message) => Err((-32603, message))
-    }
-  } else {
-    @mcp_sdk.dispatch_tool_call(
-      params,
-      context,
-      (args, request_context) => {
-        run_outlines_tool_with_context(args, request_context, cancelled)
-      },
-      (args, request_context) => {
-        run_symbol_tool_with_context(args, request_context, cancelled)
-      },
-    )
+  match name {
+    "codeiq.query.outlines" =>
+      match run_outlines_tool_with_context(args, context, cancelled) {
+        Ok(result) => Ok(result)
+        Err(message) => Err((-32603, message))
+      }
+    "codeiq.query.symbol" =>
+      match run_symbol_tool_with_context(args, context, cancelled) {
+        Ok(result) => Ok(result)
+        Err(message) => Err((-32603, message))
+      }
+    "codeiq.runtime.context" =>
+      match run_runtime_context_tool() {
+        Ok(result) => Ok(result)
+        Err(message) => Err((-32603, message))
+      }
+    _ => Err((-32601, "unknown tool: \{name}"))
   }
 }
 
@@ -288,7 +367,90 @@ pub fn run_stdio_repl() -> Unit {
 }
 
 ///|
-pub fn run_serve(params : McpServeParams) -> @cli.CliResult[Unit, @cli.CliError] {
+pub fn health_path() -> String {
+  "/health"
+}
+
+///|
+pub fn rpc_path() -> String {
+  "/rpc"
+}
+
+///|
+pub fn base_url(port : Int) -> String {
+  "http://127.0.0.1:\{port}"
+}
+
+///|
+pub fn health_url(port : Int) -> String {
+  @server_runtime.join_url(base_url(port), health_path())
+}
+
+///|
+pub fn rpc_url(port : Int) -> String {
+  @server_runtime.join_url(base_url(port), rpc_path())
+}
+
+///|
+fn parse_http_request(body : Bytes) -> Result[Json, String] {
+  let text = @utf8.decode(body) catch {
+    _ => return Err("http request body is not valid utf-8")
+  }
+  let parsed = try? @json.parse(text)
+  guard parsed is Ok(request) else {
+    return Err("http request body is not valid json")
+  }
+  Ok(request)
+}
+
+///|
+pub fn handle_http_request(
+  http_method : String,
+  path : String,
+  headers : Map[String, String],
+  body : Bytes,
+) -> Result[@server_runtime.HttpResponse, String] {
+  ignore(headers)
+  match path {
+    "/health" =>
+      if http_method == "GET" {
+        Ok(
+          @server_runtime.json_response(200, {
+            "status": "ok",
+            "name": "codeiq-mcp",
+            "protocolVersion": "2025-11-25",
+          }),
+        )
+      } else {
+        Ok(@server_runtime.text_response(405, "method not allowed"))
+      }
+    "/rpc" =>
+      if http_method == "POST" {
+        let request_out = parse_http_request(body)
+        guard request_out is Ok(request) else {
+          return Ok(
+            @server_runtime.json_response(
+              400,
+              @mcp_sdk.error_response(
+                Json::null(),
+                -32700,
+                request_out.unwrap_err(),
+              ),
+            ),
+          )
+        }
+        Ok(@server_runtime.json_response(200, handle_request(request)))
+      } else {
+        Ok(@server_runtime.text_response(405, "method not allowed"))
+      }
+    _ => Ok(@server_runtime.text_response(404, "not found"))
+  }
+}
+
+///|
+pub fn run_serve(
+  params : McpServeParams,
+) -> @cli.CliResult[Unit, @cli.CliError] {
   let port_out = validate_port(params.port)
   guard port_out is Ok(_) else { return Err(port_out.unwrap_err()) }
   let dist_out = ensure_dist_dir()
@@ -296,6 +458,9 @@ pub fn run_serve(params : McpServeParams) -> @cli.CliResult[Unit, @cli.CliError]
   let sync_out = sync_tools_state()
   guard sync_out is Ok(_) else { return Err(sync_out.unwrap_err()) }
   @mcp_sdk.clear_runtime_state()
-  run_stdio_repl()
+  let serve_out = @server_runtime.serve_http(params.port, handle_http_request)
+  guard serve_out is Ok(_) else {
+    return Err(mcp_error(serve_out.unwrap_err()))
+  }
   Ok(())
 }

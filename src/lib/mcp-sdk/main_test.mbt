@@ -54,7 +54,7 @@ test "mcp-sdk route_request returns invalid request error" {
 }
 
 ///|
-test "mcp-sdk dispatch_tool_call routes known tools" {
+test "mcp-sdk parse_tool_call extracts name and arguments" {
   let params = parse_json_or_fail(
     (
       #|{
@@ -65,26 +65,22 @@ test "mcp-sdk dispatch_tool_call routes known tools" {
       #|}
     ),
   )
-  let context : RequestContext = {
-    request_id: Json::number(7.0, repr="7"),
-    request_key: "7",
-    started_at_ms: 1,
-    deadline_ms: None,
-  }
-  let out = dispatch_tool_call(
-    params,
-    context,
-    (args, _) => {
-      let purl_out = get_required_string(args, "purl")
-      guard purl_out is Ok(purl) else { return Err(purl_out.unwrap_err()) }
-      Ok(call_result("ok", { "purl": purl }, false))
-    },
-    (_, _) => Err("unexpected symbol handler call"),
-  )
-  guard out is Ok(result) else { fail("expected outlines dispatch to succeed") }
-  let text = result.stringify(indent=2)
-  assert_true(text.contains("\"isError\": false"))
-  assert_true(text.contains("pkg:generic/acme/demo@0.1.0"))
+  let out = parse_tool_call(params)
+  guard out is Ok((name, args)) else { fail("expected tool call to parse") }
+  inspect(name, content="codeiq.query.outlines")
+  let purl_out = get_required_string(args, "purl")
+  guard purl_out is Ok(purl) else { fail("expected purl argument") }
+  inspect(purl, content="pkg:generic/acme/demo@0.1.0")
+}
+
+///|
+fn generic_tools() -> Array[Json] {
+  [{ "name": "demo.echo", "inputSchema": { "type": "object" } }]
+}
+
+///|
+fn sync_generic_tools() -> Result[Bool, String] {
+  sync_tools_state(generic_tools())
 }
 
 ///|
@@ -106,8 +102,8 @@ test "mcp-sdk handle_standard_request handles tools/list" {
     request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Err((-32601, "not used")),
   ).stringify(indent=2)
   assert_true(response.contains("\"tools\""))
@@ -132,8 +128,8 @@ test "mcp-sdk handle_standard_request supports cancel request" {
     request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Err((-32601, "not used")),
   ).stringify(indent=2)
   assert_true(response.contains("\"cancelled\": true"))
@@ -157,8 +153,8 @@ test "mcp-sdk handle_standard_request supports cancel requestId field" {
     request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Err((-32601, "not used")),
   ).stringify(indent=2)
   assert_true(response.contains("\"cancelled\": true"))
@@ -181,8 +177,8 @@ test "mcp-sdk handle_standard_request reports false cancellation for missing req
     request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Err((-32601, "not used")),
   ).stringify(indent=2)
   assert_true(response.contains("\"cancelled\": false"))
@@ -206,8 +202,8 @@ test "mcp-sdk tools/call returns cancelled when request was cancelled first" {
     cancel_request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Err((-32601, "not used")),
   ).stringify(indent=2)
   assert_true(cancel_response.contains("\"cancelled\": true"))
@@ -219,7 +215,7 @@ test "mcp-sdk tools/call returns cancelled when request was cancelled first" {
       #|  "id": 77001,
       #|  "method": "tools/call",
       #|  "params": {
-      #|    "name": "codeiq.query.outlines",
+      #|    "name": "demo.echo",
       #|    "arguments": {
       #|      "purl": "pkg:generic/acme/demo@0.1.0"
       #|    }
@@ -231,8 +227,8 @@ test "mcp-sdk tools/call returns cancelled when request was cancelled first" {
     call_request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Ok(call_result("ok", { "ok": true }, false)),
   ).stringify(indent=2)
   assert_true(response.contains("\"code\": -32603"))
@@ -257,8 +253,8 @@ test "mcp-sdk handle_standard_request rejects initialize cancellation" {
     request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Err((-32601, "not used")),
   ).stringify(indent=2)
   assert_true(response.contains("\"code\": -32600"))
@@ -290,7 +286,7 @@ test "mcp-sdk tools/call returns deadline exceeded when deadline is in the past"
       #|  "id": 88001,
       #|  "method": "tools/call",
       #|  "params": {
-      #|    "name": "codeiq.query.outlines",
+      #|    "name": "demo.echo",
       #|    "deadlineMs": 1,
       #|    "arguments": {
       #|      "purl": "pkg:generic/acme/demo@0.1.0"
@@ -303,8 +299,8 @@ test "mcp-sdk tools/call returns deadline exceeded when deadline is in the past"
     request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => Ok(call_result("ok", { "ok": true }, false)),
   ).stringify(indent=2)
   assert_true(response.contains("request deadline exceeded"))
@@ -320,7 +316,7 @@ test "mcp-sdk runtime/context reports active requests" {
       #|  "id": 99001,
       #|  "method": "tools/call",
       #|  "params": {
-      #|    "name": "codeiq.query.outlines",
+      #|    "name": "demo.echo",
       #|    "timeoutMs": 60000,
       #|    "arguments": {
       #|      "purl": "pkg:generic/acme/demo@0.1.0"
@@ -346,16 +342,16 @@ test "mcp-sdk runtime/context reports active requests" {
     call_request,
     { "protocolVersion": "2025-11-25" },
     { "status": "ok" },
-    tool_definitions(),
-    () => sync_tools_state(),
+    generic_tools(),
+    sync_generic_tools,
     (_, _, _) => {
       snapshot_json = Some(
         handle_standard_request(
           snapshot_request,
           { "protocolVersion": "2025-11-25" },
           { "status": "ok" },
-          tool_definitions(),
-          () => sync_tools_state(),
+          generic_tools(),
+          sync_generic_tools,
           (_, _, _) => Err((-32601, "not used")),
         ),
       )

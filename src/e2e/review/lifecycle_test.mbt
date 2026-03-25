@@ -6,7 +6,7 @@ fn mcp_remove_file_if_exists(path : String) -> Unit {
 }
 
 ///|
-test "e2e mcp detached lifecycle covers start status stop" {
+test "e2e mcp server lifecycle covers start status stop" {
   mcp_remove_file_if_exists("./dist/mcp-server.json")
   mcp_remove_file_if_exists("./dist/mcp-tools-state.json")
 
@@ -14,9 +14,7 @@ test "e2e mcp detached lifecycle covers start status stop" {
   ignore(stop_before)
 
   let start_out = @mcp_cmd.run_start({ port: 3050, stdio: false })
-  guard start_out is Ok(started) else {
-    fail("mcp start should succeed")
-  }
+  guard start_out is Ok(started) else { fail("mcp start should succeed") }
   assert_true(started.display().contains("pid "))
 
   let status_out = @mcp_cmd.run_status()
@@ -25,12 +23,10 @@ test "e2e mcp detached lifecycle covers start status stop" {
     fail("mcp status should succeed")
   }
   inspect(status.status, content="running")
-  assert_true(status.summary.contains("live pid"))
+  assert_true(status.summary.contains("healthy"))
 
   let stop_out = @mcp_cmd.run_stop()
-  guard stop_out is Ok(stopped) else {
-    fail("mcp stop should succeed")
-  }
+  guard stop_out is Ok(stopped) else { fail("mcp stop should succeed") }
   assert_true(stopped.summary.contains("Removed MCP descriptor"))
 
   let stopped_status_out = @mcp_cmd.run_status()

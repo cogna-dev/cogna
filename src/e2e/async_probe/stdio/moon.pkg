@@ -7,7 +7,5 @@ import {
 } for "test"
 
 options(
-  targets: {
-    "main_test.mbt": [ "native" ],
-  },
+  targets: { "main_test.mbt": [ "native" ] },
 )

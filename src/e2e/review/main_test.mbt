@@ -141,7 +141,10 @@ fn write_review_base_and_target(path : String) -> Unit {
   @fs.write_string_to_file("\{path}/dist/target/manifest.json", target_manifest) catch {
     _ => abort("failed to write review target manifest")
   }
-  @fs.write_bytes_to_file("\{path}/dist/target/declarations.ndjson", declarations) catch {
+  @fs.write_bytes_to_file(
+    "\{path}/dist/target/declarations.ndjson",
+    declarations,
+  ) catch {
     _ => abort("failed to write review target declarations")
   }
   @fs.write_bytes_to_file("\{path}/dist/target/symbols.ndjson", symbols) catch {
@@ -285,7 +288,9 @@ test "e2e review loop covers bundle diff check query and mcp consumption" {
   assert_true(sarif.contains("compat.removed-public-api"))
 
   let query_path = write_review_query(path)
-  let query_out = @query_cmd.run(@query_cmd.QueryParams::{ query_file: query_path })
+  let query_out = @query_cmd.run(@query_cmd.QueryParams::{
+    query_file: query_path,
+  })
   guard query_out is Ok(_) else {
     cleanup_lsp_e2e(path)
     cleanup_review_runtime_state()
@@ -322,7 +327,9 @@ test "e2e review loop covers bundle diff check query and mcp consumption" {
       },
     },
   }
-  let outlines_response = @mcp_core.handle_request(outlines_request).stringify(indent=2)
+  let outlines_response = @mcp_core.handle_request(outlines_request).stringify(
+    indent=2,
+  )
   assert_true(outlines_response.contains("\"outlines\""))
   assert_true(outlines_response.contains("openapi/payment.yaml"))
 
@@ -340,7 +347,9 @@ test "e2e review loop covers bundle diff check query and mcp consumption" {
       },
     },
   }
-  let symbol_response = @mcp_core.handle_request(symbol_request).stringify(indent=2)
+  let symbol_response = @mcp_core.handle_request(symbol_request).stringify(
+    indent=2,
+  )
   assert_true(symbol_response.contains("\"isError\": false"))
   assert_true(symbol_response.contains("\"schemaVersion\": \"ciq-result/v1\""))
   assert_true(symbol_response.contains("\"source\": \"bundle\""))

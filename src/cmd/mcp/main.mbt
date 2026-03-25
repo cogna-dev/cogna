@@ -58,7 +58,7 @@ fn validate_port(port : Int) -> Result[Unit, @cli.CliError] {
 
 ///|
 fn tool_definitions() -> Array[Json] {
-  @mcp_sdk.tool_definitions()
+  @mcp_core.tool_definitions()
 }
 
 ///|
@@ -83,7 +83,7 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
 
 ///|
 fn sync_tools_state() -> Result[Bool, @cli.CliError] {
-  let out = @mcp_sdk.sync_tools_state()
+  let out = @mcp_sdk.sync_tools_state(tool_definitions())
   guard out is Ok(changed) else { return Err(mcp_error(out.unwrap_err())) }
   Ok(changed)
 }
@@ -91,6 +91,29 @@ fn sync_tools_state() -> Result[Bool, @cli.CliError] {
 ///|
 fn descriptor_path() -> String {
   "./dist/mcp-server.json"
+}
+
+///|
+fn project_root_path() -> String {
+  @env.current_dir().unwrap_or(".")
+}
+
+///|
+fn native_target_dir(port : Int) -> String {
+  "/tmp/codeiq-mcp-\{port}"
+}
+
+///|
+fn shell_quote(value : String) -> String {
+  let escaped = value.replace_all(old="'", new="'\"'\"'")
+  "'\{escaped}'"
+}
+
+///|
+fn native_serve_command(port : Int) -> String {
+  let manifest_path = "\{project_root_path()}/moon.mod.json"
+  let target_dir = native_target_dir(port)
+  "moon run --target native --frozen --target-dir \{shell_quote(target_dir)} --manifest-path \{shell_quote(manifest_path)} src/cmd/main -- mcp serve --port \{port}"
 }
 
 ///|
@@ -102,16 +125,22 @@ fn pid_json(pid : Int?) -> Json {
 }
 
 ///|
-fn mcp_server_info(port : Int, stdio~ : Bool = true, pid? : Int) -> Json {
+fn mcp_server_info(port : Int, pid? : Int) -> Json {
   let bundle_resolved = @fs.path_exists("./dist/manifest.json")
+  let base_url = @mcp_core.base_url(port)
+  let rpc_url = @mcp_core.rpc_url(port)
+  let health_url = @mcp_core.health_url(port)
   {
     "schemaVersion": "codeiq-mcp-descriptor/v1",
     "name": "codeiq-mcp",
     "protocolVersion": "2025-11-25",
-    "transport": if stdio { "stdio" } else { "detached-stdio" },
+    "transport": "http",
     "port": port,
     "pid": pid_json(pid),
-    "command": if stdio { "stdio-inline" } else { "moon run src/cmd/main --" },
+    "baseUrl": base_url,
+    "rpcUrl": rpc_url,
+    "healthUrl": health_url,
+    "command": native_serve_command(port),
     "bundleResolved": bundle_resolved,
     "initializeResult": @mcp_core.initialize_result(),
     "tools": tool_definitions(),
@@ -120,49 +149,38 @@ fn mcp_server_info(port : Int, stdio~ : Bool = true, pid? : Int) -> Json {
 
 ///|
 fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
-  @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
-    err =>
-      return Err(mcp_error("cannot write mcp info \{path}: \{err.to_string()}"))
-  }
+  let out = @server_runtime.write_descriptor(path, info)
+  guard out is Ok(_) else { return Err(mcp_error(out.unwrap_err())) }
   Ok(())
 }
 
 ///|
 fn read_mcp_info(path : String) -> Result[McpDescriptor, @cli.CliError] {
-  let text = @fs.read_file_to_string(path) catch {
-    err =>
-      return Err(mcp_error("cannot read mcp info \{path}: \{err.to_string()}"))
-  }
-  let parsed = try? @json.parse(text)
-  guard parsed is Ok(info) else {
-    return Err(mcp_error("mcp descriptor is not valid json"))
-  }
-  Ok({ path, info })
+  let out = @server_runtime.read_descriptor(path)
+  guard out is Ok(descriptor) else { return Err(mcp_error(out.unwrap_err())) }
+  Ok({ path: descriptor.path, info: descriptor.info })
 }
 
 ///|
 fn descriptor_pid(info : Json) -> Int? {
-  guard info is Object(info_object) else { return None }
-  match info_object.get("pid") {
-    Some(Number(value, ..)) => Some(value.to_int())
-    _ => None
+  @server_runtime.descriptor_pid(info)
+}
+
+///|
+fn descriptor_health_url(info : Json, port : Int) -> String {
+  match @server_runtime.descriptor_string(info, "healthUrl") {
+    Some(url) => url
+    None => @mcp_core.health_url(port)
   }
 }
 
 ///|
-fn write_runtime_state_with_pid(path : String, port : Int, pid : Int) -> Result[Unit, @cli.CliError] {
-  write_mcp_info(path, mcp_server_info(port, stdio=false, pid=pid))
-}
-
-///|
-fn wait_for_process_start(pid : Int) -> Bool {
-  for _ in 0..<10 {
-    if @shell.is_alive(pid) {
-      return true
-    }
-    @shell.sleep_ms(100)
-  }
-  false
+fn write_runtime_state_with_pid(
+  path : String,
+  port : Int,
+  pid : Int,
+) -> Result[Unit, @cli.CliError] {
+  write_mcp_info(path, mcp_server_info(port, pid~))
 }
 
 ///|
@@ -177,16 +195,38 @@ fn wait_for_process_stop(pid : Int) -> Bool {
 }
 
 ///|
-fn spawn_detached_stdio_process(port : Int) -> Result[Int, @cli.CliError] {
-  let command = "moon run src/cmd/main -- mcp serve --port \{port}"
+fn spawn_detached_server_process(port : Int) -> Result[Int, @cli.CliError] {
+  let command = native_serve_command(port)
   let spawn_out = @shell.spawn_detached(command)
   guard spawn_out is Ok(pid) else {
     return Err(mcp_error(spawn_out.unwrap_err()))
   }
-  if wait_for_process_start(pid) {
-    Ok(pid)
-  } else {
-    Err(mcp_error("detached MCP process did not start in time"))
+  Ok(pid)
+}
+
+///|
+fn wait_for_server_health(port : Int, pid : Int) -> Bool {
+  let health_url = @mcp_core.health_url(port)
+  for _ in 0..<200 {
+    if @server_runtime.wait_for_health(health_url, attempts=1, sleep_ms=0) {
+      return true
+    }
+    if !@shell.is_alive(pid) {
+      return false
+    }
+    @shell.sleep_ms(100)
+  }
+  false
+}
+
+///|
+fn stop_process_if_alive(pid : Int) -> Unit {
+  if @shell.is_alive(pid) {
+    ignore(@shell.terminate(pid))
+    if !wait_for_process_stop(pid) {
+      ignore(@shell.force_kill(pid))
+      ignore(wait_for_process_stop(pid))
+    }
   }
 }
 
@@ -200,16 +240,14 @@ pub fn run_start(
   let dist_out = ensure_dist_dir()
   guard dist_out is Ok(_) else { return Err(dist_out.unwrap_err()) }
 
-  if params.stdio {
-    return Err(
-      mcp_error(
-        "inline stdio mode moved to `codeiq mcp serve`; use `codeiq mcp start --stdio false` for detached mode",
-      ),
-    )
-  }
+  ignore(params.stdio)
 
-  let pid_out = spawn_detached_stdio_process(params.port)
+  let pid_out = spawn_detached_server_process(params.port)
   guard pid_out is Ok(pid) else { return Err(pid_out.unwrap_err()) }
+  if !wait_for_server_health(params.port, pid) {
+    stop_process_if_alive(pid)
+    return Err(mcp_error("MCP server did not become healthy in time"))
+  }
   let info_path = descriptor_path()
   let write_out = write_runtime_state_with_pid(info_path, params.port, pid)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
@@ -219,7 +257,7 @@ pub fn run_start(
 
   Ok({
     port: params.port,
-    summary: "Started MCP detached stdio process with descriptor at \{info_path} (port \{params.port}, pid \{pid})",
+    summary: "Started MCP server with descriptor at \{info_path} (port \{params.port}, pid \{pid})",
   })
 }
 
@@ -229,20 +267,38 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
   if @fs.path_exists(info_path) {
     let info_out = read_mcp_info(info_path)
     guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }
+    let port = @server_runtime.descriptor_port(descriptor.info).unwrap_or(0)
+    let health_url = descriptor_health_url(descriptor.info, port)
+    let healthy = @server_runtime.wait_for_health(
+      health_url,
+      attempts=1,
+      sleep_ms=0,
+    )
     match descriptor_pid(descriptor.info) {
       Some(pid) =>
-        if @shell.is_alive(pid) {
+        if @shell.is_alive(pid) && healthy {
           Ok({
             status: "running",
-            summary: "MCP descriptor found at \{info_path} with live pid \{pid}",
+            summary: "MCP server healthy at \{health_url} with live pid \{pid}",
           })
         } else {
           Ok({
             status: "stopped",
-            summary: "MCP descriptor found at \{info_path} but pid \{pid} is not running",
+            summary: "MCP descriptor found at \{info_path} but server is not healthy (pid \{pid})",
           })
         }
-      None => Ok({ status: "running", summary: "MCP descriptor found at \{info_path}" })
+      None =>
+        if healthy {
+          Ok({
+            status: "running",
+            summary: "MCP server healthy at \{health_url}",
+          })
+        } else {
+          Ok({
+            status: "stopped",
+            summary: "MCP descriptor found at \{info_path} but server is not healthy",
+          })
+        }
     }
   } else {
     Ok({
@@ -261,15 +317,7 @@ pub fn run_stop() -> @cli.CliResult[McpStopResult, @cli.CliError] {
     let info_out = read_mcp_info(info_path)
     guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }
     match descriptor_pid(descriptor.info) {
-      Some(pid) => {
-        if @shell.is_alive(pid) {
-          ignore(@shell.terminate(pid))
-          if !wait_for_process_stop(pid) {
-            ignore(@shell.force_kill(pid))
-            ignore(wait_for_process_stop(pid))
-          }
-        }
-      }
+      Some(pid) => stop_process_if_alive(pid)
       None => ()
     }
     @fs.remove_file(info_path) catch {

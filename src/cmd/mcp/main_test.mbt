@@ -31,7 +31,7 @@ test "mcp start writes server descriptor" {
     cleanup_tmp_dir(dir)
     fail("mcp start should succeed")
   }
-  assert_true(ok.display().contains("Started MCP detached stdio process"))
+  assert_true(ok.display().contains("Started MCP server"))
   assert_true(ok.display().contains("pid "))
 
   let content = @fs.read_file_to_string("./dist/mcp-server.json") catch {
@@ -48,7 +48,11 @@ test "mcp start writes server descriptor" {
   assert_true(content.contains("\"initializeResult\""))
   assert_true(content.contains("\"codeiq.query.outlines\""))
   assert_true(content.contains("\"codeiq.query.symbol\""))
-  assert_true(content.contains("\"transport\": \"detached-stdio\""))
+  assert_true(content.contains("\"transport\": \"http\""))
+  assert_true(content.contains("\"rpcUrl\": \"http://127.0.0.1:8080/rpc\""))
+  assert_true(
+    content.contains("\"healthUrl\": \"http://127.0.0.1:8080/health\""),
+  )
   assert_true(content.contains("\"pid\":"))
   assert_true(@fs.path_exists("./dist/mcp-tools-state.json"))
 
@@ -69,12 +73,13 @@ test "mcp start rejects invalid port" {
 }
 
 ///|
-test "mcp start rejects inline stdio mode" {
+test "mcp start accepts deprecated stdio flag" {
   let out = run_start({ port: 3000, stdio: true })
-  guard out is Err(error) else {
-    fail("mcp start with stdio=true should fail")
+  guard out is Ok(result) else {
+    fail("mcp start with stdio=true should still start the server")
   }
-  assert_true(error.to_string().contains("mcp serve"))
+  assert_true(result.display().contains("Started MCP server"))
+  ignore(run_stop())
 }
 
 ///|
@@ -93,7 +98,7 @@ test "mcp status reports running for live pid descriptor" {
   guard start_out is Ok(_) else { fail("mcp start should succeed") }
   let out = run_status()
   guard out is Ok(result) else { fail("mcp status should succeed") }
-  assert_true(result.display().contains("live pid"))
+  assert_true(result.display().contains("healthy"))
   ignore(run_stop())
 }
 
