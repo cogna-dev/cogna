@@ -105,7 +105,7 @@ test "e2e registry loop covers upload resolve publish and materialize" {
   @fs.create_dir(dir)
 
   let output_path = "\{dir}/codeiq.yaml"
-  let init_out = @init_cmd.run(@init_cmd.InitParams::{ output_path })
+  let init_out = @init_cmd.run(@init_cmd.InitParams::{ output_path, })
   guard init_out is Ok(_) else {
     registry_cleanup_tmp_dir(dir)
     registry_cleanup_runtime_state()
@@ -130,7 +130,9 @@ test "e2e registry loop covers upload resolve publish and materialize" {
     fail("registry upload-local should succeed")
   }
   let upload_receipt = uploaded.receipt.stringify(indent=2)
-  assert_true(upload_receipt.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""))
+  assert_true(
+    upload_receipt.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""),
+  )
   assert_true(upload_receipt.contains("\"status\": \"published\""))
 
   let download_out = @registry_cmd.run_download_local({
@@ -142,10 +144,16 @@ test "e2e registry loop covers upload resolve publish and materialize" {
     fail("registry download-local should succeed")
   }
   let download_response = downloaded.response.stringify(indent=2)
-  assert_true(download_response.contains("\"schemaVersion\": \"codeiq-registry-download/v1\""))
+  assert_true(
+    download_response.contains(
+      "\"schemaVersion\": \"codeiq-registry-download/v1\"",
+    ),
+  )
   assert_true(download_response.contains("\"status\": 200"))
 
-  let publish_out = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file })
+  let publish_out = @publish_cmd.run(@publish_cmd.PublishParams::{
+    bundle_file,
+  })
   guard publish_out is Ok(_) else {
     registry_cleanup_tmp_dir(dir)
     registry_cleanup_runtime_state()
@@ -154,7 +162,9 @@ test "e2e registry loop covers upload resolve publish and materialize" {
   let publish_receipt = @fs.read_file_to_string("\{dir}/dist/publish.json") catch {
     _ => ""
   }
-  assert_true(publish_receipt.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""))
+  assert_true(
+    publish_receipt.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""),
+  )
   assert_true(
     publish_receipt.contains("\"status\": \"published\"") ||
     publish_receipt.contains("\"status\": \"already-exists\""),
@@ -236,7 +246,7 @@ test "e2e registry remote http requires explicit insecure opt-in" {
     remote_upload_receipt.stringify(indent=2),
   )
 
-  let blocked = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file })
+  let blocked = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file, })
   guard blocked is Err(error) else {
     registry_cleanup_tmp_dir(dir)
     registry_cleanup_runtime_state()
@@ -249,7 +259,7 @@ test "e2e registry remote http requires explicit insecure opt-in" {
   )
 
   @sys.set_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP", "true")
-  let allowed = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file })
+  let allowed = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file, })
   guard allowed is Ok(_) else {
     registry_cleanup_tmp_dir(dir)
     registry_cleanup_runtime_state()

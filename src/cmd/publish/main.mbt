@@ -26,124 +26,30 @@ fn should_fail_on_download_error(message : String) -> Bool {
 }
 
 ///|
-fn shell_escape(value : String) -> String {
-  let escaped = value.replace_all(old="'", new="'\"'\"'")
-  "'\{escaped}'"
-}
-
-///|
-fn parse_signature_status(status : String) -> String {
-  match status {
-    "verified" => "verified"
-    "untrusted" => "untrusted"
-    _ => "unsigned"
-  }
-}
-
-///|
-fn registry_base_url() -> String? {
-  match @sys.get_env_var("CODEIQ_REGISTRY_BASE_URL") {
-    Some(value) => {
-      let trimmed = value.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
-}
-
-///|
-fn normalize_base_url(url : String) -> String {
-  if url.has_suffix("/") {
-    url[:url.length() - 1].to_string()
-  } else {
-    url
-  }
-}
-
-///|
-fn local_registry_base_url(url : String) -> Bool {
-  let normalized = normalize_base_url(url)
-  normalized == "inproc://registry" ||
-  normalized.has_prefix("http://localhost") ||
-  normalized.has_prefix("https://localhost") ||
-  normalized.has_prefix("http://127.0.0.1") ||
-  normalized.has_prefix("https://127.0.0.1") ||
-  normalized.has_prefix("http://[::1]") ||
-  normalized.has_prefix("https://[::1]")
-}
-
-///|
 fn trust_enforcement_required() -> Bool {
-  match registry_base_url() {
+  match @registry_lib.registry_base_url() {
     None => false
-    Some(base_url) => !local_registry_base_url(base_url)
+    Some(base_url) => !@registry_lib.local_registry_base_url(base_url)
   }
-}
-
-///|
-fn signature_status_with_status(signature : Json, status : String) -> Json {
-  guard signature is Object(signature_object) else {
-    return { "status": status, "algorithm": "sha256" }
-  }
-  signature_object["status"] = Json::string(status)
-  Json::object(signature_object)
 }
 
 ///|
 fn signature_from_env() -> Json {
-  let status = match @sys.get_env_var("CODEIQ_SIGNATURE_STATUS") {
-    Some(value) => parse_signature_status(value.trim().to_string())
-    None => "unsigned"
-  }
-  let value = match @sys.get_env_var("CODEIQ_SIGNATURE_VALUE") {
-    Some(raw) => {
-      let trimmed = raw.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
-  let signature : Map[String, Json] = {
-    "status": Json::string(status),
-    "algorithm": Json::string("sha256"),
-  }
-  match @sys.get_env_var("CODEIQ_SIGNATURE_KEY_ID") {
-    Some(value) if value.trim().to_string() != "" =>
-      signature["keyId"] = Json::string(value.trim().to_string())
-    _ => ()
-  }
-  match value {
-    Some(sig) => signature["value"] = Json::string(sig)
-    None => ()
-  }
-  Json::object(signature)
+  @registry_lib.signature_json(@registry_lib.load_signature_status_from_env())
 }
 
 ///|
 fn signature_from_download(download : Map[String, Json]) -> Json {
-  match download.get("signature") {
-    Some(Object(signature_object)) => Json::object(signature_object)
-    _ => signature_from_env()
-  }
+  @registry_lib.signature_json(
+    @registry_lib.signature_status_from_download(download),
+  )
 }
 
 ///|
 fn signature_from_receipt(receipt : Map[String, Json]) -> Json {
-  match receipt.get("provenance") {
-    Some(Object(provenance)) =>
-      match provenance.get("signature") {
-        Some(Object(signature_object)) => Json::object(signature_object)
-        _ => signature_from_env()
-      }
-    _ => signature_from_env()
-  }
+  @registry_lib.signature_json(
+    @registry_lib.signature_status_from_receipt(receipt),
+  )
 }
 
 ///|
@@ -155,7 +61,7 @@ fn ensure_signature_status_allowed(
     return Err(publish_error("invalid signature metadata shape"))
   }
   let status = match signature_object.get("status") {
-    Some(String(value)) => parse_signature_status(value)
+    Some(String(value)) => @registry_lib.parse_signature_status(value)
     _ => "unsigned"
   }
   if enforce_trust && status == "untrusted" {
@@ -166,79 +72,19 @@ fn ensure_signature_status_allowed(
 }
 
 ///|
-fn signature_value(signature : Json) -> String? {
-  guard signature is Object(signature_object) else { return None }
-  match signature_object.get("value") {
-    Some(String(value)) if value.trim().to_string() != "" => Some(value)
-    _ => None
-  }
-}
-
-///|
-fn signature_public_key_file() -> String? {
-  match @sys.get_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE") {
-    Some(raw) => {
-      let trimmed = raw.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
-}
-
-///|
 fn verify_signature_with_openssl(
   bundle_file : String,
   signature : Json,
 ) -> Json {
-  guard signature is Object(_) else { return signature }
-  let status = match signature {
-    Object(signature_object) =>
-      match signature_object.get("status") {
-        Some(String(value)) => parse_signature_status(value)
-        _ => "unsigned"
-      }
-    _ => "unsigned"
-  }
-  if status != "verified" {
-    return signature
-  }
-  let public_key = match signature_public_key_file() {
-    Some(path) if @fs.path_exists(path) => path
-    _ => return signature
-  }
-  let value = match signature_value(signature) {
-    Some(sig) => sig
-    None => return signature_status_with_status(signature, "untrusted")
-  }
-  if !@fs.path_exists(bundle_file) {
-    return signature_status_with_status(signature, "untrusted")
-  }
-  @fs.create_dir(".codeiq") catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  @fs.create_dir(".codeiq/registry") catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  @fs.create_dir(".codeiq/registry/http") catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  let b64_path = ".codeiq/registry/http/publish.signature.verify.b64"
-  let bin_path = ".codeiq/registry/http/publish.signature.verify.bin"
-  @fs.write_string_to_file(b64_path, value) catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  let decode = "openssl base64 -d -A -in \{shell_escape(b64_path)} -out \{shell_escape(bin_path)}"
-  let verify = "openssl dgst -sha256 -verify \{shell_escape(public_key)} -signature \{shell_escape(bin_path)} \{shell_escape(bundle_file)}"
-  let (exit_code, _, _) = @shell.run_command_capture("\{decode} && \{verify}")
-  if exit_code == 0 {
-    signature
-  } else {
-    signature_status_with_status(signature, "untrusted")
-  }
+  guard signature is Object(signature_object) else { return signature }
+  let verified = @registry_lib.verify_signature_for_file(
+    bundle_file,
+    @registry_lib.signature_status_from_download({
+      "signature": Json::object(signature_object),
+    }),
+    "publish.signature.verify",
+  )
+  @registry_lib.signature_json(verified)
 }
 
 ///|

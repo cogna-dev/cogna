@@ -74,6 +74,17 @@ test "parse invocation supports registry download with output" {
 }
 
 ///|
+test "parse invocation supports registry serve with custom port" {
+  let argv = ["codeiq", "registry", "serve", "--port", "8788"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(RegistryServe(params)) else {
+    fail("expected registry serve invocation to parse")
+  }
+
+  inspect(params.port, content="8788")
+}
+
+///|
 test "parse invocation supports mcp start with custom port" {
   let argv = ["codeiq", "mcp", "start", "--port", "9090"]
   let out = parse_cli_args(argv)

@@ -9,6 +9,7 @@ pub(all) enum CliInvocation {
   RegistryUploadLocal(@registry_cmd.RegistryUploadParams)
   RegistryDownloadLocal(@registry_cmd.RegistryDownloadParams)
   RegistryDownloadBundle(@registry_cmd.RegistryDownloadBundleParams)
+  RegistryServe(@registry_cmd.RegistryServeParams)
   McpStart(@mcp_cmd.McpStartParams)
   McpServe(@mcp_core.McpServeParams)
   McpStatus
@@ -158,6 +159,18 @@ fn parse_invocation(
               ),
             ],
           ),
+          @argparse.Command::new(
+            "serve",
+            about="Run local registry HTTP server",
+            options=[
+              @argparse.OptionArg::new(
+                "port",
+                long="port",
+                action=@argparse.OptionAction::Set,
+                default_values=["8787"],
+              ),
+            ],
+          ),
         ],
         subcommand_required=true,
       ),
@@ -179,14 +192,18 @@ fn parse_invocation(
               default_values=["true"],
             ),
           ]),
-          @argparse.Command::new("serve", about="Run MCP agent foreground loop", options=[
-            @argparse.OptionArg::new(
-              "port",
-              long="port",
-              action=@argparse.OptionAction::Set,
-              default_values=["3000"],
-            ),
-          ]),
+          @argparse.Command::new(
+            "serve",
+            about="Run MCP agent foreground loop",
+            options=[
+              @argparse.OptionArg::new(
+                "port",
+                long="port",
+                action=@argparse.OptionAction::Set,
+                default_values=["3000"],
+              ),
+            ],
+          ),
           @argparse.Command::new("status", about="Show MCP agent status"),
           @argparse.Command::new("stop", about="Stop MCP agent"),
         ],
@@ -272,6 +289,14 @@ fn parse_invocation(
             }),
           )
         }
+        Some(("serve", serve_matches)) => {
+          let port_values = serve_matches.values["port"]
+          let parsed_port = try? @strconv.parse_int(port_values[0])
+          guard parsed_port is Ok(port) else {
+            return Err(@cli.usage_error("--port must be an integer"))
+          }
+          Ok(RegistryServe(@registry_cmd.RegistryServeParams::{ port, }))
+        }
         _ => Err(@cli.usage_error(command.render_help()))
       }
     Some(("mcp", mcp_matches)) =>
@@ -292,7 +317,7 @@ fn parse_invocation(
           guard parsed_port is Ok(port) else {
             return Err(@cli.usage_error("--port must be an integer"))
           }
-          Ok(McpServe(@mcp_core.McpServeParams::{ port }))
+          Ok(McpServe(@mcp_core.McpServeParams::{ port, }))
         }
         Some(("status", _)) => Ok(McpStatus)
         Some(("stop", _)) => Ok(McpStop)
@@ -354,6 +379,11 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
       }
     RegistryDownloadBundle(params) =>
       match @registry_cmd.run_download_bundle(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    RegistryServe(params) =>
+      match @registry_cmd.run_serve(params) {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }

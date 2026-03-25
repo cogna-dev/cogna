@@ -1,81 +1,4 @@
 ///|
-fn remove_dir_if_exists(path : String) -> Unit {
-  @fs.remove_dir(path) catch {
-    _ => ()
-  }
-}
-
-///|
-fn cleanup_registry() -> Unit {
-  remove_dir_if_exists(".codeiq/registry/index")
-  remove_dir_if_exists(".codeiq/registry/bundles")
-  remove_dir_if_exists(".codeiq/registry/http")
-  remove_dir_if_exists(".codeiq/registry")
-  remove_dir_if_exists(".codeiq/cache/registry/index")
-  remove_dir_if_exists(".codeiq/cache/registry/bundles")
-  remove_dir_if_exists(".codeiq/cache/registry")
-  remove_dir_if_exists(".codeiq/cache")
-  remove_dir_if_exists(".codeiq")
-  @sys.unset_env_var("CODEIQ_REGISTRY_BASE_URL")
-  @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
-  @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_Authorization")
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_X_API_KEY")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE")
-  @sys.unset_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_MAX_TIME")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_RETRY")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_INSECURE_TLS")
-  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CA_FILE")
-  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE")
-  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE")
-}
-
-///|
-fn bundle_fixture(repo : String) -> String {
-  let bundle_path = "\{repo}/dist/bundle.ciq.tgz"
-  @fs.write_string_to_file(bundle_path, "bundle fixture") catch {
-    _ => abort("failed to write bundle fixture")
-  }
-  bundle_path
-}
-
-///|
-fn upload_request(bundle_path : String, purl : String) -> Json {
-  let bytes = @fs.read_file_to_bytes(bundle_path) catch {
-    _ => abort("failed to read bundle fixture")
-  }
-  {
-    "schemaVersion": "codeiq-registry-upload/v1",
-    "endpoint": "POST /api/v1/bundles",
-    "bundleFile": bundle_path,
-    "bundleType": "ciq-bundle",
-    "purl": purl,
-    "digest": "sha256:\{@sha256.sha256_hexdigest(bytes)}",
-    "size": bytes.length(),
-  }
-}
-
-///|
-fn upload_request_with_signature(
-  bundle_path : String,
-  purl : String,
-  signature : Json,
-) -> Json {
-  let request = upload_request(bundle_path, purl)
-  guard request is Object(request_object) else {
-    abort("upload request should be object")
-  }
-  request_object["signature"] = signature
-  Json::object(request_object)
-}
-
-///|
 test "registry download returns 304 when etag matches" {
   let repo = "src/cmd/registry/tmp_registry_etag"
   cleanup_registry()
@@ -913,8 +836,7 @@ test "registry allows insecure remote http when explicitly enabled" {
     _ => ()
   }
   @fs.write_string_to_file(
-    ".codeiq/cache/registry/bundles/bundle_sha256_remote_http_allowed.ciq.tgz",
-    "bundle fixture",
+    ".codeiq/cache/registry/bundles/bundle_sha256_remote_http_allowed.ciq.tgz", "bundle fixture",
   ) catch {
     _ => abort("failed to write insecure http allow fixture")
   }
@@ -925,13 +847,15 @@ test "registry allows insecure remote http when explicitly enabled" {
     fail("download_by_purl should allow insecure remote http when enabled")
   }
   let text = response.stringify(indent=2)
-  assert_true(text.contains("\"bundleId\": \"bundle_sha256_remote_http_allowed\""))
+  assert_true(
+    text.contains("\"bundleId\": \"bundle_sha256_remote_http_allowed\""),
+  )
 
   cleanup_registry()
 }
 
 ///|
-test "registry upload rejects missing configured tls ca file" {
+test "registry upload rejects unsupported async transport env vars" {
   let repo = "src/cmd/registry/tmp_registry_missing_tls_ca"
   cleanup_registry()
   @fs.remove_dir(repo) catch {
@@ -953,9 +877,14 @@ test "registry upload rejects missing configured tls ca file" {
     @fs.remove_dir(repo) catch {
       _ => ()
     }
-    fail("upload should reject missing tls ca file")
+    fail("upload should reject unsupported async transport env vars")
   }
-  assert_true(error.to_string().contains("configured file does not exist"))
+  assert_true(
+    error
+    .to_string()
+    .contains("async registry transport does not support env vars"),
+  )
+  assert_true(error.to_string().contains("CODEIQ_REGISTRY_TLS_CA_FILE"))
 
   cleanup_registry()
   @fs.remove_dir(repo) catch {
@@ -964,7 +893,7 @@ test "registry upload rejects missing configured tls ca file" {
 }
 
 ///|
-test "registry download rejects missing configured tls client cert file" {
+test "registry download rejects unsupported async client cert env vars" {
   cleanup_registry()
   @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "https://registry.example.test")
   @sys.set_env_var(
@@ -983,16 +912,24 @@ test "registry download rejects missing configured tls client cert file" {
     ),
   )
   @sys.set_env_var(
-    "CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE",
-    "missing-client-cert.pem",
+    "CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE", "missing-client-cert.pem",
   )
 
   let out = download_by_purl("pkg:generic/acme/demo@4.3.7")
   guard out is Err(error) else {
     cleanup_registry()
-    fail("download_by_purl should reject missing tls client cert file")
+    fail(
+      "download_by_purl should reject unsupported async client cert env vars",
+    )
   }
-  assert_true(error.to_string().contains("configured file does not exist"))
+  assert_true(
+    error
+    .to_string()
+    .contains("async registry transport does not support env vars"),
+  )
+  assert_true(
+    error.to_string().contains("CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE"),
+  )
 
   cleanup_registry()
 }

@@ -13,11 +13,14 @@ import {
   "yufeiminds/codeiq/cmd/publish" @publish_cmd,
   "yufeiminds/codeiq/cmd/query" @query_cmd,
   "yufeiminds/codeiq/cmd/registry" @registry_cmd,
+  "yufeiminds/codeiq/lib/server-runtime" @server_runtime,
+  "yufeiminds/codeiq/lib/shell" @shell,
 } for "test"
 
 options(
   targets: {
     "init_test.mbt": [ "wasm" ],
+    "registry_server_test.mbt": [ "native" ],
     "registry_test.mbt": [ "wasm" ],
   },
 )

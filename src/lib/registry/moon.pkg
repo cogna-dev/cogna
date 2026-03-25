@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
+  "shu-kitamura/sha256" @sha256,
+  "yufeiminds/codeiq/lib/server-runtime" @server_runtime,
+  "yufeiminds/codeiq/lib/shell" @shell,
+  "yufeiminds/codeiq/cli" @cli,
+  "yufeiminds/codeiq/schema" @schema,
+}
