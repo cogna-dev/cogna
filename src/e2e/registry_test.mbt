@@ -73,6 +73,7 @@ fn registry_cleanup_runtime_state() -> Unit {
   @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
   @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
   @sys.unset_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE")
+  @sys.unset_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
 }
 
 ///|
@@ -194,6 +195,67 @@ test "e2e registry loop covers upload resolve publish and materialize" {
   @fs.remove_dir(output_dir) catch {
     _ => ()
   }
+  registry_cleanup_tmp_dir(dir)
+  registry_cleanup_runtime_state()
+}
+
+///|
+test "e2e registry remote http requires explicit insecure opt-in" {
+  let dir = "src/e2e/tmp_codeiq_e2e_registry_remote_http"
+  registry_cleanup_tmp_dir(dir)
+  registry_cleanup_runtime_state()
+  @fs.create_dir(dir)
+
+  let bundle_file = "\{dir}/bundle.ciq.tgz"
+  @fs.write_string_to_file(bundle_file, "bundle fixture") catch {
+    _ => abort("failed to write bundle fixture")
+  }
+  let bundle_bytes = @fs.read_file_to_bytes(bundle_file) catch {
+    _ => abort("failed to read bundle fixture")
+  }
+  let digest = "sha256:\{@sha256.sha256_hexdigest(bundle_bytes)}"
+  let remote_upload_receipt : Json = {
+    "schemaVersion": "codeiq-publish-receipt/v1",
+    "publishId": "pub_remote_http_gate",
+    "bundleId": "bundle_sha256_remote_http_gate",
+    "purl": "pkg:generic/local/bundle@0",
+    "digest": digest,
+    "bundleType": "ciq-bundle",
+    "downloadUrl": "http://registry.example.test/api/v1/bundles/bundle_sha256_remote_http_gate/download",
+    "status": "published",
+    "provenance": {
+      "source": "remote-registry",
+      "digestVerified": true,
+      "etag": "\"bundle_sha256_remote_http_gate\"",
+    },
+  }
+
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "http://registry.example.test")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON",
+    remote_upload_receipt.stringify(indent=2),
+  )
+
+  let blocked = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file })
+  guard blocked is Err(error) else {
+    registry_cleanup_tmp_dir(dir)
+    registry_cleanup_runtime_state()
+    fail("publish should reject insecure remote http by default")
+  }
+  assert_true(
+    error
+    .to_string()
+    .contains("requires https or CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true"),
+  )
+
+  @sys.set_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP", "true")
+  let allowed = @publish_cmd.run(@publish_cmd.PublishParams::{ bundle_file })
+  guard allowed is Ok(_) else {
+    registry_cleanup_tmp_dir(dir)
+    registry_cleanup_runtime_state()
+    fail("publish should allow insecure remote http when enabled")
+  }
+
   registry_cleanup_tmp_dir(dir)
   registry_cleanup_runtime_state()
 }
