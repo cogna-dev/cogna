@@ -81,14 +81,58 @@ codeiq publish ./dist/tokio@1.43.0.ciq.tgz
 
 `publish` 当前会把本地构建好的 bundle 上传到本地 registry stub（`.codeiq/registry`），或在配置 `CODEIQ_REGISTRY_BASE_URL` 时走 remote registry 路径。当检测到同一 PURL 且 `If-None-Match` 命中时，会返回 `304` 语义并产出 `status = "already-exists"` 的 receipt；否则正常上传并返回 `published`。返回结果是 `codeiq-publish-receipt/v1`，包含 `publishId`、`bundleId`、`purl`、`digest`、`bundleType`、`downloadUrl` 与 `status`。
 
-当前 `R8` 的 trust baseline 已明确：
+当前 `R8` 的 trust baseline 已完成并冻结：
 
 - verifier 继续保留为 shell OpenSSL CLI（依赖 `CODEIQ_SIGNATURE_PUBLIC_KEY_FILE`）；
 - verification failure 继续降级到 `untrusted`；
 - `local registry`、`inproc://registry` 与 loopback 开发场景允许免认证 / 降级后继续运行；
 - 非本地 remote registry 仍会把 `untrusted` 视为拒绝条件。
 
-当前产品主线工作流是 `init → build → diff → check → query → MCP review`。`publish ↔ registry` 的单机、免认证 baseline 已在 R6 收口完成；`R8` 负责把 signature / verifier / downgrade 边界正式写实并固定下来。
+当前产品主线工作流是 `init → build → diff → check → query → MCP review`。`publish ↔ registry` 的单机、免认证 baseline 已在 R6 收口完成；`R8` 已把 signature / verifier / downgrade 边界正式写实并固定下来；`R9` 已把 remote auth、transport security 与最小 deployment / ops 边界收口为当前 baseline。
+
+## Remote Registry Auth / Transport Baseline（R9）
+
+当你把 `CODEIQ_REGISTRY_BASE_URL` 指向非本地 remote registry 时，当前 CLI 约定如下：
+
+- 默认要求 remote endpoint 与 remote `downloadUrl` 使用 `https://`；
+- 如果确实需要在开发环境中使用非本地 `http://`，必须显式设置：
+  - `CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true`
+- 远端请求会自动附带下列 env 驱动的 transport flags：
+  - `CODEIQ_REGISTRY_CURL_MAX_TIME`（默认 `30`）
+  - `CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT`（默认 `10`）
+  - `CODEIQ_REGISTRY_CURL_RETRY`（默认 `2`）
+  - `CODEIQ_REGISTRY_CURL_INSECURE_TLS=true`（等价于 curl `-k`，仅用于开发/调试）
+- 如需显式 TLS 材料：
+  - `CODEIQ_REGISTRY_TLS_CA_FILE`
+  - `CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE`
+  - `CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE`
+
+### Remote Header Injection
+
+remote registry 的 auth / token / API key 通过环境变量注入。约定是：
+
+- `CODEIQ_REGISTRY_HEADER_<Header-Name>`
+- 如果 header 名称里有 `-`，在 env var 中用 `_` 代替，运行时会自动转回 `-`
+
+例如：
+
+```bash
+export CODEIQ_REGISTRY_BASE_URL="https://registry.example.test"
+export CODEIQ_REGISTRY_HEADER_Authorization="Bearer <token>"
+export CODEIQ_REGISTRY_HEADER_X_API_KEY="demo-key"
+codeiq publish ./dist/tokio@1.43.0.ciq.tgz
+```
+
+### Remote HTTP 开发模式示例
+
+```bash
+export CODEIQ_REGISTRY_BASE_URL="http://registry.example.test"
+export CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true
+export CODEIQ_REGISTRY_HEADER_Authorization="Bearer <token>"
+codeiq publish ./dist/tokio@1.43.0.ciq.tgz
+```
+
+如果没有设置 `CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true`，CLI 会拒绝非本地 remote `http://` endpoint 或 `downloadUrl`。
 
 ## `codeiq registry upload-local <upload-request-file>`
 

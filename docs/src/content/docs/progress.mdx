@@ -22,20 +22,20 @@ order: 6
 | R6 | Single-Machine Registry Baseline | ✅ Completed | 单机/免认证 registry + publish baseline 已完成并关闭 |
 | R7 | Provider Matrix Coverage | ✅ Completed | Go / Rust / Terraform / OpenAPI provider 证据面已完成收口 |
 | R8 | Registry Trust & Verifier | ✅ Completed | shell verifier + downgrade + local/no-auth trust baseline 已完成收口 |
-| R9 | Deployment & Security Hardening | 🟡 Active | 当前进入 remote auth、deployment、transport/storage security 与 ops hardening 阶段 |
+| R9 | Deployment & Security Hardening | ✅ Completed | remote auth、transport security 与 deployment / ops baseline 已完成收口 |
 
 ## 已完成阶段（摘要）
 
 - `R1-R6` 已完成并冻结为当前 repo 基线；
 - `R5` 已完成，主业务流程 `init → build → diff → check → query → MCP review` 已形成稳定闭环；
 - `R6` 已完成，单机/免认证 registry + publish baseline 已关闭；
-- 当前看板记录最新完成阶段与当前 active release：`R7`、`R8` 已完成，`R9` 已成为当前执行阶段。
+- 当前看板记录最新完成阶段：`R7`、`R8`、`R9` 已完成；当前 active release 已回到 backlog / 下一阶段待定状态。
 
 ## R7 · Provider Matrix Coverage（Completed）
 
 - 已把 Go / Rust / Terraform / OpenAPI provider 能力矩阵冻结为 repo 证据；
 - `examples/*`、extractor、e2e tests 与 `providers / progress / plan` 文档已完成收口；
-- 详细执行清单不再保留在本页，当前 dashboard 只展开 active release `R8`。
+- 详细执行清单不再保留在本页；当前没有 active release，后续只保留 backlog / 下一阶段摘要。
 
 ## R8 · Registry Trust & Verifier（Completed）
 
@@ -44,79 +44,15 @@ order: 6
 - 已确认 local registry、`inproc://registry` 与 loopback/开发场景允许免认证 / 降级运行，非本地 remote registry 继续执行 stricter trust enforcement；
 - shared non-shell verifier、trust root、KMS / key rotation、hosted deployment 继续保留在 backlog，不阻塞当前阶段。
 
-## R9 · Deployment & Security Hardening（Active）
+## R9 · Deployment & Security Hardening（Completed）
 
-**Scope**
+- 已为 remote registry 固化 `CODEIQ_REGISTRY_HEADER_*` header/token 注入边界；
+- 已为 remote endpoint / `downloadUrl` 固化 transport security baseline：默认要求 `https://`，只有显式设置 `CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true` 时才允许非本地 `http://`；
+- 已为 curl transport 固化可配置 env：`CODEIQ_REGISTRY_CURL_MAX_TIME`、`CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT`、`CODEIQ_REGISTRY_CURL_RETRY`、`CODEIQ_REGISTRY_CURL_INSECURE_TLS`；
+- 已为 optional TLS 材料固化 env：`CODEIQ_REGISTRY_TLS_CA_FILE`、`CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE`、`CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE`；
+- 详细执行清单不再保留在本页，后续只把 backlog / 下一阶段保留为摘要方向。
 
-- 在 `R8` trust baseline 固定后，继续推进 remote registry auth boundary、hosted deployment、transport / storage security 与 ops hardening；
-- 让当前本地 / 单机语义逐步扩展到可部署、可鉴权、可运维的更完整 runtime boundary；
-- 保持已完成的 shell verifier + downgrade baseline 不回退，同时避免把 shared verifier / KMS backlog 与当前部署问题混写。
-
-**Done when**
-
-- remote registry 的认证 / 鉴权边界、header / token 注入方式与 CLI 行为被明确固定；
-- deployment / transport / storage security 的最小可验证基线在 docs 与实现中一致；
-- ops / hosted registry productization 的下一轮边界被明确，不再与 R8 trust baseline 混淆。
-
-**Verify**
-
-- `moon test src/cmd/registry/main_test.mbt --target wasm -v`
-- `moon test src/cmd/publish/main_test.mbt --target wasm -v`
-- `moon test src/e2e/registry_test.mbt --target wasm -v`
-- `pnpm build`（在 `docs/` 下）
-
-**Out of scope**
-
-- shared non-shell verifier 的完整实现；
-- trust root / key rotation / KMS；
-- 与当前 release 无关的额外产品化议题。
-
-## R9 执行清单（当前唯一执行清单）
-
-### R9-1 · Remote auth boundary
-
-**状态：🟡 Active**
-
-- **Goal**：定义并实现 remote registry 的认证 / 鉴权注入边界，而不是继续依赖隐含约定。
-- **Main touchpoints**：`src/cmd/registry/main.mbt`、`src/cmd/publish/main.mbt`、`docs/src/content/docs/cli.mdx`
-- **Done when**：
-  - remote registry 的 header / token 注入策略被固定；
-  - local / loopback / inproc no-auth 与 remote auth enforcement 的边界被明确写入 docs；
-  - tests 对 remote auth boundary 有明确覆盖。
-- **Verify**：
-  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
-- **Out of scope**：KMS、shared verifier。
-
-### R9-2 · Deployment / security baseline
-
-**状态：🟡 Active**
-
-- **Goal**：把 transport / storage security 与 hosted deployment 的最小基线转成明确的 repo 计划与文档约束。
-- **Main touchpoints**：`spec/plan.typ`、`docs/src/content/docs/progress.mdx`、`docs/src/content/docs/cli.mdx`
-- **Done when**：
-  - deployment / transport / storage security 的优先级与阶段边界被明确；
-  - hosted registry productization 的最小范围与 backlog 分界被记录；
-  - docs 对当前 active release 的表述保持一致。
-- **Verify**：
-  - `pnpm build`（在 `docs/` 下）
-- **Out of scope**：一次性完成全部 enterprise security hardening。
-
-### R9-3 · Ops / release alignment
-
-**状态：🟡 Active**
-
-- **Goal**：让 `progress / plan / cli docs` 以 `R9` 作为唯一 active release，避免历史阶段继续保留详细执行项。
-- **Main touchpoints**：`docs/src/content/docs/progress.mdx`、`spec/plan.typ`、`AGENTS.md`
-- **Done when**：
-  - `R9` 被明确写为当前执行阶段；
-  - `R8` 只保留 completed summary，不再保留详细 checklist；
-  - dashboard / plan / docs 保持一致并继续可构建。
-- **Verify**：
-  - `pnpm build`（在 `docs/` 下）
-- **Out of scope**：同时展开新的 `R10+` 规划。
-
-## 当前验证状态（R8 已完成 + R9 起始态）
+## 当前验证状态（R8 / R9 已完成）
 
 以下结果是当前 repo 在 `R8` 收口后继续复用的基线证据：
 
@@ -129,7 +65,8 @@ order: 6
 | `moon build --target native` | ✅ 通过（本轮） | native build 当前可通过 |
 | `moon test --target native -v` | ✅ 通过（本轮） | 100 passed, 0 failed |
 | `moon test src/cmd/registry/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | trust / receipt / signature propagation baseline 通过 |
-| `moon test src/cmd/publish/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | publish-side verifier / downgrade / reject / local-loopback allow 语义通过 |
+| `moon test src/cmd/publish/main_test.mbt --target wasm -v` | ✅ 通过（本轮） | publish-side verifier / downgrade / reject / local-loopback allow / remote-http gate 语义通过 |
+| `moon test src/e2e/registry_test.mbt --target wasm -v` | ✅ 通过（本轮） | e2e registry loop 与 remote-http opt-in gate 通过 |
 | `pnpm build`（`docs/`） | ✅ 通过（本轮） | 当前文档站可构建 |
 
 **环境说明**
@@ -141,21 +78,22 @@ order: 6
 
 ## 非当前执行项（只保留方向）
 
-- `R9`：处理 deployment、auth、security、ops 与企业级 hardening；
+- `shared non-shell verifier`、`trust root / key rotation / KMS`；
+- 更完整的 hosted registry productization、enterprise security hardening、ops/observability；
 - 它们不是当前 release 的执行清单，不在本页继续展开。
 
 ## 本轮补充文档
 
 - `docs/src/content/docs/providers.mdx`：已更新 provider 覆盖矩阵，纳入 Go/Rust/Terraform/OpenAPI 新证据；
 - `docs/src/content/docs/progress.mdx`：已完成 provider matrix dashboard 收口；
-- `spec/plan.typ`：当前 release 顺序已切换为 `R9` active；`R8` 已作为 completed baseline 固化。
+- `spec/plan.typ`：当前 release 顺序已把 `R8` / `R9` 都作为 completed baseline 固化。
 
 ## 下一步（当前有效顺序）
 
-1. 在 `R9` 内优先收口 remote registry auth boundary、deployment / transport / storage security baseline。
-2. 持续保留并跟踪 MoonBit native `link-core` ICE 的独立最小 repro：`repro/moonbit-link-core-ice/`。
-3. 当前已确认最小触发条件仍为 native blackbox test 中的 live `@zstd.compress(b"")` 调用；但 main workflow 已通过 plain artifact workaround 绕开该触发器。
-4. 继续保持 MoonBit 工具链回归跟踪；若上游修复，再评估是否恢复 `.zst` 作为默认中间格式。
+1. 持续保留并跟踪 MoonBit native `link-core` ICE 的独立最小 repro：`repro/moonbit-link-core-ice/`。
+2. 当前已确认最小触发条件仍为 native blackbox test 中的 live `@zstd.compress(b"")` 调用；但 main workflow 已通过 plain artifact workaround 绕开该触发器。
+3. 继续保持 MoonBit 工具链回归跟踪；若上游修复，再评估是否恢复 `.zst` 作为默认中间格式。
+4. 下一轮只在 backlog 中择机推进 shared verifier、KMS、hosted deployment productization。
 
 ## 本轮 workaround 结论
 
@@ -169,7 +107,7 @@ order: 6
 
 ## 当前 trust baseline 结论
 
-- 当前 repo 已经不是“尚未开始 trust/verifier”状态，而是 #strong[baseline 已完成并冻结]：
+- 当前 repo 已经不是“尚未开始 trust/verifier / deployment baseline”状态，而是 #strong[R8 / R9 baseline 已完成并冻结]：
   - `build` 已携带 signature provenance；
   - `registry` / `publish` 已有 OpenSSL shell verify path；
   - schema / tests 已覆盖 verified / untrusted / downgrade / remote propagation 语义；
@@ -177,7 +115,7 @@ order: 6
 - `local registry`、`inproc://registry` 与 loopback 开发场景允许免认证运行；非本地 remote registry 仍维持 stricter trust enforcement；
 - `R8` 的重点不是从零开始发明 trust model，而是把现有 baseline 收敛成清晰、稳定、可决策的实现边界；
 - 当前外部参考可作为术语基线：`OCI Distribution` 的 digest verification、`cosign` 的 detached signature / bundle、`TUF/Rekor` 的 trust metadata / transparency；但这些并不自动意味着本轮就实现完整 shared verifier；
-- `shared non-shell verifier`、`trust root`、`KMS / key rotation`、`hosted deployment` 仍保持 backlog，不反向阻塞当前 active release。
+- `shared non-shell verifier`、`trust root`、`KMS / key rotation`、更完整的 `hosted deployment` 仍保持 backlog，不反向阻塞当前已完成基线。
 
 ## 相关文档
 
