@@ -521,6 +521,65 @@ test "publish downgrades verified signature without value to untrusted" {
 }
 
 ///|
+test "publish allows downgraded untrusted signature for local loopback registry" {
+  let repo = "src/cmd/publish/tmp_publish_local_loopback_untrusted"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+
+  let bundle_path = "\{repo}/dist/bundle.ciq.tgz"
+  @fs.write_string_to_file(bundle_path, "bundle placeholder") catch {
+    _ => abort("failed to write bundle fixture")
+  }
+
+  @sys.set_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE", bundle_path)
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "http://localhost:8787")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON",
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-publish-receipt/v1",
+      #|  "publishId": "pub_local_loopback_no_sig_value",
+      #|  "bundleId": "bundle_sha256_local_loopback_no_sig_value",
+      #|  "purl": "pkg:generic/local/bundle@0",
+      #|  "digest": "sha256:01054985999c3b8016a6f7d5d192f2da23d44f3317792222aa621a6ea6daba27",
+      #|  "bundleType": "ciq-bundle",
+      #|  "downloadUrl": "http://localhost:8787/api/v1/bundles/bundle_sha256_local_loopback_no_sig_value/download",
+      #|  "status": "published",
+      #|  "provenance": {
+      #|    "source": "remote-registry",
+      #|    "digestVerified": true,
+      #|    "etag": "\"bundle_sha256_local_loopback_no_sig_value\"",
+      #|    "signature": {
+      #|      "status": "verified",
+      #|      "algorithm": "sha256",
+      #|      "keyId": "acme-main"
+      #|    }
+      #|  }
+      #|}
+    ),
+  )
+
+  let out = run({ bundle_file: bundle_path })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("publish should allow downgraded trust for local loopback registry")
+  }
+
+  let receipt = @fs.read_file_to_string("\{repo}/dist/publish.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("publish receipt should exist")
+      ""
+    }
+  }
+  assert_true(receipt.contains("\"signature\""))
+  assert_true(receipt.contains("\"status\": \"untrusted\""))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
 test "publish fails when remote signature status is untrusted" {
   let repo = "src/cmd/publish/tmp_publish_untrusted_signature"
   cleanup_tmp_repo(repo)

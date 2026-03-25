@@ -41,6 +41,50 @@ fn parse_signature_status(status : String) -> String {
 }
 
 ///|
+fn registry_base_url() -> String? {
+  match @sys.get_env_var("CODEIQ_REGISTRY_BASE_URL") {
+    Some(value) => {
+      let trimmed = value.trim().to_string()
+      if trimmed == "" {
+        None
+      } else {
+        Some(trimmed)
+      }
+    }
+    None => None
+  }
+}
+
+///|
+fn normalize_base_url(url : String) -> String {
+  if url.has_suffix("/") {
+    url[:url.length() - 1].to_string()
+  } else {
+    url
+  }
+}
+
+///|
+fn local_registry_base_url(url : String) -> Bool {
+  let normalized = normalize_base_url(url)
+  normalized == "inproc://registry" ||
+  normalized.has_prefix("http://localhost") ||
+  normalized.has_prefix("https://localhost") ||
+  normalized.has_prefix("http://127.0.0.1") ||
+  normalized.has_prefix("https://127.0.0.1") ||
+  normalized.has_prefix("http://[::1]") ||
+  normalized.has_prefix("https://[::1]")
+}
+
+///|
+fn trust_enforcement_required() -> Bool {
+  match registry_base_url() {
+    None => false
+    Some(base_url) => !local_registry_base_url(base_url)
+  }
+}
+
+///|
 fn signature_status_with_status(signature : Json, status : String) -> Json {
   guard signature is Object(signature_object) else {
     return { "status": status, "algorithm": "sha256" }
@@ -105,6 +149,7 @@ fn signature_from_receipt(receipt : Map[String, Json]) -> Json {
 ///|
 fn ensure_signature_status_allowed(
   signature : Json,
+  enforce_trust~ : Bool,
 ) -> Result[Unit, @cli.CliError] {
   guard signature is Object(signature_object) else {
     return Err(publish_error("invalid signature metadata shape"))
@@ -113,7 +158,7 @@ fn ensure_signature_status_allowed(
     Some(String(value)) => parse_signature_status(value)
     _ => "unsigned"
   }
-  if status == "untrusted" {
+  if enforce_trust && status == "untrusted" {
     Err(publish_error("registry signature status is untrusted"))
   } else {
     Ok(())
@@ -314,6 +359,7 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
     Some(String(value)) => value
     _ => "ciq-bundle"
   }
+  let enforce_trust = trust_enforcement_required()
   let if_none_match = @sys.get_env_var("CODEIQ_REGISTRY_IF_NONE_MATCH")
   if download_purl != "" {
     match if_none_match {
@@ -365,6 +411,7 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
           )
           let signature_out = ensure_signature_status_allowed(
             verified_signature,
+            enforce_trust~,
           )
           guard signature_out is Ok(_) else {
             return Err(signature_out.unwrap_err())
@@ -431,7 +478,10 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
   }
   let signature = signature_from_receipt(receipt_object)
   let verified_signature = verify_signature_with_openssl(bundle_file, signature)
-  let signature_out = ensure_signature_status_allowed(verified_signature)
+  let signature_out = ensure_signature_status_allowed(
+    verified_signature,
+    enforce_trust~,
+  )
   guard signature_out is Ok(_) else { return Err(signature_out.unwrap_err()) }
   match receipt_object.get("provenance") {
     Some(Object(provenance)) => provenance["signature"] = verified_signature
