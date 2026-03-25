@@ -79,9 +79,16 @@ codeiq query ./query.json
 codeiq publish ./dist/tokio@1.43.0.ciq.tgz
 ```
 
-`publish` 当前会把本地构建好的 bundle 上传到本地 registry stub（`.codeiq/registry`）。当检测到同一 PURL 且 `If-None-Match` 命中时，会返回 `304` 语义并产出 `status = "already-exists"` 的 receipt；否则正常上传并返回 `published`。返回结果是 `codeiq-publish-receipt/v1`，包含 `publishId`、`bundleId`、`purl`、`digest`、`bundleType`、`downloadUrl` 与 `status`。
+`publish` 当前会把本地构建好的 bundle 上传到本地 registry stub（`.codeiq/registry`），或在配置 `CODEIQ_REGISTRY_BASE_URL` 时走 remote registry 路径。当检测到同一 PURL 且 `If-None-Match` 命中时，会返回 `304` 语义并产出 `status = "already-exists"` 的 receipt；否则正常上传并返回 `published`。返回结果是 `codeiq-publish-receipt/v1`，包含 `publishId`、`bundleId`、`purl`、`digest`、`bundleType`、`downloadUrl` 与 `status`。
 
-当前产品主线工作流是 `init → build → diff → check → query → MCP review`。`publish ↔ registry` 的单机、免认证 baseline 已在 R6 收口完成；后续 trust / hosted deployment 进入 R7/R8。
+当前 `R8` 的 trust baseline 已明确：
+
+- verifier 继续保留为 shell OpenSSL CLI（依赖 `CODEIQ_SIGNATURE_PUBLIC_KEY_FILE`）；
+- verification failure 继续降级到 `untrusted`；
+- `local registry`、`inproc://registry` 与 loopback 开发场景允许免认证 / 降级后继续运行；
+- 非本地 remote registry 仍会把 `untrusted` 视为拒绝条件。
+
+当前产品主线工作流是 `init → build → diff → check → query → MCP review`。`publish ↔ registry` 的单机、免认证 baseline 已在 R6 收口完成；`R8` 负责把 signature / verifier / downgrade 边界正式写实并固定下来。
 
 ## `codeiq registry upload-local <upload-request-file>`
 
@@ -97,7 +104,7 @@ codeiq registry upload-local ./dist/upload.json
 codeiq registry download-local "pkg:openapi/acme/payment-api@2026.03.01"
 ```
 
-按 PURL 从本地 registry 解析下载响应（`codeiq-registry-download/v1`）。该响应包含 `status`、`etag`、`downloadUrl` 与 `notModified` 字段，可用于单机 304/缓存语义验证。
+按 PURL 从本地 registry 解析下载响应（`codeiq-registry-download/v1`）。该响应包含 `status`、`etag`、`downloadUrl`、`notModified` 与 `signature` 字段，可用于单机 304/缓存语义验证，以及当前 trust baseline 的 metadata 传递。
 
 ## `codeiq registry download <purl> --output <dir>`
 

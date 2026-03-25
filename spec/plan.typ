@@ -156,12 +156,12 @@
 
 == R8：Registry Trust & Verifier（active）
 
-- #strong[Scope]：provider matrix baseline 与 native workaround 已稳定，当前 active release 改为收口 signature path、shared verifier feasibility、以及是否继续保留 shell OpenSSL CLI 的正式决定。
-- #strong[当前 repo 基线]：`src/cmd/build/main.mbt` 已通过 `runtime_signature_from_env()` 注入 signature provenance；`src/cmd/registry/main.mbt` 与 `src/cmd/publish/main.mbt` 已通过 shell OpenSSL CLI 执行现有 verifier baseline；`src/schema/contracts.mbt` 与对应 tests 已覆盖 verified / untrusted / downgrade 等 trust baseline 语义。
+- #strong[Scope]：provider matrix baseline 与 native workaround 已稳定，当前 active release 改为收口 signature path，并正式确认 #strong[shell OpenSSL CLI 继续作为当前 verifier baseline]；同时明确 local / inproc / loopback registry 可免认证运行，只有非本地 remote registry 继续执行更严格的 trust enforcement。
+- #strong[当前 repo 基线]：`src/cmd/build/main.mbt` 已通过 `runtime_signature_from_env()` 注入 signature provenance；`src/cmd/registry/main.mbt` 与 `src/cmd/publish/main.mbt` 已通过 shell OpenSSL CLI 执行现有 verifier baseline，并在 verification failure 时降级为 `untrusted`；`src/schema/contracts.mbt` 与对应 tests 已覆盖 verified / untrusted / downgrade 等 trust baseline 语义。
 - #strong[Done when]：
   - `build / publish / registry` 对 signature status、algorithm、keyId、value 的边界有统一表述；
-  - 当前 OpenSSL shell verifier 的保留范围、局限与替换条件在 docs / plan / progress 中一致；
-  - shared non-shell verifier 是否进入下一轮实现被明确记为结论，而不是继续保持模糊方向；
+  - 当前 OpenSSL shell verifier 的保留范围、局限与 local/no-auth 适用边界在 docs / plan / progress 中一致；
+  - shared non-shell verifier 被明确降级到 backlog，而不是继续保持模糊方向；
   - trust root / key rotation / KMS / hosted registry 继续保持 backlog 边界，不反向阻塞当前 release。
 - #strong[Verify]：
   - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
