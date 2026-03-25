@@ -355,6 +355,18 @@ fn normalize_base_url(url : String) -> String {
 }
 
 ///|
+fn local_registry_base_url(url : String) -> Bool {
+  let normalized = normalize_base_url(url)
+  normalized == "inproc://registry" ||
+  normalized.has_prefix("http://localhost") ||
+  normalized.has_prefix("https://localhost") ||
+  normalized.has_prefix("http://127.0.0.1") ||
+  normalized.has_prefix("https://127.0.0.1") ||
+  normalized.has_prefix("http://[::1]") ||
+  normalized.has_prefix("https://[::1]")
+}
+
+///|
 fn remote_registry_enabled() -> Bool {
   registry_base_url() is Some(_)
 }
@@ -430,6 +442,212 @@ fn ascii_lower(text : String) -> String {
     out.write_char(ascii_lower_char(char))
   }
   out.to_string()
+}
+
+///|
+fn trimmed_env_var(name : String) -> String? {
+  match @sys.get_env_var(name) {
+    Some(value) => {
+      let trimmed = value.trim().to_string()
+      if trimmed == "" {
+        None
+      } else {
+        Some(trimmed)
+      }
+    }
+    None => None
+  }
+}
+
+///|
+fn env_bool(name : String) -> Bool {
+  match trimmed_env_var(name) {
+    Some(value) => {
+      let normalized = ascii_lower(value)
+      normalized == "1" || normalized == "true" || normalized == "yes" ||
+      normalized == "on"
+    }
+    None => false
+  }
+}
+
+///|
+fn env_positive_int(name : String, fallback : Int) -> Int {
+  match trimmed_env_var(name) {
+    Some(value) =>
+      match parse_decimal_int(value) {
+        Some(parsed) if parsed > 0 => parsed
+        _ => fallback
+      }
+    None => fallback
+  }
+}
+
+///|
+fn optional_existing_file_env(
+  name : String,
+) -> Result[String?, @cli.CliError] {
+  match trimmed_env_var(name) {
+    Some(path) =>
+      if @fs.path_exists(path) {
+        Ok(Some(path))
+      } else {
+        Err(registry_error("configured file does not exist for \{name}: \{path}"))
+      }
+    None => Ok(None)
+  }
+}
+
+///|
+fn insecure_remote_http_allowed() -> Bool {
+  env_bool("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
+}
+
+///|
+fn ensure_secure_remote_url(
+  url : String,
+  context : String,
+) -> Result[Unit, @cli.CliError] {
+  if url.has_prefix("http://") && !local_registry_base_url(url) &&
+    !insecure_remote_http_allowed() {
+    Err(
+      registry_error(
+        "\{context} requires https or CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true: \{url}",
+      ),
+    )
+  } else {
+    Ok(())
+  }
+}
+
+///|
+fn header_name_from_env_key(key : String) -> String? {
+  let prefix = "CODEIQ_REGISTRY_HEADER_"
+  if !key.has_prefix(prefix) {
+    return None
+  }
+  let suffix = key[prefix.length():].to_string()
+  if suffix == "" || suffix == "If-None-Match" {
+    None
+  } else {
+    Some(suffix.replace_all(old="_", new="-"))
+  }
+}
+
+///|
+fn collect_registry_header_flags() -> String {
+  let mut flags = ""
+  for key, value in @sys.get_env_vars() {
+    match header_name_from_env_key(key) {
+      Some(name) if value.trim().to_string() != "" => {
+        let header = "\{name}: \{value.trim().to_string()}"
+        flags = "\{flags} -H \{shell_escape(header)}"
+      }
+      _ => ()
+    }
+  }
+  flags
+}
+
+///|
+fn remote_curl_transport_flags() -> Result[String, @cli.CliError] {
+  let max_time = env_positive_int("CODEIQ_REGISTRY_CURL_MAX_TIME", 30)
+  let retry_count = env_positive_int("CODEIQ_REGISTRY_CURL_RETRY", 2)
+  let connect_timeout = env_positive_int(
+    "CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT",
+    10,
+  )
+  let mut flags =
+    " --fail --max-time \{max_time} --connect-timeout \{connect_timeout} --retry \{retry_count} --retry-delay 1"
+  if env_bool("CODEIQ_REGISTRY_CURL_INSECURE_TLS") {
+    flags = "\{flags} -k"
+  }
+  let ca_file_out = optional_existing_file_env("CODEIQ_REGISTRY_TLS_CA_FILE")
+  guard ca_file_out is Ok(ca_file) else { return Err(ca_file_out.unwrap_err()) }
+  match ca_file {
+    Some(path) => flags = "\{flags} --cacert \{shell_escape(path)}"
+    None => ()
+  }
+  let cert_file_out = optional_existing_file_env(
+    "CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE",
+  )
+  guard cert_file_out is Ok(cert_file) else {
+    return Err(cert_file_out.unwrap_err())
+  }
+  match cert_file {
+    Some(path) => flags = "\{flags} --cert \{shell_escape(path)}"
+    None => ()
+  }
+  let key_file_out = optional_existing_file_env(
+    "CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE",
+  )
+  guard key_file_out is Ok(key_file) else {
+    return Err(key_file_out.unwrap_err())
+  }
+  match key_file {
+    Some(path) => flags = "\{flags} --key \{shell_escape(path)}"
+    None => ()
+  }
+  Ok("\{flags}\{collect_registry_header_flags()}")
+}
+
+///|
+fn build_remote_upload_command(
+  endpoint : String,
+  request_path : String,
+) -> Result[String, @cli.CliError] {
+  let secure_out = ensure_secure_remote_url(endpoint, "remote registry endpoint")
+  guard secure_out is Ok(_) else { return Err(secure_out.unwrap_err()) }
+  let flags_out = remote_curl_transport_flags()
+  guard flags_out is Ok(flags) else { return Err(flags_out.unwrap_err()) }
+  Ok(
+    "curl -sS -L -X POST\{flags} \{shell_escape(endpoint)} -H 'Content-Type: application/json' -H 'Accept: application/json' --data-binary @\{shell_escape(request_path)}",
+  )
+}
+
+///|
+fn build_remote_resolve_command(
+  endpoint : String,
+  purl : String,
+  if_none_match : String?,
+) -> Result[String, @cli.CliError] {
+  let secure_out = ensure_secure_remote_url(endpoint, "remote registry endpoint")
+  guard secure_out is Ok(_) else { return Err(secure_out.unwrap_err()) }
+  let flags_out = remote_curl_transport_flags()
+  guard flags_out is Ok(flags) else { return Err(flags_out.unwrap_err()) }
+  let query_arg = shell_escape("purl=\{purl}")
+  let mut command =
+    "curl -sS -L -G\{flags} \{shell_escape(endpoint)} -H 'Accept: application/json' --data-urlencode \{query_arg}"
+  match if_none_match {
+    Some(value) => {
+      let header = "If-None-Match: \{value}"
+      command = "\{command} -H \{shell_escape(header)}"
+    }
+    None => ()
+  }
+  Ok(command)
+}
+
+///|
+fn build_remote_bundle_download_command(
+  download_url : String,
+) -> Result[String, @cli.CliError] {
+  let secure_out = ensure_secure_remote_url(download_url, "remote bundle download url")
+  guard secure_out is Ok(_) else { return Err(secure_out.unwrap_err()) }
+  let flags_out = remote_curl_transport_flags()
+  guard flags_out is Ok(flags) else { return Err(flags_out.unwrap_err()) }
+  Ok(
+    "curl -sS -L\{flags} \{shell_escape(download_url)} -H 'Accept: application/octet-stream'",
+  )
+}
+
+///|
+fn ensure_remote_transport_policy(base_url : String) -> Result[Unit, @cli.CliError] {
+  let base_url_out = ensure_secure_remote_url(base_url, "remote registry endpoint")
+  guard base_url_out is Ok(_) else { return Err(base_url_out.unwrap_err()) }
+  let flags_out = remote_curl_transport_flags()
+  guard flags_out is Ok(_) else { return Err(flags_out.unwrap_err()) }
+  Ok(())
 }
 
 ///|
@@ -826,7 +1044,10 @@ fn maybe_cache_bundle_download(
   let http_body_path = "\{http_tmp_dir()}/bundle-download.bin"
   let bundle_bytes_out = if download_url.has_prefix("http://") ||
     download_url.has_prefix("https://") {
-    let command = "curl -sS -L \{shell_escape(download_url)} -H 'Accept: application/octet-stream'"
+    let command_out = build_remote_bundle_download_command(download_url)
+    guard command_out is Ok(command) else {
+      return Err(command_out.unwrap_err())
+    }
     let status_out = run_curl_status_to_file(command, http_body_path)
     guard status_out is Ok((code, download_headers)) else {
       return Err(status_out.unwrap_err())
@@ -1124,6 +1345,8 @@ fn upload_remote(upload_request : Json) -> Result[UploadResult, @cli.CliError] {
     return Err(registry_error("remote registry base url is not configured"))
   }
   let normalized_base_url = normalize_base_url(base_url)
+  let transport_out = ensure_remote_transport_policy(normalized_base_url)
+  guard transport_out is Ok(_) else { return Err(transport_out.unwrap_err()) }
 
   let response_json_out = if inproc_registry_enabled(normalized_base_url) {
     let api_out = api_upload(upload_request)
@@ -1149,7 +1372,10 @@ fn upload_remote(upload_request : Json) -> Result[UploadResult, @cli.CliError] {
         guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
         let body_path = "\{http_tmp_dir()}/upload-response.json"
         let endpoint = "\{normalized_base_url}/api/v1/bundles"
-        let command = "curl -sS -L -X POST \{shell_escape(endpoint)} -H 'Content-Type: application/json' -H 'Accept: application/json' --data-binary @\{shell_escape(request_path)}"
+        let command_out = build_remote_upload_command(endpoint, request_path)
+        guard command_out is Ok(command) else {
+          return Err(command_out.unwrap_err())
+        }
         let http_out = run_curl_to_file(command, body_path)
         guard http_out is Ok((status, body, _)) else {
           return Err(http_out.unwrap_err())
@@ -1212,6 +1438,8 @@ fn download_remote_by_purl(purl : String) -> Result[Json, @cli.CliError] {
     return Err(registry_error("remote registry base url is not configured"))
   }
   let normalized_base_url = normalize_base_url(base_url)
+  let transport_out = ensure_remote_transport_policy(normalized_base_url)
+  guard transport_out is Ok(_) else { return Err(transport_out.unwrap_err()) }
 
   if inproc_registry_enabled(normalized_base_url) {
     let if_none_match = resolved_if_none_match_header(purl)
@@ -1250,16 +1478,14 @@ fn download_remote_by_purl(purl : String) -> Result[Json, @cli.CliError] {
     None => {
       let body_path = "\{http_tmp_dir()}/download-response.json"
       let endpoint = "\{normalized_base_url}/api/v1/bundles/resolve"
-      let purl_query = "purl=\{purl}"
-      let query_arg = shell_escape(purl_query)
-      let mut command = "curl -sS -L -G \{shell_escape(endpoint)} -H 'Accept: application/json' --data-urlencode \{query_arg}"
       let if_none_match = resolved_if_none_match_header(purl)
-      match if_none_match {
-        Some(value) => {
-          let if_none_match_header = "If-None-Match: \{value}"
-          command = "\{command} -H \{shell_escape(if_none_match_header)}"
-        }
-        None => ()
+      let command_out = build_remote_resolve_command(
+        endpoint,
+        purl,
+        if_none_match,
+      )
+      guard command_out is Ok(command) else {
+        return Err(command_out.unwrap_err())
       }
       let http_out = run_curl_to_file(command, body_path)
       guard http_out is Ok((status, body, _)) else {

@@ -20,10 +20,20 @@ fn cleanup_registry() -> Unit {
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
   @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
+  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_Authorization")
+  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_X_API_KEY")
   @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
   @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
   @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
   @sys.unset_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE")
+  @sys.unset_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
+  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_MAX_TIME")
+  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_RETRY")
+  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT")
+  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_INSECURE_TLS")
+  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CA_FILE")
+  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE")
+  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE")
 }
 
 ///|
@@ -834,6 +844,157 @@ test "registry remote inproc mode resolves via local api" {
   @fs.remove_dir(repo) catch {
     _ => ()
   }
+}
+
+///|
+test "registry rejects insecure remote http base url by default" {
+  cleanup_registry()
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "http://registry.example.test")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON",
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-registry-download/v1",
+      #|  "status": 200,
+      #|  "purl": "pkg:generic/acme/demo@4.4.0",
+      #|  "bundleId": "bundle_sha256_remote_http_blocked",
+      #|  "digest": "sha256:f6e327339b5a5695efb777ad14d77cffcf3ff7002dba36c63bc95ed9a2470584",
+      #|  "etag": "\"bundle_sha256_remote_http_blocked\"",
+      #|  "downloadUrl": "http://registry.example.test/api/v1/bundles/bundle_sha256_remote_http_blocked/download",
+      #|  "notModified": false
+      #|}
+    ),
+  )
+
+  let out = download_by_purl("pkg:generic/acme/demo@4.4.0")
+  guard out is Err(error) else {
+    cleanup_registry()
+    fail("download_by_purl should reject insecure remote http")
+  }
+  assert_true(
+    error
+    .to_string()
+    .contains("requires https or CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true"),
+  )
+
+  cleanup_registry()
+}
+
+///|
+test "registry allows insecure remote http when explicitly enabled" {
+  cleanup_registry()
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "http://registry.example.test")
+  @sys.set_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP", "true")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON",
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-registry-download/v1",
+      #|  "status": 200,
+      #|  "purl": "pkg:generic/acme/demo@4.3.9",
+      #|  "bundleId": "bundle_sha256_remote_http_allowed",
+      #|  "digest": "sha256:f6e327339b5a5695efb777ad14d77cffcf3ff7002dba36c63bc95ed9a2470584",
+      #|  "etag": "\"bundle_sha256_remote_http_allowed\"",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_remote_http_allowed.ciq.tgz",
+      #|  "notModified": false
+      #|}
+    ),
+  )
+  @fs.create_dir(".codeiq") catch {
+    _ => ()
+  }
+  @fs.create_dir(".codeiq/cache") catch {
+    _ => ()
+  }
+  @fs.create_dir(".codeiq/cache/registry") catch {
+    _ => ()
+  }
+  @fs.create_dir(".codeiq/cache/registry/bundles") catch {
+    _ => ()
+  }
+  @fs.write_string_to_file(
+    ".codeiq/cache/registry/bundles/bundle_sha256_remote_http_allowed.ciq.tgz",
+    "bundle fixture",
+  ) catch {
+    _ => abort("failed to write insecure http allow fixture")
+  }
+
+  let out = download_by_purl("pkg:generic/acme/demo@4.3.9")
+  guard out is Ok(response) else {
+    cleanup_registry()
+    fail("download_by_purl should allow insecure remote http when enabled")
+  }
+  let text = response.stringify(indent=2)
+  assert_true(text.contains("\"bundleId\": \"bundle_sha256_remote_http_allowed\""))
+
+  cleanup_registry()
+}
+
+///|
+test "registry upload rejects missing configured tls ca file" {
+  let repo = "src/cmd/registry/tmp_registry_missing_tls_ca"
+  cleanup_registry()
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+
+  let request = upload_request(
+    bundle_fixture(repo),
+    "pkg:generic/acme/demo@4.3.8",
+  )
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "https://registry.example.test")
+  @sys.set_env_var("CODEIQ_REGISTRY_TLS_CA_FILE", "missing-ca.pem")
+
+  let out = upload(request)
+  guard out is Err(error) else {
+    cleanup_registry()
+    @fs.remove_dir(repo) catch {
+      _ => ()
+    }
+    fail("upload should reject missing tls ca file")
+  }
+  assert_true(error.to_string().contains("configured file does not exist"))
+
+  cleanup_registry()
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+}
+
+///|
+test "registry download rejects missing configured tls client cert file" {
+  cleanup_registry()
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "https://registry.example.test")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON",
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-registry-download/v1",
+      #|  "status": 200,
+      #|  "purl": "pkg:generic/acme/demo@4.3.7",
+      #|  "bundleId": "bundle_sha256_missing_client_cert",
+      #|  "digest": "sha256:f6e327339b5a5695efb777ad14d77cffcf3ff7002dba36c63bc95ed9a2470584",
+      #|  "etag": "\"bundle_sha256_missing_client_cert\"",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_missing_client_cert.ciq.tgz",
+      #|  "notModified": false
+      #|}
+    ),
+  )
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE",
+    "missing-client-cert.pem",
+  )
+
+  let out = download_by_purl("pkg:generic/acme/demo@4.3.7")
+  guard out is Err(error) else {
+    cleanup_registry()
+    fail("download_by_purl should reject missing tls client cert file")
+  }
+  assert_true(error.to_string().contains("configured file does not exist"))
+
+  cleanup_registry()
 }
 
 ///|

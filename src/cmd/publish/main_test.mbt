@@ -40,6 +40,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
   @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
   @sys.unset_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE")
+  @sys.unset_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
 }
 
 ///|
@@ -575,6 +576,98 @@ test "publish allows downgraded untrusted signature for local loopback registry"
   }
   assert_true(receipt.contains("\"signature\""))
   assert_true(receipt.contains("\"status\": \"untrusted\""))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "publish rejects insecure non-local remote registry http by default" {
+  let repo = "src/cmd/publish/tmp_publish_insecure_remote_http"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+
+  let bundle_path = "\{repo}/dist/bundle.ciq.tgz"
+  @fs.write_string_to_file(bundle_path, "bundle placeholder") catch {
+    _ => abort("failed to write bundle fixture")
+  }
+
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "http://registry.example.test")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON",
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-publish-receipt/v1",
+      #|  "publishId": "pub_remote_insecure_http",
+      #|  "bundleId": "bundle_sha256_remote_insecure_http",
+      #|  "purl": "pkg:generic/local/bundle@0",
+      #|  "digest": "sha256:01054985999c3b8016a6f7d5d192f2da23d44f3317792222aa621a6ea6daba27",
+      #|  "bundleType": "ciq-bundle",
+      #|  "downloadUrl": "http://registry.example.test/api/v1/bundles/bundle_sha256_remote_insecure_http/download",
+      #|  "status": "published",
+      #|  "provenance": {
+      #|    "source": "remote-registry",
+      #|    "digestVerified": true,
+      #|    "etag": "\"bundle_sha256_remote_insecure_http\""
+      #|  }
+      #|}
+    ),
+  )
+
+  let out = run({ bundle_file: bundle_path })
+  guard out is Err(error) else {
+    cleanup_tmp_repo(repo)
+    fail("publish should reject insecure remote http by default")
+  }
+  assert_true(
+    error
+    .to_string()
+    .contains("requires https or CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true"),
+  )
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "publish allows insecure non-local remote registry http when enabled" {
+  let repo = "src/cmd/publish/tmp_publish_insecure_remote_http_allowed"
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+
+  let bundle_path = "\{repo}/dist/bundle.ciq.tgz"
+  @fs.write_string_to_file(bundle_path, "bundle placeholder") catch {
+    _ => abort("failed to write bundle fixture")
+  }
+
+  @sys.set_env_var("CODEIQ_REGISTRY_BASE_URL", "http://registry.example.test")
+  @sys.set_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP", "true")
+  @sys.set_env_var(
+    "CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON",
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-publish-receipt/v1",
+      #|  "publishId": "pub_remote_insecure_http_allowed",
+      #|  "bundleId": "bundle_sha256_remote_insecure_http_allowed",
+      #|  "purl": "pkg:generic/local/bundle@0",
+      #|  "digest": "sha256:01054985999c3b8016a6f7d5d192f2da23d44f3317792222aa621a6ea6daba27",
+      #|  "bundleType": "ciq-bundle",
+      #|  "downloadUrl": "http://registry.example.test/api/v1/bundles/bundle_sha256_remote_insecure_http_allowed/download",
+      #|  "status": "published",
+      #|  "provenance": {
+      #|    "source": "remote-registry",
+      #|    "digestVerified": true,
+      #|    "etag": "\"bundle_sha256_remote_insecure_http_allowed\""
+      #|  }
+      #|}
+    ),
+  )
+
+  let out = run({ bundle_file: bundle_path })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("publish should allow insecure remote http when explicitly enabled")
+  }
 
   cleanup_tmp_repo(repo)
 }
