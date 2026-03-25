@@ -154,7 +154,7 @@
   - `pnpm build`（在 `docs/` 下）
 - #strong[Out of scope]：同时展开 `R8+` 的 trust / deployment 实施细节。
 
-== R8：Registry Trust & Verifier（active）
+== R8：Registry Trust & Verifier（completed）
 
 - #strong[Scope]：provider matrix baseline 与 native workaround 已稳定，当前 active release 改为收口 signature path，并正式确认 #strong[shell OpenSSL CLI 继续作为当前 verifier baseline]；同时明确 local / inproc / loopback registry 可免认证运行，只有非本地 remote registry 继续执行更严格的 trust enforcement。
 - #strong[当前 repo 基线]：`src/cmd/build/main.mbt` 已通过 `runtime_signature_from_env()` 注入 signature provenance；`src/cmd/registry/main.mbt` 与 `src/cmd/publish/main.mbt` 已通过 shell OpenSSL CLI 执行现有 verifier baseline，并在 verification failure 时降级为 `untrusted`；`src/schema/contracts.mbt` 与对应 tests 已覆盖 verified / untrusted / downgrade 等 trust baseline 语义。
@@ -170,11 +170,26 @@
   - `pnpm build`（在 `docs/` 下）
 - #strong[Explicitly excludes]：shared non-shell verifier 的完整实现、trust root / key rotation / KMS、hosted registry productization、auth、deployment、enterprise security。
 
-== R9：Deployment & Security Hardening（planned）
+== R9：Deployment & Security Hardening（completed）
 
-- #strong[Scope]：最后再处理部署、认证鉴权、transport / storage security、KMS、key rotation、运维和企业级 hardening。
+- #strong[Scope]：在 `R8` baseline 固定后，继续推进 remote registry auth boundary、transport / storage security 与 hosted deployment 的最小可验证边界；要求 repo 内当前实现对 remote auth headers、TLS 材料、HTTP/HTTPS 边界与文档约束保持一致。
+- #strong[Includes]：
+  - `CODEIQ_REGISTRY_HEADER_*` 注入 remote registry 请求；
+  - remote endpoint / `downloadUrl` 默认 `https://`，仅在显式配置 `CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP=true` 时允许非本地 `http://`；
+  - curl transport env：`CODEIQ_REGISTRY_CURL_MAX_TIME`、`CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT`、`CODEIQ_REGISTRY_CURL_RETRY`、`CODEIQ_REGISTRY_CURL_INSECURE_TLS`；
+  - optional TLS material：`CODEIQ_REGISTRY_TLS_CA_FILE`、`CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE`、`CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE`。
+- #strong[Done when]：
+  - remote auth / header injection 边界在 registry / publish / CLI docs 中一致；
+  - transport security 的默认拒绝策略（remote http blocked unless explicitly allowed）有实现与测试证据；
+  - hosted deployment / ops 仍保持最小边界，不与 verifier / KMS backlog 混写。
+- #strong[Verify]：
+  - `moon test src/cmd/registry/main_test.mbt --target wasm -v`
+  - `moon test src/cmd/publish/main_test.mbt --target wasm -v`
+  - `moon test src/e2e/registry_test.mbt --target wasm -v`
+  - `pnpm build`（在 `docs/` 下）
+- #strong[Explicitly excludes]：shared non-shell verifier、trust root / key rotation / KMS、完整 hosted deployment productization、enterprise security hardening。
 
-= Backlog（不阻塞当前 active release）
+= Backlog（不阻塞当前 baseline）
 
 - #strong[shared non-shell verifier implementation]；
 - #strong[registry remote HTTP boundary hardening]（在进入 R6 前不再抢占优先级）；
@@ -187,4 +202,4 @@
 
 `R5 Core Workflow Complete` 已关闭。该 release 已把#strong[开发代码提取、分析、审查主流程]收口为当前版本最清晰、最可信、最可演示的业务闭环。
 
-`R6 Single-Machine Registry Baseline` 已关闭。`R7 Provider Matrix Coverage` 现已完成：Go / Rust / Terraform / OpenAPI 的 provider 能力矩阵已冻结为 repo 级证据。当前 active release 已切换为 `R8`，聚焦 trust / verifier baseline 收口；之后再进入 `R9` 处理 deployment / security / ops 收口。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
+`R6 Single-Machine Registry Baseline` 已关闭。`R7 Provider Matrix Coverage`、`R8 Registry Trust & Verifier` 与 `R9 Deployment & Security Hardening` 现已完成：provider 证据矩阵、shell verifier / downgrade / local-no-auth baseline，以及 remote auth / transport security baseline 都已冻结为 repo 级证据。当前 roadmap 已回到 backlog / 下一阶段待定状态。这样做既符合 repo 当前证据，也符合产品优先级的重新排序。
