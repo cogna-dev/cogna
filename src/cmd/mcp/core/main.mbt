@@ -152,13 +152,67 @@ pub fn local_sarif() -> Json? {
 }
 
 ///|
-fn query_repo_by_purl(purl : String) -> String {
-  let purl_key = purl
+fn purl_cache_key(purl : String) -> String {
+  purl
     .replace_all(old=":", new="_")
     .replace_all(old="/", new="_")
     .replace_all(old="@", new="_")
-  let cache_dir = ".codeiq/cache/mcp/\{purl_key}"
-  if @fs.path_exists("\{cache_dir}/manifest.json") {
+}
+
+///|
+fn ensure_dir(path : String) -> Result[Unit, @cli.CliError] {
+  if @fs.path_exists(path) {
+    Ok(())
+  } else {
+    @fs.create_dir(path) catch {
+      err =>
+        return Err(mcp_error("cannot create directory \{path}: \{err.to_string()}"))
+    }
+    Ok(())
+  }
+}
+
+///|
+fn materialize_repo_by_purl(purl : String) -> Result[String, @cli.CliError] {
+  let root_out = ensure_dir(".codeiq")
+  guard root_out is Ok(_) else { return Err(root_out.unwrap_err()) }
+  let cache_out = ensure_dir(".codeiq/cache")
+  guard cache_out is Ok(_) else { return Err(cache_out.unwrap_err()) }
+  let mcp_out = ensure_dir(".codeiq/cache/mcp")
+  guard mcp_out is Ok(_) else { return Err(mcp_out.unwrap_err()) }
+  let repo_root = ".codeiq/cache/mcp/\{purl_cache_key(purl)}"
+  let repo_out = ensure_dir(repo_root)
+  guard repo_out is Ok(_) else { return Err(repo_out.unwrap_err()) }
+  let dist_dir = "\{repo_root}/dist"
+  let dist_out = ensure_dir(dist_dir)
+  guard dist_out is Ok(_) else { return Err(dist_out.unwrap_err()) }
+  let download_out = @registry_cmd.download_by_purl(purl)
+  guard download_out is Ok(response) else {
+    return Err(mcp_error(download_out.unwrap_err().to_string()))
+  }
+  guard response is Object(response_object) else {
+    return Err(mcp_error("registry response must be object"))
+  }
+  guard response_object.get("downloadUrl") is Some(String(download_url)) else {
+    return Err(mcp_error("registry response missing downloadUrl"))
+  }
+  if !download_url.has_prefix("local://") {
+    return Err(mcp_error("bundle is not materialized locally: \{download_url}"))
+  }
+  let materialize_out = @bundle.materialize_bundle_tar_gz(
+    download_url[8:].to_string(),
+    dist_dir,
+  )
+  guard materialize_out is Ok(_) else {
+    return Err(mcp_error(materialize_out.unwrap_err()))
+  }
+  Ok(repo_root)
+}
+
+///|
+fn query_repo_by_purl(purl : String) -> String {
+  let cache_dir = ".codeiq/cache/mcp/\{purl_cache_key(purl)}"
+  if @fs.path_exists("\{cache_dir}/dist/manifest.json") {
     return cache_dir
   }
   let cwd = @env.current_dir().unwrap_or(".")
@@ -173,7 +227,10 @@ fn query_repo_by_purl(purl : String) -> String {
       }
     }
   }
-  cwd
+  match materialize_repo_by_purl(purl) {
+    Ok(repo) => repo
+    Err(_) => cwd
+  }
 }
 
 ///|
