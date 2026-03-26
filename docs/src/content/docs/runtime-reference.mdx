@@ -1,0 +1,90 @@
+---
+title: MCP / Registry Reference
+description: 精确查阅本地查询运行时和 Local Registry 的命令、工具面、HTTP 接口和当前行为边界。
+order: 10
+---
+
+# MCP / Registry Reference
+
+这一页不是讲“为什么”，而是讲“现在具体有什么可以用”。
+
+## MCP runtime 命令
+
+```bash
+codeiq mcp start
+codeiq mcp serve
+codeiq mcp status
+codeiq mcp stop
+```
+
+| 命令 | 当前作用 |
+| --- | --- |
+| `start` | 启动本地查询服务 |
+| `serve` | 以前台方式运行本地 HTTP JSON-RPC runtime |
+| `status` | 查看当前服务状态 |
+| `stop` | 停止本地服务 |
+
+## MCP tools
+
+当前公开的本地工具面包括：
+
+| Tool | 用途 |
+| --- | --- |
+| `codeiq.query.outlines` | 返回指定 bundle 的公开接口大纲 |
+| `codeiq.query.symbol` | 查询具体 symbol 的结构化详情 |
+| `codeiq.runtime.context` | 返回当前本地运行时请求上下文快照 |
+
+## 推荐查询顺序
+
+```text
+codeiq.query.outlines -> codeiq.query.symbol
+```
+
+适合的原因：
+
+- 先缩小范围；
+- 再获取精确信息；
+- 更适合 AI / Agent 多轮交互。
+
+## Local Registry 相关命令
+
+```bash
+codeiq publish <bundle-file>
+codeiq registry upload-local <upload-request-file>
+codeiq registry download-local <purl>
+codeiq registry download <purl> --output <dir>
+codeiq registry serve [--port <port>]
+```
+
+| 命令 | 作用 |
+| --- | --- |
+| `publish` | 把 bundle 写入共享本地 registry store |
+| `registry upload-local` | 直接写入本地 registry 请求 |
+| `registry download-local` | 按 PURL 解析本地下载响应与元数据 |
+| `registry download` | 按 PURL 物化 bundle 到输出目录 |
+| `registry serve` | 以前台方式运行本地 Registry HTTP server |
+
+## Registry HTTP 最小接口
+
+当前公开的最小 HTTP 接口包括：
+
+- `GET /health`
+- `POST /api/v1/bundles`
+- `GET /api/v1/bundles/resolve?purl=...`
+- `GET /api/v1/packages/{purl-encoded}/versions`
+- `GET /api/v1/bundles/{bundleId}`
+- `GET /api/v1/bundles/{bundleId}/download`
+
+## 当前边界说明
+
+为了避免误用，这一页也要明确边界：
+
+- 这些接口和命令都以 local-only runtime 为前提；
+- 当前不是 hosted registry API 承诺；
+- 当前不是远端 MCP 网络生态兼容声明；
+- 当前的核心目标是让本机上的 CLI、Registry 和查询运行时共享同一份 bundle 事实来源。
+
+## 关联页面
+
+- 如果你想先理解为什么这样设计，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。
+- 如果你想先看用户任务，请读 [在本机共享 bundle：publish / registry / materialize](/docs/bundle-sharing)。

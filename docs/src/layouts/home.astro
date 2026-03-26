@@ -14,10 +14,11 @@ const { title, description } = Astro.props
 <Base title={title} description={description}>
 	<Header client:load header={{
 		title: "CodeIQ",
-		description: "云、端一体的代码理解平台",
+		description: "把仓库变成可检查、可查询、可复用的本地上下文资产",
 		menus: [
-			{ title: "文档概览", href: "/docs/introduction" },
+			{ title: "了解 CodeIQ", href: "/docs/introduction" },
 			{ title: "快速开始", href: "/docs/quickstart" },
+			{ title: "兼容性检查", href: "/docs/release-check" },
 			{ title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
 		],
 		homeHref: "/",
@@ -27,21 +28,22 @@ const { title, description } = Astro.props
 	</main>
 	<Footer client:load footer={{
 		title: "CodeIQ",
-		description: "把代码仓库转换为 AI 可查询、可追溯的结构化上下文。",
+		description: "单机、local-only 的代码接口治理与 AI 查询工作流。",
 		menus: [
 			{
-				title: "文档",
+				title: "Start Here",
 				children: [
-					{ title: "概览", href: "/docs/introduction" },
-					{ title: "快速开始", href: "/docs/quickstart" },
-					{ title: "CLI 参考", href: "/docs/cli" },
+					{ title: "CodeIQ 能帮我解决什么问题？", href: "/docs/introduction" },
+					{ title: "第一次跑通", href: "/docs/quickstart" },
+					{ title: "发版前兼容性检查", href: "/docs/release-check" },
 				],
 			},
 			{
-				title: "资源",
+				title: "Reference & Status",
 				children: [
-					{ title: "MCP 工作流", href: "/docs/mcp" },
-					{ title: "功能成熟度", href: "/docs/roadmap" },
+					{ title: "CLI Reference", href: "/docs/cli" },
+					{ title: "MCP / Registry Reference", href: "/docs/runtime-reference" },
+					{ title: "Progress / Product Status", href: "/docs/progress" },
 					{ title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
 				],
 			},

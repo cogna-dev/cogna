@@ -1,118 +1,118 @@
 ---
-title: MCP 工作流
-description: 了解 CodeIQ 如何通过本地 MCP Agent 把 bundle 中的公开接口与契约提供给 AI 客户端与自动化工具。
+title: 让 AI / Agent 查询依赖与 API
+description: 理解什么时候用 CLI query，什么时候用 local query runtime，以及为什么推荐 outlines → symbol 的查询顺序。
 order: 4
 ---
 
-# MCP 在 CodeIQ 中扮演什么角色？
+# 让 AI / Agent 查询依赖与 API
 
-CodeIQ 的 MCP Agent 是一个本地常驻内存查询代理。它的作用不是构建 bundle，也不是执行差异比较或策略检查，而是在 bundle 已经准备好的前提下，为 AI 客户端提供高频查询能力。
+如果你的目标是“让 AI 在一个第三方库、Terraform Module 或 OpenAPI 规格里更可靠地找到答案”，那么你应该把 CodeIQ 理解成 #strong[先构建上下文，再消费上下文] 的工具，而不是一个随时替代所有 CLI 操作的万能入口。
 
-在当前实现中，它更准确的角色仍是：#strong[review consumption surface]。也就是先由 CLI 生成 bundle、diff、SARIF、query result，再由 MCP 为审查者或 Agent 暴露稳定的查询入口；这条查询入口已经从 stdio / detached-stdio baseline 迁移到真实 server runtime，并与 CLI / Local Registry 共享同一套本地 bundle cache。
+## 先记住一个原则
 
-在这个模型里：
+CodeIQ 里的 AI / Agent 查询分成两种使用方式：
 
-- `build` 负责生成 `CIQ Bundle` 或 `CIQ OPA Bundle`
-- `mcp start` 负责把本地 bundle 装载到内存并暴露查询能力
-- `publish` 负责把稳定 bundle 写入共享本地 Local Registry，供同机 CLI / MCP 复用
+| 场景 | 更适合什么入口 |
+| --- | --- |
+| 一次性查询、脚本、CI | `codeiq query` |
+| 交互式、多轮查询、AI Agent 会不断追问 | `codeiq mcp start` |
 
-## 一个典型的本地流程
+也就是说：
+
+- 如果你只想查一个符号，CLI query 往往更简单；
+- 如果你希望 AI 连续追问多个接口，local query runtime 更合适。
+
+## 典型路径
 
 ```bash
-codeiq init
 codeiq build ./sdk
 codeiq mcp start
 ```
 
-这个流程适合以下情况：
+这条路径适合下面这些情况：
 
-- 你在本机验证一个仓库
-- 你希望 IDE、终端 Agent 或本地工具直接查询上下文
-- 你暂时不需要团队级共享
+- 你已经把 bundle 构建好了；
+- 你想让 AI 基于本地产物做多轮查询；
+- 你不想让 AI 只依赖 README、注释片段或仓库全文搜索。
 
-## MCP 为什么重要？
+## 为什么推荐 `outlines → symbol`？
 
-因为它把“产物构建”和“上下文消费”拆成了两个阶段：
+这是当前最适合 AI 的查询顺序。
 
-1. **先构建**：把仓库整理成标准化 bundle。
-2. **再查询**：把这些 bundle 以低延迟方式提供给 AI 客户端。
+### 第一步：`codeiq.query.outlines`
 
-这样做的好处是：
+它的作用不是直接给你最终答案，而是给 AI 一个“公开接口大纲”。
 
-- 同一个 bundle 可以被同机上的多个客户端复用。
-- AI 不必每次都重新解析仓库。
-- 查询入口更可控，也更容易做缓存和版本绑定。
+它适合回答：
 
-当当前工作目录没有现成 `dist/` bundle 时，MCP 也可以按 PURL 从共享本地 registry store 物化 bundle 到 `.codeiq/cache/mcp/<purl-key>/dist`，再继续提供查询。
+- 这个包大概有哪些公开模块、类型、函数或路径？
+- 当前任务最可能相关的入口有哪些？
+- 下一步应该精查哪个 symbol？
 
-## MCP 当前提供哪些工具？
+### 第二步：`codeiq.query.symbol`
 
-CodeIQ 当前保留两个 MCP 工具：
+当你已经有目标 path 或 selector 之后，再用它来拿精确信息。
 
-### `codeiq.query.outlines`
+它更适合回答：
 
-根据 PURL 返回指定包的公开接口大纲索引。适合让 AI 先了解“这个包大概有哪些公开内容”。
+- 这个具体函数/类型/契约的签名是什么？
+- 它在什么位置？
+- 它有哪些关系、注释、结构化字段？
+- 对 Terraform / OpenAPI 来说，它的契约摘要是什么？
 
-典型用途：
+这种两段式查询的好处是：AI 先缩小范围，再拿精确事实，通常会比“直接盲猜某个 symbol 名称”更稳定。
 
-- 先列出候选模块、类型、函数、路径
-- 再决定下一步应查询哪个具体 symbol
+## CLI query 和 MCP 的边界是什么？
 
-### `codeiq.query.symbol`
+这是用户最容易混淆的地方。
 
-在已有 path 的前提下，对具体声明做精确查询，返回：
-
-- 声明 ID
-- 签名
-- 注释
-- 位置
-- Terraform / OpenAPI 契约摘要
-
-## 推荐查询顺序：先 outlines，后 symbol
-
-推荐 AI Agent 使用如下顺序：
-
-1. 调用 `codeiq.query.outlines` 获取公开接口大纲。
-2. 从返回的大纲里选择目标 path。
-3. 再调用 `codeiq.query.symbol` 获取精确声明与契约细节。
-
-这样比直接盲查单个 symbol 更稳定，也更适合 AI 在大包中逐步缩小范围。
-
-## 什么时候需要 `status` 与 `stop`？
-
-```bash
-codeiq mcp status
-codeiq mcp stop
-```
-
-- `status`：检查当前服务是否可用，适合排查连接问题或自动化探活。
-- `stop`：在本地开发或脚本收尾阶段关闭服务。
-
-如果需要以前台方式直接运行 MCP server，可使用：
-
-```bash
-codeiq mcp serve
-```
-
-该模式当前会启动真实的本地 HTTP JSON-RPC runtime，提供：
-
-- `GET /health`
-- `POST /rpc`
-
-`codeiq mcp start` / `status` / `stop` 管理的也是同一套 runtime state 与 health contract；兼容参数 `--stdio` 仍被接受，但不再切回旧的 detached stdio baseline。
-
-## 本地 MCP 与 CLI 的边界
-
-| 能力 | 应该通过什么入口 |
+| 能力 | 应该走哪个入口 |
 | --- | --- |
 | 构建 bundle | CLI |
 | 生成 diff | CLI |
-| 执行 check（OPA CLI policy decision）并输出 SARIF | CLI |
-| 发布到 Registry | CLI |
-| 查询 outlines / symbol | MCP 或一次性 CLI query |
+| 执行 check / OPA / SARIF | CLI |
+| 发布到 Local Registry | CLI |
+| 一次性查询 | CLI query |
+| 多轮交互式查询 | local query runtime |
 
-简而言之：MCP 只负责查询，不负责构建和治理。
+换句话说：#strong[MCP 在这里是本地查询入口，不是构建和治理入口]。
+
+## local query runtime 当前是怎么工作的？
+
+在当前实现里，它是一个 #strong[single-machine local HTTP JSON-RPC runtime]。
+
+这意味着：
+
+- 它只负责查询；
+- 它和 CLI / Local Registry 共享本地 bundle cache；
+- 如果当前工作目录没有现成的 `dist/` bundle，它也可以按 PURL 从共享本地 store 物化一份 bundle 再继续查询；
+- 它不承诺 hosted agent、远端发现、跨节点 tool registry。
+
+## 常用命令
+
+```bash
+codeiq mcp start
+codeiq mcp status
+codeiq mcp stop
+codeiq mcp serve
+```
+
+- `start`：启动本地查询服务；
+- `status`：检查是否可用；
+- `stop`：关闭本地服务；
+- `serve`：以前台方式运行，适合调试和本地集成。
+
+## 什么时候你应该优先接入这页的能力？
+
+如果你满足下面任一情况，优先做 AI / Agent 查询接入通常很有价值：
+
+- 你经常让 AI 帮你理解第三方库；
+- 你希望 AI 基于当前版本的真实接口，而不是历史文档；
+- 你需要在一个较大的包里逐步缩小范围，而不是一次性把整个仓库塞进上下文；
+- 你想让 CLI 和 AI 共用同一份本地 bundle 来源。
 
 ## 下一步
 
-如果你需要命令级别的快速查阅，请继续阅读 [CLI 参考](/docs/cli)。
+- 如果你想把同一份 bundle 交给同机多个工具复用，请读 [在本机共享 bundle：publish / registry / materialize](/docs/bundle-sharing)。
+- 如果你想理解 bundle、diff、result 和 SARIF 分别是什么，请读 [理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF](/docs/indexing)。
+- 如果你需要精确参数和接口，请读 [MCP / Registry Reference](/docs/runtime-reference)。

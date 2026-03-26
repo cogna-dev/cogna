@@ -1,0 +1,109 @@
+---
+title: 理解 Local Registry、PURL 与 local query runtime
+description: 理解当前为什么是 local-only、PURL 在系统里扮演什么角色，以及 Registry 和查询运行时分别负责什么。
+order: 7
+---
+
+# 理解 Local Registry、PURL 与 local query runtime
+
+这一页不是教你敲命令，而是帮你建立当前系统边界的正确心智模型。
+
+如果你没有先理解这件事，就很容易把 CodeIQ 误解成 hosted platform、远端 registry 或完整 MCP 网络生态的一部分。
+
+## 先记住结论
+
+当前 CodeIQ 应该按这三个词来理解：
+
+- #strong[local private registry]
+- #strong[local cache]
+- #strong[local query runtime]
+
+它们共同组成了一条 #strong[single-machine / local-only] 工作流。
+
+## PURL 在这里到底起什么作用？
+
+PURL 是当前 bundle identity 的核心入口。
+
+你可以把它理解成：
+
+- build 出来的 bundle 用它标识；
+- query 会用它定位 bundle；
+- registry download / materialize 会用它解析目标；
+- local query runtime 也会按 PURL 去找或物化 bundle。
+
+因此，对用户来说，PURL 不是一个“顺手写写的标签”，而是贯穿 build、query、download 和复用的主键。
+
+## 为什么当前要坚持 local-only？
+
+因为当前最可靠、最清晰的价值路径在本机：
+
+- 在本机 build bundle；
+- 在本机生成 diff 和 check；
+- 在本机让 AI 查询；
+- 在本机复用同一份 bundle store。
+
+这样做的好处是边界清晰：
+
+- 不需要先解决 hosted registry 的复杂度；
+- 不需要先解决多节点同步与 HA；
+- 不需要先引入远端信任链和 verifier 体系；
+- 更容易让 CLI、Registry 和 query runtime 共用一套事实来源。
+
+## Local Registry 负责什么？
+
+它负责的是：
+
+- 接收 bundle；
+- 维护本地索引；
+- 按 PURL / bundleId 提供解析与下载；
+- 为本机其他工具提供共享 store 的 façade。
+
+它不负责：
+
+- hosted cloud service 能力；
+- 远端查询执行；
+- 跨节点复制；
+- 当前产品口径里的信任验证体系。
+
+## local query runtime 负责什么？
+
+它的职责更窄：
+
+- 面向 AI / Agent 提供多轮查询入口；
+- 暴露 `outlines`、`symbol` 等工具；
+- 必要时从本地 store 物化 bundle 后继续查询。
+
+它不负责：
+
+- build
+- diff
+- check
+- publish
+
+因此，你可以简单把职责分工记成：
+
+```text
+Registry 负责存和找，local query runtime 负责拿来查。
+```
+
+## proposal 和当前实现最大的区别是什么？
+
+对用户来说，最重要的区别不是内部代码，而是文档口径：
+
+- proposal 里有些表述更偏 broader narrative；
+- 当前 active docs 必须优先描述 repo 已经验证过的 local-only reality；
+- 因此现在更准确的术语是 local private registry / local cache / local query runtime，而不是把它们写成 hosted 或 broad ecosystem promise。
+
+## 什么时候你应该关心这一页？
+
+如果你遇到下面这些疑问，就该回到这页：
+
+- “为什么文档一直强调 local-only？”
+- “为什么 query runtime 不直接帮我 build / diff？”
+- “为什么 publish 是本地共享，而不是云端服务？”
+- “为什么所有流程都围绕 PURL？”
+
+## 下一步
+
+- 如果你想查精确命令和接口，请读 [MCP / Registry Reference](/docs/runtime-reference)。
+- 如果你想理解这些产物本身，请读 [理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF](/docs/indexing)。

@@ -1,0 +1,98 @@
+---
+title: 在本机共享 bundle：publish / registry / materialize
+description: 理解为什么要把 bundle 写入共享本地 store，以及 publish、download-local、download 分别解决什么问题。
+order: 5
+---
+
+# 在本机共享 bundle：publish / registry / materialize
+
+如果你已经能在本机完成 `build`、`diff`、`check` 和 `query`，下一个自然问题通常是：怎样让同一份 bundle 被多个工具复用，而不是每次都重新构建？
+
+CodeIQ 当前给出的答案不是 hosted cloud registry，而是 #strong[共享本地 bundle store]。
+
+## 为什么你会需要这条路径？
+
+你通常会在这些情况下需要它：
+
+- 同一台机器上的 CLI、AI runtime、脚本都想复用同一份 bundle；
+- 你不希望每次查询前都重新 build；
+- 你希望按 PURL 找到并物化一个已经存在的 bundle；
+- 你希望本地自动化流程复用稳定快照，而不是依赖临时输出目录。
+
+## 先记住一个边界
+
+当前产品边界里，Local Registry 应理解为：
+
+- #strong[local private registry]
+- #strong[local cache]
+- #strong[shared local store 的 façade]
+
+它不应被理解成 hosted registry 产品。
+
+## 这条路径涉及哪些命令？
+
+### 1. `publish`
+
+```bash
+codeiq publish ./dist/tokio@1.43.0.ciq.tgz
+```
+
+它的作用是把构建好的 bundle 写入共享本地 registry store。
+
+### 2. `registry download-local`
+
+```bash
+codeiq registry download-local "pkg:openapi/acme/payment-api@2026.03.01"
+```
+
+它的作用是：按 PURL 读取当前本地 registry 的解析结果和元数据，而不是直接展开 bundle 内容。
+
+### 3. `registry download`
+
+```bash
+codeiq registry download "pkg:openapi/acme/payment-api@2026.03.01" --output ./out
+```
+
+它的作用是把 bundle 实际物化到输出目录，供后续查询或人工检查。
+
+## `.codeiq/cache/registry/*` 和 `.codeiq/cache/mcp/*` 是什么关系？
+
+这是当前用户最容易混淆的点之一。
+
+### `.codeiq/cache/registry/*`
+
+这里是共享本地 store，主要用于保存 bundle 及其索引。
+
+### `.codeiq/cache/mcp/*`
+
+这里更像是 local query runtime 为查询准备的本地物化和运行时目录。
+
+简单说：
+
+- Registry 负责“存和找”；
+- MCP 运行时负责“拿来查”。
+
+## 什么时候你应该真正使用 `publish`？
+
+如果你只是第一次体验 CodeIQ，`publish` 不是必选项。
+
+但如果你已经进入这些场景，就应该优先接：
+
+- 你在同一台机器上同时用 CLI 和 AI；
+- 你不想把 `dist/` 目录当成长期共享源；
+- 你希望查询和下载按 PURL 进行，而不是靠手工记文件路径；
+- 你开始把 bundle 作为稳定资产来复用。
+
+## 当前明确不做什么？
+
+为了避免误解，这一页必须明确当前非目标：
+
+- 不是 hosted registry；
+- 不是多节点分发系统；
+- 不是 remote auth / trust verifier 产品；
+- 不是给远端团队做分布式同步的服务。
+
+## 下一步
+
+- 如果你要精确查命令和接口，请读 [MCP / Registry Reference](/docs/runtime-reference)。
+- 如果你想理解本地边界和 PURL 的作用，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。

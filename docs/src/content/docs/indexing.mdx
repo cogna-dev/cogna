@@ -1,81 +1,123 @@
 ---
-title: 索引与紧凑上下文
-description: 了解 CodeIQ 如何从代码与规格文件提取公开接口事实，并把它们整理成更适合 AI 使用的上下文。
-order: 3
+title: 理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF
+description: 用“谁生成、谁消费、什么时候该关心”来理解 CodeIQ 的核心产物，而不是把它们当成一组抽象名词。
+order: 6
 ---
 
-# 为什么 CodeIQ 要先做 bundle？
+# 理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF
 
-大型仓库对 AI 来说最大的问题，往往不是“完全看不懂”，而是“上下文太多、证据太散、代价太高”。
+很多用户第一次接触 CodeIQ 时，真正困惑的不是命令本身，而是：为什么会有这么多产物？
 
-CodeIQ 的策略是先从代码与规格文件中提取 **公开接口与结构化契约**，再把这些结果组织成一份可发布、可比较、可查询的 `CIQ Bundle`。
+理解它们最好的方式不是背字段，而是问三个问题：
 
-## 索引的重点是什么？
+1. #strong[谁生成它？]
+2. #strong[谁消费它？]
+3. #strong[我在什么场景下需要关心它？]
 
-当前计划中的核心对象包括：
+## 总览：一张表先看全
 
-- Go / Rust 的公开函数、类型、模块、接口、常量
-- Terraform Module 的变量、输出、provider 约束
-- OpenAPI 的 path、operation、schema、parameter、response
+| 产物 | 谁生成 | 谁消费 | 什么时候你需要关心它 |
+| --- | --- | --- | --- |
+| `CIQ Config` | `init` | `build` 等 CLI 流程 | 第一次接入仓库时 |
+| `CIQ Bundle` | `build` | `query`、MCP、publish、diff | 你想查询或复用仓库事实时 |
+| `CIQ OPA Bundle` | `build`（policy-bundle） | `check` | 你想做 policy check 时 |
+| `CIQ Diff` | `diff` | `check`、人工 review | 你想知道这次改了什么时 |
+| `CIQ Result` | `query` / MCP | 人、脚本、AI | 你想查具体接口时 |
+| `SARIF` | `check` | CI、审查流程、人 | 你想把检查结果接进流程时 |
 
-这些信息不会直接变成“更长的文档”，而是会进入标准化的 bundle 结构中。
+## `CIQ Config`：告诉 CodeIQ 这个仓库是什么
 
-## Bundle 中最重要的部分是什么？
+这是工作流的起点。
 
-典型 `CIQ Bundle` 会包含：
+你可以把它理解为：
 
-- `manifest.json`
+- 当前仓库属于哪个 profile；
+- 当前仓库的 PURL 是什么；
+- 从哪些文件构建；
+- 默认检查策略应该怎么接。
+
+对普通用户来说，第一次接入时关心它就够了。后续大多数时候，你只是在消费它带来的行为，而不是频繁手改所有字段。
+
+## `CIQ Bundle`：一份可查询、可比较、可复用的仓库快照
+
+这是 CodeIQ 最核心的产物。
+
+一个 bundle 不只是“索引文件”，而是一份把仓库公开事实整理后的结构化快照。当前代码 bundle 通常包含：
+
 - `declarations.ndjson`
 - `symbols.ndjson`
+- `software-components.ndjson`
+- `sbom.cdx.json`
+- `sbom.spdx.json`
 - `metadata.json`
 - `checksums.txt`
 
-它既能支撑版本间比较，也能支撑本地查询和 Registry 分发。
+你应该在这些场景关心 bundle：
 
-## 什么是 outlines？
+- 你想查询某个接口；
+- 你想把同一份事实复用给 CLI / MCP / 自动化；
+- 你想把当前版本和另一个版本做结构化比较。
 
-`outlines` 可以理解为“公开接口大纲”。它不是精确声明本身，而是一个更轻的入口，帮助 AI 先快速了解：
+## `CIQ OPA Bundle`：给 `check` 用的 policy 载荷
 
-- 这个包公开了哪些模块、类型、函数、路径
-- 哪些符号最可能与当前任务相关
-- 接下来应该精查哪个 path
+这不是给 AI 查询的 bundle，而是给发布前检查使用的本地 policy bundle。
 
-## 推荐查询流：先 outlines，再 symbol
+在当前实现里，它的活跃路径应该理解为：
 
-在 AI 使用 CodeIQ 时，推荐这样查询：
+- 本地准备 policy bundle；
+- `check` 调用本机 `opa eval --bundle ...`；
+- 再把结果转成当前的本地 `SARIF` 输出。
 
-1. 先通过 `codeiq.query.outlines` 获取指定 PURL 的公开接口大纲。
-2. 从 outlines 中选出候选 path。
-3. 再通过 `codeiq.query.symbol` 获取精确声明、签名、注释、位置与契约详情。
+因此，它的价值不是“存放更多代码事实”，而是“给变更事实附加组织自己的规则”。
 
-这种两段式查询，比直接在大包里盲目检索更稳定，也更节省上下文窗口。
+## `CIQ Diff`：不是源码 patch，而是结构化变更结果
 
-## 它解决了什么问题？
+源码 diff 告诉你“改了哪些行”；`CIQ Diff` 告诉你“改了哪些公开接口、契约和软件成分”。
 
-### 文档与实现不一致
+在当前基线里，用户更值得关心的是：
 
-如果 AI 主要依赖外部文档，而文档过时、错误或不完整，那么结论很容易偏离真实实现。CodeIQ 直接从代码与规格文件建立 bundle，就是为了降低这种偏差。
+- `kind`
+- `level`
+- `semanticCategory`
+- `semanticDiff`
+- `beforeRecord` / `afterRecord`
+- `componentDiff`
 
-### 大仓库难以整体装入上下文
+如果你想做发布前判断，这会比单纯看源码 patch 更接近真正的问题。
 
-就算有索引，如果索引仍然只是庞大的文本摘要，AI 依然会遇到同样的问题。CodeIQ 的目标是把“检索入口”压缩成结构化内容，并通过 outlines→symbol 的顺序逐步缩小范围。
+## `CIQ Result`：把查询结果结构化返回
 
-### 变更治理需要可比较的事实
+无论你是通过一次性 `query`，还是通过 local query runtime 去查，最后都需要一个稳定的结果载体。
 
-当你需要知道“这个版本删掉了哪些公开 API”“这个 OpenAPI schema 是否产生了破坏性变化”时，bundle 与 diff 会比零散搜索更可靠。
+`CIQ Result` 的意义在于：
 
-## 需要注意的边界
+- 给脚本消费时足够结构化；
+- 给人看时足够可追溯；
+- 给 AI 用时不会丢掉 path、signature、location 等关键信息。
 
-CodeIQ 会提升“找到正确上下文”的效率，但它并不承诺完整语义等价分析。
+## `SARIF`：把检查结果带进审查流程
 
-对于高风险任务，推荐这样组合使用：
+`SARIF` 是 `check` 的最终输出层。
 
-| 目标 | 推荐做法 |
-| --- | --- |
-| 快速让 AI 进入仓库上下文 | 先用 `codeiq.query.outlines` 获取大纲，再精查 symbol |
-| 做高风险门禁 | 用 `diff + check`（`check` 调用 OPA CLI）输出 `SARIF`，再与现有流程集成 |
-| 做长期团队治理 | 结合 Registry 管理 bundle 版本与分发 |
+对用户来说，你可以简单把它理解成：CodeIQ 把 diff + policy 的结果整理成一份更容易进入现有工作流的报告格式。
+
+当前口径应理解为：#strong[local minimal SARIF v2.1.0 output]。
+
+这句话的重点在于：
+
+- 它已经足够支持当前本地工作流；
+- 但它不意味着“任何 hosted 平台都零调整自动兼容”。
+
+## 一条更容易理解的心智模型
+
+如果你只想记一句话，可以这样记：
+
+```text
+Config 告诉 CodeIQ 怎么开始，Bundle 记录当前事实，Diff 记录变化，Check + SARIF 记录结论，Result 负责查询返回。
+```
 
 ## 下一步
 
-如果你已经理解了 bundle 和 outlines 的定位，下一步建议阅读 [MCP 工作流](/docs/mcp)，了解这些结果如何被 AI 客户端实际消费。
+- 如果你想理解本地共享和 PURL/Registry/runtime 的关系，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。
+- 如果你想直接查命令，请读 [CLI Reference](/docs/cli)。
+- 如果你最关心能力边界，请读 [支持范围与当前限制](/docs/providers)。

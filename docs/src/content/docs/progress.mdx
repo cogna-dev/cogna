@@ -1,136 +1,113 @@
 ---
-title: 开发进度看板
-description: 与 spec/plan.typ 对齐的当前 release ledger、单机范围收敛与下一步执行重点。
-order: 6
+title: Progress / Product Status
+description: 查看当前 release ledger、产品边界、proposal 对账结论，以及当前明确的非目标。
+order: 11
 ---
 
-# CodeIQ 开发进度看板
+# Progress / Product Status
+
+这一页只回答一个问题：#strong[今天的 CodeIQ 到底已经做到哪里，当前边界又在哪里？]
+
+它不是“怎么用”的第一入口，而是帮助你判断：
+
+- 当前成熟度够不够支撑你的使用场景；
+- 哪些能力已经形成稳定基线；
+- 哪些历史叙事不应再被理解为当前 active promise。
 
 > 最后更新时间：2026-03-26（Asia/Shanghai）
 
-此页面只保留当前有效状态，并与 [`spec/plan.typ`](https://github.com/yufeiminds/codeiq/blob/main/spec/plan.typ) 同步。CodeIQ 当前的产品范围已经重置为 #strong[单机 CLI + Local Registry]：只围绕共享本地 bundle store、本地 SBOM / declaration facts、provider semantic depth 与 OPA diff 演进；不再把 trust verifier、distributed/hosted registry 或多节点 productization 作为 active scope。
+## 当前总览
 
-## 当前总览（唯一状态面板）
+当前 CodeIQ 的产品边界已经明确收敛为：#strong[单机 CLI + Local Registry + local query runtime]。
 
-| Release | 范围 | 当前状态 | 说明 |
+这意味着当前主线围绕这些能力展开：
+
+- 共享本地 bundle store；
+- declaration facts + software component facts；
+- CycloneDX / SPDX SBOM 导出；
+- richer semantic diff；
+- local minimal SARIF v2.1.0 output；
+- 本机上的查询与复用工作流。
+
+## Release ledger
+
+| Release | 范围 | 当前状态 | 当前结论 |
 | --- | --- | --- | --- |
-| R1 | Local Governance Baseline | ✅ Completed | 本地治理 baseline 已冻结 |
-| R2 | Extractor v1 Trustworthy | ✅ Completed | extractor v1 baseline 已冻结，Terraform 已转向 `lib/hcl` |
-| R3 | Distribution Beta（repo-local / inproc） | ✅ Completed | 历史 repo-local / inproc 分发 beta 已形成可回归闭环 |
-| R4 | Externalization Hardening | ✅ Completed | process lifecycle hardening 已交付 |
-| R5 | Core Workflow Complete | ✅ Completed | 主业务流程闭环已完成并完成收口 |
+| R5 | Core Workflow Complete | ✅ Completed | `init -> build -> diff -> check -> query` baseline 已闭环 |
 | R6 | Single-Machine Registry Baseline | ✅ Completed | 本地 publish / registry baseline 已完成 |
 | R7 | Provider Matrix Coverage | ✅ Completed | provider evidence matrix 已冻结为 baseline 证据 |
-| R8 | 历史 trust/verifier baseline | ✅ Completed | 历史 shell verifier / trust baseline 已完成，但不再继续作为产品方向 |
-| R9 | 历史 remote/security baseline | ✅ Completed | 历史 remote auth / transport gate baseline 已完成，但不再继续作为产品方向 |
-| R10 | Local Server Capability & Shared Framework Extraction | ✅ Completed | MCP / Registry 本地 server capability、共享框架抽取与 zstd 移除已完成 |
-| R11 | Local-Only Storage + SBOM Foundation | ✅ Completed | 共享本地 bundle store、SBOM foundation、bundle integration 与 docs sync 已完成 |
-| R12 | Provider Semantic Depth + CIQ Schema Richness | ✅ Completed | provider semantic depth、consumer readiness 与 R13 handoff 已完成 |
-| R13 | OPA Diff Enrichment | ✅ Completed | semantic diff、component diff、OPA input shaping 与 SARIF enrichment 已完成闭环 |
+| R8 | 历史 trust/verifier baseline | ✅ Completed | 已完成，但不再继续作为当前产品方向 |
+| R9 | 历史 remote/security baseline | ✅ Completed | 已完成，但不再继续作为当前产品方向 |
+| R10 | Local Server Capability & Shared Framework Extraction | ✅ Completed | 本地 server capability 与共享框架抽取已完成 |
+| R11 | Local-Only Storage + SBOM Foundation | ✅ Completed | 共享本地 store、SBOM foundation 与 bundle integration 已完成 |
+| R12 | Provider Semantic Depth + CIQ Schema Richness | ✅ Completed | provider semantic depth、consumer readiness 与 handoff 已完成 |
+| R13 | OPA Diff Enrichment | ✅ Completed | semantic diff、component diff、OPA input shaping 与 SARIF enrichment 已闭环 |
 
-## 当前产品范围（scope reset）
+## 当前产品范围（active scope）
 
-- #strong[单机优先]：只面向单台机器上的 CLI / Local Registry / MCP 工作流；
-- #strong[共享本地存储]：本地 bundle cache 目录是唯一 authoritative storage；
-- #strong[不支持 trust verifier]：不再把 trust verifier、trust root、KMS 写入当前产品范围；
-- #strong[不支持 distributed / hosted]：不再把 remote registry、hosted deployment、多节点 HA 写入当前产品范围；
-- #strong[新增 `src/lib/sbom/*`]：从源码与包管理器文件提取软件成分，导出 CycloneDX / SPDX，并把软件成分信息纳入 bundle 构建；
-- #strong[继续推进语义和 policy]：在本地边界内继续推进 provider semantic depth、CIQ schema richness 与 OPA diff。
+- #strong[单机优先]：只面向本机上的 CLI / Local Registry / local query runtime；
+- #strong[共享本地存储]：本地 bundle cache 是唯一 authoritative storage；
+- #strong[继续推进语义和 policy]：当前继续围绕 richer declaration facts、SBOM 和 semantic diff 演进；
+- #strong[不支持 hosted / distributed]：不再把 remote registry、多节点 HA、hosted deployment 写入 active scope；
+- #strong[不支持 trust verifier 主线]：不再把 trust verifier、trust root、KMS 作为当前产品主线。
 
-## 已完成阶段（摘要）
+## 当前最值得用户关心的完成项
 
-- `R1-R6` 已完成并冻结为当前 repo 基线；
-- `R7` 已把 Go / Rust / Terraform / OpenAPI provider evidence 收口为 repo 级证据；
-- `R8-R9` 代表历史 trust / remote hardening baseline，但不再继续作为当前产品方向；
-- `R10` 已完成 MCP / Registry 的本地 server capability 与共享框架抽取；
-- `R12` 已完成 provider semantic depth、consumer readiness 与 `R13` handoff；
-- `R13` 已完成 semantic diff、component diff、OPA input shaping 与 SARIF enrichment 的本地闭环；
-- `spec/plan.typ` 已新增 proposal → implementation reconciliation，对 proposal 中的历史样例、aspirational wording 与当前 repo reality 做了显式对账；
-- 当前尚未开启新的 active release，因此本页不再保留详细执行清单。
+### R11 · Local-Only Storage + SBOM Foundation
 
-## R12 → R13 handoff 结论
+- `.codeiq/cache/registry/*` 已成为共享本地 store；
+- `src/lib/sbom/*` 已提供 component model、采集与导出能力；
+- bundle/query/diff 已开始消费 `software-components.ndjson`、`sbom.cdx.json`、`sbom.spdx.json`。
 
-- #strong[stable identity 不变]：`id / kind / path / signature / location` 仍是当前 declaration matching / traceability contract。
-- #strong[consumer payload additive]：`shape`、`language_specific`、`name`、`canonical_name`、`language`、`baselineRole`、`source_refs`、`relations`、`visibility`、`docs` 现在都可以由 bundle/query/diff 稳定 transport。
-- #strong[query handoff 已明确]：`ciq-result/v1.matches[*]` 保持原 selector 语义不变，但允许 richer declaration payload 直接透传给下游 consumer。
-- #strong[diff handoff 已明确]：`ciq-diff/v1.changes[*]` 继续使用 stable keys/matching，同时把 richer facts 以 `beforeRecord` / `afterRecord` 形式作为 additive evidence 暴露给后续 semantic diff。
-- #strong[semantic interpretation defer to R13]：provider semantic diff、SBOM diff、OPA input shaping 与 breaking/policy judgement 仍属于 `R13`，不在 `R12` 内提前实现。
+### R12 · Provider Semantic Depth + CIQ Schema Richness
 
-## 当前 release 状态
+- richer `shape` / `relations` / `language_specific` 已成为当前稳定 contract 的一部分；
+- query、diff、bundle reader 已能稳定透传这些 richer payload；
+- Go、Rust、Terraform、OpenAPI 的 richer facts 已形成当前可验证基线。
 
-## R11 · Local-Only Storage + SBOM Foundation（Completed summary）
+### R13 · OPA Diff Enrichment
 
-- `.codeiq/cache/registry/*` 已成为 CLI / Local Registry / MCP 共用的 authoritative local store；
-- `src/lib/sbom/*` 已提供 component model、source + package-manager collection，以及 CycloneDX / SPDX exporter；
-- build / bundle / query / diff 已消费 `software-components.ndjson`、`sbom.cdx.json`、`sbom.spdx.json`；
-- active docs / dashboard / proposal 已按单机 Local Registry 范围同步。
+- diff 已能输出 `semanticCategory`、`semanticDiff`、`componentDiff`；
+- check 已能把 diff 整形成 OPA-friendly 输入；
+- SARIF 输出已带上更丰富的 semantic / location 信息。
 
-## R12 · Provider Semantic Depth + CIQ Schema Richness（Completed summary）
+## Proposal → implementation reconciliation（摘要）
 
-- `R12-1` ~ `R12-6` 已分别完成 Terraform provider depth、shared schema foundation、Go semantic depth、Rust semantic depth、Terraform contract depth 与 OpenAPI semantic depth；
-- `R12-7` 已完成 consumer readiness 收口：`bundle reader` 持续接受 richer declarations，`query` 现在稳定透传 additive declaration fields，`diff` 现在稳定输出 additive `beforeRecord` / `afterRecord` evidence；
-- `ciq-result/v1` 与 `ciq-diff/v1` contract 已同步允许这些 additive handoff fields，保持 stable identity 与 matching contract 不变；
-- `R12` 的 richer declaration facts 已准备好交给 `R13` 做 semantic diff / SBOM diff / OPA input interpretation。
+`spec/proposal.typ` 仍保留项目申报和问题定义价值，但它已经不再等同于当前 repo 的 active contract。
 
-当前没有新的 active release；`R13` 已完成并作为最新已验证基线收口。
+当前文档和实现都遵循这个规则：#strong[以 schema + implementation + tests + docs 的已验证现实为准]。
 
-## R13 · OPA Diff Enrichment（Completed summary）
+对用户来说，这个对账最重要的含义是：
 
-**Goal**
+- `shape` 已经不是“未来再设计”，而是当前稳定 declaration contract 的一部分；
+- `CIQ Diff` 已经不只是浅层 add/remove/change marker，而是 richer semantic surface；
+- `SARIF` 当前应理解为本地 minimal output，不应被误解成 hosted ingestion promise；
+- `MCP` 当前应理解为 local query runtime，而不是 broader hosted MCP ecosystem promise；
+- Local Registry 当前应理解为 local private registry / local cache，而不是 hosted product。
 
-- 消费 `R12` 已稳定的 richer declaration / software-component facts，构建更可靠的 semantic diff 与 policy input；
-- 让 `CIQ Diff` 和 OPA input 从浅层 changed/add/remove marker 升级到 declaration diff + provider semantic diff + SBOM diff 的统一语义面；
-- 保持本地 bundle store / Local Registry 范围，不重新引入 verifier、remote 或 hosted 能力。
+## 当前文档状态
 
-**R12 → R13 handoff matrix**
+- 文档站已按用户视角完成一轮完整重构：导航现分为 #strong[Start Here]、#strong[Common Tasks]、#strong[Core Concepts]、#strong[Reference & Status]；
+- 首页与 docs layout 已改为任务优先入口，不再把内部模块结构直接暴露为主要导航心智；
+- 当前 docs 主要页面已覆盖：第一次跑通、发版前兼容性检查、AI / Agent 查询、本机 bundle 共享、产物模型、本地 runtime 边界、CLI reference、MCP / Registry reference 与产品状态；
+- 这轮重构的目标不是增加新功能，而是让当前 local-only reality 更容易被最终用户理解和采用。
 
-| Surface | R12 guarantees now | R13 interprets later |
-| --- | --- | --- |
-| Stable identity | `id` / `kind` / `path` / `signature` / `location` 保持为 matching / traceability contract | 是否构成 breaking / warning / allow / deny judgement |
-| Bundle declarations | richer additive facts 已稳定落盘并被 bundle reader 接受 | 如何把这些 facts 聚合为 provider semantic diff / SBOM diff |
-| `ciq-result/v1.matches[*]` | 透传 `path`、`name`、`canonical_name`、`language`、`baselineRole`、`source_refs`、`relations`、`visibility`、`docs`、`shape`、`language_specific` | 如何基于 richer payload 做 query-time semantic views / policy-oriented projections |
-| `ciq-diff/v1.changes[*]` | `changed` 带 `beforeRecord` + `afterRecord`；`added` / `deprecated` 带 `afterRecord`；`removed` 带 `beforeRecord` | 如何把 richer before/after evidence 转成 semantic categories、policy input 与 SARIF/OPA 结果 |
+## 当前明确非目标
 
-**Completed outcomes**
+下面这些内容现在都不应被理解成当前产品承诺：
 
-- `src/cmd/diff/main.mbt` 现在对 declaration changes 输出稳定的 `semanticCategory` 与 `semanticDiff`，并对 component changes 输出 `componentDiff`；
-- component diff 现在按稳定 component identity 做匹配，不再把纯版本升级误判为 remove + add；
-- `src/cmd/check/main.mbt` 现在把 diff 整形成 OPA-friendly input（`changes` + `componentChanges`），并在 SARIF 中使用 `semanticCategory` 与 declaration record location enrichment；
-- `src/schema/contracts.mbt` 已显式接受 `componentDiff`，`src/schema/contracts_test.mbt` 已覆盖对应 contract；
-- `src/cmd/check/main_test.mbt` 已验证真实 diff record 的 `location.uri` / `startLine` 会进入 SARIF。
+- trust verifier / trust root / key rotation / KMS
+- remote registry / hosted registry
+- distributed replication / multi-node HA
+- 把 Local Registry 做成云产品
+- 把 build / diff / check / publish 迁移成查询运行时职责
 
-**Verify**
+## 这页应该什么时候读？
 
-- `moon test src/cmd/diff --target wasm` ✅ 12/12
-- `moon test src/schema/contracts_test.mbt --target wasm -v` ✅ 22/22
-- `moon test src/cmd/check --target wasm` ✅ 6/6
-- `moon check` ✅ 0 errors, 80 warnings
-- `moon build` ✅
+如果你想知道“现在能不能正式评估接入、文档里哪些说法才代表当前事实”，就应该读这页。
 
-## Proposal → implementation reconciliation（Current summary）
+## 相关页面
 
-- `spec/proposal.typ` 继续作为项目申报与问题定义文档保留，但不再直接充当当前 repo 的 active contract；
-- 当前 active contract 以 `schema + implementation + tests + docs` 为准，`spec/plan.typ` 已补充 proposal 对账表，显式记录 config/profile、declaration `shape`、OPA bundle、CIQ Diff、SARIF、Local Registry、MCP runtime 与 PURL wording 的现实边界；
-- 对外术语现统一收敛到：#strong[local private registry / local cache]、#strong[local query runtime]、#strong[local minimal SARIF v2.1.0 output]，避免把 hosted / remote / broad ecosystem compatibility 写成当前承诺。
-
-## 明确非目标
-
-- trust verifier、trust root、key rotation、KMS；
-- remote registry、distributed replication、hosted deployment、多节点 HA；
-- 把 Local Registry 继续写成独立云产品，而不是共享本地 bundle store 的 façade。
-
-## 当前可复用证据（R11 起步输入）
-
-- workflow + artifacts：`src/cmd/build/main_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/cmd/check/main_test.mbt`、`src/cmd/query/main_test.mbt`；
-- Local Registry baseline：`src/registry/storage.mbt`、`src/lib/registry/client.mbt`、`src/cmd/registry/main_test.mbt`、`src/e2e/registry_test.mbt`；
-- MCP baseline：`src/lib/mcp-sdk/*`、`src/lib/server-runtime/*`、`src/cmd/mcp/main.mbt`、`src/cmd/mcp/core/main.mbt`；
-- provider baseline：`src/cmd/build/extractor.mbt`、`src/schema/declarations.mbt`、`src/e2e/lsp_extractor_test.mbt`；
-- 当前计划输入：`spec/proposal.typ`、`spec/plan.typ`、`docs/src/content/docs/progress.mdx`。
-
-## 相关文档
-
-- [概览](/docs/introduction)
-- [快速开始](/docs/quickstart)
-- [MCP 工作流](/docs/mcp)
-- [CLI 参考](/docs/cli)
-- [Provider 覆盖率报告](/docs/providers)
+- 如果你想从用户任务进入，请回到 [CodeIQ 能帮我解决什么问题？](/docs/introduction)。
+- 如果你想查具体命令，请读 [CLI Reference](/docs/cli)。
+- 如果你想理解本地边界，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。

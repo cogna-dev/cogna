@@ -1,48 +1,92 @@
 ---
-title: 概览
-description: 了解 CodeIQ 解决什么问题，以及它适合怎样的团队与工作流。
+title: CodeIQ 能帮我解决什么问题？
+description: 从用户任务出发，理解 CodeIQ 的价值、适用场景、核心工作流和当前边界。
 order: 1
 ---
 
-# CodeIQ 是什么？
+# CodeIQ 能帮我解决什么问题？
 
-CodeIQ 是一个面向第三方库、Terraform Module 与 OpenAPI 规格的声明级索引与变更治理工具。它的目标不是替代源码本身，而是把仓库中的公开接口、契约与可追溯证据整理成更适合开发者和 AI 使用的标准化产物。
+CodeIQ 解决的不是“怎么读懂所有实现细节”，而是另一个更常见的问题：当你要发版、升级依赖、审查 OpenAPI 或让 AI 查询第三方库时，怎样才能先拿到一份 #strong[稳定、可追溯、可比较] 的事实基础。
 
-相较于只依赖文档或纯文本检索的方案，CodeIQ 更强调 **声明级事实** 与 **可追溯的查询入口**：函数、类型、模块、接口、配置契约、API schema 等公开结构会被整理成 `CIQ Bundle`、`CIQ Diff`、`CIQ Result` 等标准化对象，再通过 CLI 或 MCP 提供给开发流程使用。
+它把仓库里的公开接口、配置契约和 API 合约整理成标准化产物，让你可以在本机完成这几类高价值动作：
 
-## 它适合哪些场景？
+- 发布前先看清这次到底改了什么；
+- 把变更结果交给 policy 检查，而不是只看文本 diff；
+- 让 AI / Agent 按稳定入口查询依赖和 API，而不是盲搜全仓；
+- 把同一份 bundle 复用给 CLI、MCP 和自动化脚本。
 
-- **SDK 发版前的兼容性检查**：确认这次改动是否删除了公开 API，是否会破坏升级路径。
-- **平台能力统一交付**：把代码、Terraform Module、OpenAPI 和策略规则一起沉淀为可复用资产。
-- **AI 辅助开发**：让 AI 先基于 bundle 大纲理解公开接口，再对具体 symbol 做精确查询。
-- **高风险变更审查**：把差异和 policy 结果输出为 `SARIF`，接入现有 CI 与代码审查流程。
+## 它最适合哪些场景？
 
-## CodeIQ 提供什么？
+### 1. SDK / Library 发版前检查
 
-| 能力 | 对最终用户的价值 | 当前定位 |
+你要确认的不只是“代码过没过测试”，还包括：
+
+- 是否删掉了公开 API；
+- 是否把某个接口变成了更危险或不兼容的版本；
+- 这些变化是否违反组织自己的兼容性 policy。
+
+### 2. Terraform / OpenAPI 变更治理
+
+如果你的仓库不是传统代码，而是 Terraform Module 或 OpenAPI 规格，CodeIQ 仍然能把这些契约变化整理成结构化产物，而不是让你手工对 YAML / HCL 做逐行比较。
+
+### 3. 让 AI 查询第三方依赖与 API
+
+如果你已经在用 AI 写代码，你会很快遇到一个问题：AI 很容易找到“看起来像答案的文本”，但不一定能稳定找到“当前这个版本真正公开了什么”。
+
+CodeIQ 的做法是：
+
+- 先给 AI 一个 #strong[outlines] 级别的大纲入口；
+- 再让它对具体 symbol 做精确查询；
+- 最后把路径、签名、位置、契约摘要都绑定到 bundle 里，而不是漂浮在文档片段里。
+
+## 它和 README、grep、LSP、lint 有什么不同？
+
+| 方式 | 更擅长什么 | 局限是什么 |
 | --- | --- | --- |
-| `CIQ Bundle` | 把仓库变成可复用上下文资产 | 当前核心 |
-| `CIQ Diff` + `SARIF` | 支持发版前差异检查与策略门禁 | 当前核心 |
-| `Local Registry` | 共享本地 bundle cache、下载与物化 façade | 当前核心 |
-| MCP 查询工具 | 让 AI 按 outlines → symbol 的顺序理解依赖 | 当前核心 |
-| 更大规模的治理与分析 | 面向更复杂的团队与平台场景 | 路线图 |
+| README / 外部文档 | 快速理解产品背景 | 文档可能过时，和当前实现不一致 |
+| grep / 全仓搜索 | 找文本、找关键词 | 很难稳定回答“这次发布到底改了哪些公开契约” |
+| LSP / IDE 导航 | 交互式跳转和定位 | 不会自动给你可发布、可比较、可审查的产物 |
+| lint / 静态分析 | 实现级质量问题 | 不以公开接口变化作为主要输出 |
+| #strong[CodeIQ] | 公开接口、结构化契约、变更检查、AI 查询复用 | 当前只覆盖单机 local-only 工作流 |
 
-## 它与纯文档检索有什么不同？
+## CodeIQ 给你的直接产物是什么？
 
-CodeIQ 的起点是代码和规格文件，而不是 README 或外部文档。
+| 产物 / 能力 | 你会直接得到什么 |
+| --- | --- |
+| `CIQ Bundle` | 一份可发布、可查询、可比较的仓库快照 |
+| `CIQ Diff` | 一份面向声明和软件成分的结构化变更结果 |
+| `SARIF` | 一份可被审查流程或 CI 消费的检查输出 |
+| Local Registry | 一套共享本地 bundle store 和 façade |
+| local query runtime | 一个面向 AI / Agent 的交互式查询入口 |
 
-- 如果文档过时、缺失或与实现不一致，单纯依赖文档索引会降低 AI 输出的可靠性。
-- 如果你需要把结果接入代码审查或自动化流程，那么可追溯、可比较的声明事实会更重要。
-- 如果你需要让 AI 理解一个第三方库，先看 outlines 再查 symbol，比直接在大仓库里盲目搜索更稳定。
+## 典型工作流是什么？
 
-## 使用 CodeIQ 时需要了解的边界
+你不需要一开始就理解所有概念。只要先记住这条主线：
 
-- 它优先解决“**公开接口与契约如何被稳定提取、比较和查询**”这个问题，而不是试图一次性替代完整静态分析平台。
-- MCP 只负责本地常驻查询；`build`、`diff`、`check`、`publish` 仍然属于 CLI。
-- 在高风险门禁场景中，CodeIQ 关注的是公开接口变化，不负责实现级控制流、数据流或漏洞分析。
+```text
+init -> build -> diff -> check -> query / mcp -> publish（可选）
+```
 
-## 下一步
+- `init`：准备配置；
+- `build`：把仓库整理成 bundle；
+- `diff`：看当前版本与基线版本之间的结构化变化；
+- `check`：把 diff 交给本地 policy bundle 做检查，并输出 SARIF；
+- `query / mcp`：消费 bundle，给脚本或 AI 查询；
+- `publish`：把 bundle 放进本机共享 store，供后续复用。
 
-- 想尽快跑通一遍核心流程，请继续阅读 [快速开始](/docs/quickstart)。
-- 想理解 CodeIQ 如何组织 bundle 与查询入口，请阅读 [索引与紧凑上下文](/docs/indexing)。
-- 想确认当前哪些能力已经明确、哪些仍在规划，请阅读 [功能成熟度](/docs/roadmap)。
+## 当前边界是什么？
+
+这点非常重要：CodeIQ 当前是 #strong[single-machine / local-only] 产品边界。
+
+这意味着：
+
+- 面向本机上的 CLI、Local Registry 和 local query runtime；
+- 不承诺 hosted registry、distributed sync、多节点 HA；
+- 不承诺 trust verifier、KMS、远端签名验证链路；
+- `MCP` 在这里是本地查询入口，不是构建、发版或门禁执行入口。
+
+## 你下一步应该读哪一页？
+
+- 如果你想先判断自己能不能跑通，请读 [第一次跑通：10 分钟完成 build → diff → check → query](/docs/quickstart)。
+- 如果你最关心发布前门禁，请读 [发版前兼容性检查](/docs/release-check)。
+- 如果你最关心 AI 查询，请读 [让 AI / Agent 查询依赖与 API](/docs/mcp)。
