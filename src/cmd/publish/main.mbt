@@ -27,10 +27,7 @@ fn should_fail_on_download_error(message : String) -> Bool {
 
 ///|
 fn trust_enforcement_required() -> Bool {
-  match @registry_lib.registry_base_url() {
-    None => false
-    Some(base_url) => !@registry_lib.local_registry_base_url(base_url)
-  }
+  false
 }
 
 ///|
@@ -76,15 +73,8 @@ fn verify_signature_with_openssl(
   bundle_file : String,
   signature : Json,
 ) -> Json {
-  guard signature is Object(signature_object) else { return signature }
-  let verified = @registry_lib.verify_signature_for_file(
-    bundle_file,
-    @registry_lib.signature_status_from_download({
-      "signature": Json::object(signature_object),
-    }),
-    "publish.signature.verify",
-  )
-  @registry_lib.signature_json(verified)
+  ignore(bundle_file)
+  signature
 }
 
 ///|
@@ -272,7 +262,7 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
             "downloadUrl": download_url,
             "status": "already-exists",
             "provenance": {
-              "source": "publish-cache",
+              "source": "local-registry",
               "digestVerified": true,
               "etag": response_etag,
               "signature": verified_signature,

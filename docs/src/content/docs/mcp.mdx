@@ -8,13 +8,13 @@ order: 4
 
 CodeIQ 的 MCP Agent 是一个本地常驻内存查询代理。它的作用不是构建 bundle，也不是执行差异比较或策略检查，而是在 bundle 已经准备好的前提下，为 AI 客户端提供高频查询能力。
 
-在当前实现中，它更准确的角色仍是：#strong[review consumption surface]。也就是先由 CLI 生成 bundle、diff、SARIF、query result，再由 MCP 为审查者或 Agent 暴露稳定的查询入口；`R10` 已把这条查询入口从 stdio / detached-stdio baseline 推进到真实 server runtime，并继续把 transport/runtime 公共框架收口到 `src/lib/mcp-sdk/*`。
+在当前实现中，它更准确的角色仍是：#strong[review consumption surface]。也就是先由 CLI 生成 bundle、diff、SARIF、query result，再由 MCP 为审查者或 Agent 暴露稳定的查询入口；这条查询入口已经从 stdio / detached-stdio baseline 迁移到真实 server runtime，并与 CLI / Local Registry 共享同一套本地 bundle cache。
 
 在这个模型里：
 
 - `build` 负责生成 `CIQ Bundle` 或 `CIQ OPA Bundle`
 - `mcp start` 负责把本地 bundle 装载到内存并暴露查询能力
-- `publish` 负责把稳定 bundle 发布到 Registry，供更多团队下载和复用
+- `publish` 负责把稳定 bundle 写入共享本地 Local Registry，供同机 CLI / MCP 复用
 
 ## 一个典型的本地流程
 
@@ -39,9 +39,11 @@ codeiq mcp start
 
 这样做的好处是：
 
-- 同一个 bundle 可以被多个客户端复用。
+- 同一个 bundle 可以被同机上的多个客户端复用。
 - AI 不必每次都重新解析仓库。
 - 查询入口更可控，也更容易做缓存和版本绑定。
+
+当当前工作目录没有现成 `dist/` bundle 时，MCP 也可以按 PURL 从共享本地 registry store 物化 bundle 到 `.codeiq/cache/mcp/<purl-key>/dist`，再继续提供查询。
 
 ## MCP 当前提供哪些工具？
 

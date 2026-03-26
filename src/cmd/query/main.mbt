@@ -166,6 +166,41 @@ fn record_location(record : Json, path_fallback : String) -> Json {
 }
 
 ///|
+fn append_record_field(
+  target : Map[String, Json],
+  record_object : Map[String, Json],
+  field : String,
+) -> Unit {
+  match record_object.get(field) {
+    Some(value) => target[field] = value
+    None => ()
+  }
+}
+
+///|
+fn append_result_passthrough_fields(
+  target : Map[String, Json],
+  record_object : Map[String, Json],
+) -> Unit {
+  let fields = [
+    "path",
+    "name",
+    "canonical_name",
+    "language",
+    "baselineRole",
+    "source_refs",
+    "relations",
+    "visibility",
+    "docs",
+    "shape",
+    "language_specific",
+  ]
+  for i in 0..<fields.length() {
+    append_record_field(target, record_object, fields[i])
+  }
+}
+
+///|
 fn append_records(
   records : Array[Json],
   source : Result[Array[Json], String],
@@ -194,6 +229,7 @@ fn all_bundle_records(repo : String) -> Array[Json] {
   let records : Array[Json] = []
   append_records(records, read_repo_records(repo, "declarations"))
   append_records(records, read_repo_records(repo, "symbols"))
+  append_records(records, read_repo_records(repo, "software-components"))
   records
 }
 
@@ -219,12 +255,22 @@ fn all_bundle_records_with_cancel(
   if query_deadline_exceeded(cancelled) {
     return Err("request cancelled")
   }
+  let components = match read_repo_records(repo, "software-components") {
+    Ok(values) => values
+    Err(_) => []
+  }
+  if query_deadline_exceeded(cancelled) {
+    return Err("request cancelled")
+  }
   let records : Array[Json] = []
   for i in 0..<declarations.length() {
     records.push(declarations[i])
   }
   for i in 0..<symbols.length() {
     records.push(symbols[i])
+  }
+  for i in 0..<components.length() {
+    records.push(components[i])
   }
   Ok(records)
 }
@@ -262,12 +308,15 @@ fn record_matches_selector(
     return None
   }
 
-  Some({
+  let match_record : Map[String, Json] = {
     "id": id,
     "kind": kind,
     "signature": signature,
     "location": record_location(record, path),
-  })
+  }
+  guard record is Object(record_object) else { return Some(Json::object(match_record)) }
+  append_result_passthrough_fields(match_record, record_object)
+  Some(Json::object(match_record))
 }
 
 ///|

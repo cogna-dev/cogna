@@ -19,6 +19,8 @@
 CodeIQ is a declaration-focused CLI for API and third-party dependency governance.
 It extracts interface contracts, computes diffs, and prepares structured artifacts for policy checks and downstream automation.
 
+Current product scope is single-machine only: CLI, Local Registry, and MCP share one local bundle store, and bundles now include declaration facts plus SBOM artifacts.
+
 ## Project Scope
 
 - Focus on public declarations and contracts rather than implementation-level linting.

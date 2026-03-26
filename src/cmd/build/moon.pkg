@@ -6,6 +6,7 @@ import {
   "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/lib/shell" @shell,
+  "yufeiminds/codeiq/lib/sbom" @sbom,
   "yufeiminds/codeiq/lib/hcl" @hcl,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/config" @config,

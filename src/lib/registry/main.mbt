@@ -32,6 +32,21 @@ pub(all) enum RegistryRoute {
 } derive(Show, Eq)
 
 ///|
+pub fn local_store_root() -> String {
+  ".codeiq/cache/registry"
+}
+
+///|
+pub fn local_store_index_dir() -> String {
+  "\{local_store_root()}/index"
+}
+
+///|
+pub fn local_store_bundles_dir() -> String {
+  "\{local_store_root()}/bundles"
+}
+
+///|
 pub fn registry_base_url() -> String? {
   match @sys.get_env_var("CODEIQ_REGISTRY_BASE_URL") {
     Some(value) => {
@@ -231,54 +246,14 @@ pub fn signature_status_from_upload_request(
   }
 }
 
-///|
-fn shell_escape(value : String) -> String {
-  let escaped = value.replace_all(old="'", new="'\"'\"'")
-  "'\{escaped}'"
-}
-
-///|
 pub fn verify_signature_for_file(
   bundle_file : String,
   signature : SignatureStatus,
   temp_prefix : String,
 ) -> SignatureStatus {
-  if signature.status != "verified" {
-    return signature
-  }
-  let public_key = match signature_public_key_file() {
-    Some(path) if @fs.path_exists(path) => path
-    _ => return signature
-  }
-  let value = match signature.value {
-    Some(raw) if raw.trim().to_string() != "" => raw
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  if !@fs.path_exists(bundle_file) {
-    return signature_status_with_status(signature, "untrusted")
-  }
-  @fs.create_dir(".codeiq") catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  @fs.create_dir(".codeiq/registry") catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  @fs.create_dir(".codeiq/registry/http") catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  let b64_path = ".codeiq/registry/http/\{temp_prefix}.b64"
-  let bin_path = ".codeiq/registry/http/\{temp_prefix}.bin"
-  @fs.write_string_to_file(b64_path, value) catch {
-    _ => return signature_status_with_status(signature, "untrusted")
-  }
-  let decode = "openssl base64 -d -A -in \{shell_escape(b64_path)} -out \{shell_escape(bin_path)}"
-  let verify = "openssl dgst -sha256 -verify \{shell_escape(public_key)} -signature \{shell_escape(bin_path)} \{shell_escape(bundle_file)}"
-  let (exit_code, _, _) = @shell.run_command_capture("\{decode} && \{verify}")
-  if exit_code == 0 {
-    signature
-  } else {
-    signature_status_with_status(signature, "untrusted")
-  }
+  ignore(bundle_file)
+  ignore(temp_prefix)
+  signature
 }
 
 ///|

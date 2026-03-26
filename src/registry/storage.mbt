@@ -218,7 +218,7 @@ pub fn read_json_file(path : String) -> Result[Json, @cli.CliError] {
 fn read_registry_index_object(
   purl : String,
 ) -> Result[Map[String, Json]?, @cli.CliError] {
-  let index_path = ".codeiq/registry/index/\{index_key(purl)}.json"
+  let index_path = "\{@registry_lib.local_store_index_dir()}/\{index_key(purl)}.json"
   if !@fs.path_exists(index_path) {
     return Ok(None)
   }
@@ -236,7 +236,7 @@ fn read_registry_index_object(
 fn find_registry_index_by_bundle_id(
   bundle_id : String,
 ) -> Result[Map[String, Json]?, @cli.CliError] {
-  let index_dir = ".codeiq/registry/index"
+  let index_dir = @registry_lib.local_store_index_dir()
   if !@fs.path_exists(index_dir) {
     return Ok(None)
   }
@@ -277,7 +277,7 @@ fn find_registry_index_by_bundle_id(
 pub fn bundle_path_for_bundle_id(
   bundle_id : String,
 ) -> Result[String, @cli.CliError] {
-  let path = ".codeiq/registry/bundles/\{bundle_id}.ciq.tgz"
+  let path = "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.ciq.tgz"
   if @fs.path_exists(path) {
     Ok(path)
   } else {
@@ -354,7 +354,9 @@ pub fn registry_bundle_detail_response(
   }
   let receipt_out = find_registry_index_by_bundle_id(bundle_id)
   guard receipt_out is Ok(receipt) else { return Err(receipt_out.unwrap_err()) }
-  let etag = read_etag(".codeiq/registry/bundles/\{bundle_id}.etag").unwrap_or(
+  let etag = read_etag(
+    "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
+  ).unwrap_or(
     "\"\{bundle_id}\"",
   )
   let body : Map[String, Json] = {
@@ -400,7 +402,9 @@ pub fn registry_bundle_download_http(
     "Content-Type": "application/octet-stream",
     "Content-Length": "\{bytes.length()}",
   }
-  let etag = read_etag(".codeiq/registry/bundles/\{bundle_id}.etag").unwrap_or(
+  let etag = read_etag(
+    "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
+  ).unwrap_or(
     "\"\{bundle_id}\"",
   )
   headers["ETag"] = etag
@@ -511,11 +515,13 @@ pub fn upload_local(
     )
   }
 
-  let root = ".codeiq/registry"
-  let bundles_dir = "\{root}/bundles"
-  let index_dir = "\{root}/index"
+  let root = @registry_lib.local_store_root()
+  let bundles_dir = @registry_lib.local_store_bundles_dir()
+  let index_dir = @registry_lib.local_store_index_dir()
   let root_out = ensure_dir(".codeiq")
   guard root_out is Ok(_) else { return Err(root_out.unwrap_err()) }
+  let cache_out = ensure_dir(".codeiq/cache")
+  guard cache_out is Ok(_) else { return Err(cache_out.unwrap_err()) }
   let registry_out = ensure_dir(root)
   guard registry_out is Ok(_) else { return Err(registry_out.unwrap_err()) }
   let bundles_out = ensure_dir(bundles_dir)
@@ -591,9 +597,8 @@ pub fn download_local_by_purl_with_if_none_match(
   purl : String,
   if_none_match : String?,
 ) -> Result[Json, @cli.CliError] {
-  let root = ".codeiq/registry"
-  let index_dir = "\{root}/index"
-  let bundles_dir = "\{root}/bundles"
+  let index_dir = @registry_lib.local_store_index_dir()
+  let bundles_dir = @registry_lib.local_store_bundles_dir()
   let key = index_key(purl)
   let index_path = "\{index_dir}/\{key}.json"
   if !@fs.path_exists(index_path) {

@@ -181,6 +181,13 @@ pub fn read_bundle_symbols(repo : String) -> Result[Array[Json], String] {
 }
 
 ///|
+pub fn read_bundle_components(repo : String) -> Result[Array[Json], String] {
+  let path_out = bundle_ndjson_path(repo, "software-components")
+  guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
+  read_ndjson(path)
+}
+
+///|
 fn tar_field(header : Bytes, start : Int, length : Int) -> String {
   let segment = header[start:start + length]
   let mut end = segment.length()

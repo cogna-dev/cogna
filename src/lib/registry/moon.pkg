@@ -5,7 +5,6 @@ import {
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
   "yufeiminds/codeiq/lib/server-runtime" @server_runtime,
-  "yufeiminds/codeiq/lib/shell" @shell,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,
 }

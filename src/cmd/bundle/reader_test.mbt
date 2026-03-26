@@ -163,6 +163,116 @@ test "bundle reader parses ndjson" {
 }
 
 ///|
+test "bundle reader accepts richer declaration ndjson" {
+  let repo = "src/cmd/bundle/tmp_bundle_reader_rich_ndjson"
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+  @fs.create_dir(repo) catch {
+    _ => fail("failed to create repo")
+  }
+  @fs.create_dir("\{repo}/dist") catch {
+    _ => fail("failed to create dist")
+  }
+
+  let declarations =
+    #|{"id":"decl:go-module:go-module::main.go::Greet","kind":"method","name":"Greet","canonical_name":"go-module::main.go::Greet","path":"main.go","signature":"func (g *Greeter) Greet(name string) Message {","shape":{"kind":"method","subkind":"method","form":"callable","signature":"func (g *Greeter) Greet(name string) Message {","owner":"Greeter","parameters":["string"],"returns":["Message"]},"visibility":"public","docs":"","baselineRole":"baseline","language":"go","source_refs":[{"uri":"main.go","startLine":58,"endLine":58}],"relations":[{"kind":"declared_in","target":"file:main.go"},{"kind":"has_parameter","target":"type:go-module::string"},{"kind":"returns","target":"type:go-module::Message"}],"location":{"uri":"main.go","startLine":58,"endLine":58},"language_specific":{"profile":"go-module","server":"gopls","go":{"receiver":"Greeter","pointerReceiver":true,"owner":"Greeter","methodSetTypes":["*Greeter","*Box"]}}}
+    #|
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
+    _ => fail("failed to write declarations")
+  }
+
+  let out = read_bundle_declarations(repo)
+  guard out is Ok(records) else { fail("expected richer declaration records") }
+  inspect(records.length(), content="1")
+  guard records[0] is Object(record) else { fail("expected declaration object") }
+  guard record.get("canonical_name") is Some(String(canonical_name)) else {
+    fail("expected canonical_name")
+  }
+  assert_eq(canonical_name, "go-module::main.go::Greet")
+  guard record.get("source_refs") is Some(Array(source_refs)) else {
+    fail("expected source_refs")
+  }
+  inspect(source_refs.length(), content="1")
+  guard record.get("relations") is Some(Array(relations)) else {
+    fail("expected relations")
+  }
+  inspect(relations.length(), content="3")
+  guard record.get("language_specific") is Some(Object(language_specific)) else {
+    fail("expected language_specific")
+  }
+  guard language_specific.get("go") is Some(Object(go_fields)) else {
+    fail("expected go language_specific fields")
+  }
+  guard go_fields.get("receiver") is Some(String(receiver)) else {
+    fail("expected receiver")
+  }
+  assert_eq(receiver, "Greeter")
+  guard go_fields.get("methodSetTypes") is Some(Array(method_set_types)) else {
+    fail("expected methodSetTypes")
+  }
+  inspect(method_set_types.length(), content="2")
+
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+}
+
+///|
+test "bundle reader parses software component ndjson" {
+  let repo = "src/cmd/bundle/tmp_bundle_reader_components"
+  @fs.remove_file("\{repo}/dist/software-components.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+  @fs.create_dir(repo) catch {
+    _ => fail("failed to create repo")
+  }
+  @fs.create_dir("\{repo}/dist") catch {
+    _ => fail("failed to create dist")
+  }
+
+  let components =
+    #|{"id":"pkg:openapi/acme/payment-api@2026.03.01","kind":"component","path":"codeiq.yaml","signature":"application payment-api@2026.03.01","location":{"uri":"codeiq.yaml","startLine":1,"endLine":1}}
+    #|{"id":"component:file:openapi/payment.yaml","kind":"component","path":"openapi/payment.yaml","signature":"file openapi/payment.yaml","location":{"uri":"openapi/payment.yaml","startLine":1,"endLine":1}}
+    #|
+  @fs.write_string_to_file("\{repo}/dist/software-components.ndjson", components) catch {
+    _ => fail("failed to write components")
+  }
+
+  let out = read_bundle_components(repo)
+  guard out is Ok(records) else { fail("expected component records") }
+  inspect(records.length(), content="2")
+
+  @fs.remove_file("\{repo}/dist/software-components.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+}
+
+///|
 fn octal_field(value : Int, width : Int) -> String {
   let digits = value.reinterpret_as_uint().to_string(radix=8)
   if digits.length() + 1 >= width {
@@ -398,6 +508,185 @@ test "bundle reader materializes bundle tar.gz into dist" {
     _ => ()
   }
   @fs.remove_dir("\{repo}/out") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+}
+
+///|
+test "bundle reader accepts richer rust declaration ndjson" {
+  let repo = "src/cmd/bundle/tmp_bundle_reader_rust_ndjson"
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+  @fs.create_dir(repo) catch {
+    _ => fail("failed to create repo")
+  }
+  @fs.create_dir("\{repo}/dist") catch {
+    _ => fail("failed to create dist")
+  }
+
+  let declarations =
+    #|{"id":"decl:rust-crate:rust-crate::lib.rs::c_add","kind":"function","name":"c_add","canonical_name":"rust-crate::lib.rs::c_add","path":"lib.rs","signature":"pub extern \"C\" fn c_add(a: i32, b: i32) -> i32 {","shape":{"kind":"function","subkind":"function","form":"callable","signature":"pub extern \"C\" fn c_add(a: i32, b: i32) -> i32 {","parameters":["i32","i32"],"returns":["i32"],"type_params":[]},"visibility":"public","docs":"","baselineRole":"baseline","language":"rust","source_refs":[{"uri":"lib.rs","startLine":74,"endLine":74}],"relations":[{"kind":"declared_in","target":"file:lib.rs"},{"kind":"has_parameter","target":"type:rust-crate::i32"},{"kind":"returns","target":"type:rust-crate::i32"}],"location":{"uri":"lib.rs","startLine":74,"endLine":74},"language_specific":{"profile":"rust-crate","server":"rust-analyzer","rust":{"typeParams":[],"externAbi":"C"}}}
+    #|
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
+    _ => fail("failed to write rust declarations")
+  }
+
+  let out = read_bundle_declarations(repo)
+  guard out is Ok(records) else { fail("expected richer rust declaration records") }
+  inspect(records.length(), content="1")
+  guard records[0] is Object(record) else { fail("expected rust declaration object") }
+  guard record.get("language") is Some(String(language)) else {
+    fail("expected language")
+  }
+  assert_eq(language, "rust")
+  guard record.get("language_specific") is Some(Object(language_specific)) else {
+    fail("expected language_specific")
+  }
+  guard language_specific.get("rust") is Some(Object(rust_fields)) else {
+    fail("expected rust language_specific fields")
+  }
+  guard rust_fields.get("externAbi") is Some(String(extern_abi)) else {
+    fail("expected externAbi")
+  }
+  assert_eq(extern_abi, "C")
+
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+}
+
+///|
+test "bundle reader accepts richer terraform declaration ndjson" {
+  let repo = "src/cmd/bundle/tmp_bundle_reader_terraform_ndjson"
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+  @fs.create_dir(repo) catch {
+    _ => fail("failed to create repo")
+  }
+  @fs.create_dir("\{repo}/dist") catch {
+    _ => fail("failed to create dist")
+  }
+
+  let declarations =
+    #|{"id":"decl:terraform-module:terraform-module::main.tf::aws_vpc.main","kind":"resource","name":"aws_vpc.main","canonical_name":"terraform-module::main.tf::aws_vpc.main","path":"main.tf","signature":"resource \"aws_vpc\" \"main\" {","shape":{"kind":"resource","subkind":"resource","form":"symbol","signature":"resource \"aws_vpc\" \"main\" {"},"visibility":"public","docs":"","baselineRole":"baseline","language":"terraform","source_refs":[{"uri":"main.tf","startLine":56,"endLine":56}],"relations":[{"kind":"declared_in","target":"file:main.tf"},{"kind":"uses_provider","target":"decl:terraform-module:terraform-module::main.tf::aws"}],"location":{"uri":"main.tf","startLine":56,"endLine":56},"language_specific":{"profile":"terraform-module","server":"hcl-parser","providers":{"terraform":[{"name":"aws","source":"hashicorp/aws","version":">= 5.0.0","alias":"east"}]},"terraform":{"providerRef":"aws.east","dependsOn":["module.network_labels"],"preventDestroy":true,"createBeforeDestroy":true,"ignoreChanges":["tags"]}}}
+    #|
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
+    _ => fail("failed to write terraform declarations")
+  }
+
+  let out = read_bundle_declarations(repo)
+  guard out is Ok(records) else { fail("expected richer terraform declaration records") }
+  inspect(records.length(), content="1")
+  guard records[0] is Object(record) else { fail("expected terraform declaration object") }
+  guard record.get("language_specific") is Some(Object(language_specific)) else {
+    fail("expected language_specific")
+  }
+  guard language_specific.get("terraform") is Some(Object(terraform_fields)) else {
+    fail("expected terraform fields")
+  }
+  guard terraform_fields.get("providerRef") is Some(String(provider_ref)) else {
+    fail("expected providerRef")
+  }
+  assert_eq(provider_ref, "aws.east")
+  guard terraform_fields.get("ignoreChanges") is Some(Array(ignore_changes)) else {
+    fail("expected ignoreChanges")
+  }
+  inspect(ignore_changes.length(), content="1")
+  guard terraform_fields.get("preventDestroy") is Some(True) else {
+    fail("expected preventDestroy true")
+  }
+
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+}
+
+///|
+test "bundle reader accepts richer openapi declaration ndjson" {
+  let repo = "src/cmd/bundle/tmp_bundle_reader_openapi_ndjson"
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
+    _ => ()
+  }
+  @fs.remove_dir(repo) catch {
+    _ => ()
+  }
+  @fs.create_dir(repo) catch {
+    _ => fail("failed to create repo")
+  }
+  @fs.create_dir("\{repo}/dist") catch {
+    _ => fail("failed to create dist")
+  }
+
+  let declarations =
+    #|{"id":"decl:openapi-spec:openapi-spec::openapi::payment.yaml::createPayment","kind":"operation","name":"createPayment","canonical_name":"openapi-spec::openapi::payment.yaml::createPayment","path":"openapi/payment.yaml","signature":"operation createPayment","shape":{"kind":"operation","subkind":"operation","form":"symbol","signature":"operation createPayment"},"visibility":"public","docs":"","baselineRole":"baseline","language":"openapi","source_refs":[{"uri":"openapi/payment.yaml","startLine":26,"endLine":26}],"relations":[{"kind":"declared_in","target":"file:openapi/payment.yaml"}],"location":{"uri":"openapi/payment.yaml","startLine":26,"endLine":26},"language_specific":{"profile":"openapi-spec","server":"none","openapi":{"httpMethod":"POST","operationId":"createPayment","required":true,"mediaTypes":["application/json"],"statusCodes":["201"],"callbackExpression":"{$request.body#/callbackUrl}","discriminatorMapping":{"card":"#/components/schemas/CardPayment"},"memberRefs":["#/components/schemas/CardPayment"]}}}
+    #|
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
+    _ => fail("failed to write openapi declarations")
+  }
+
+  let out = read_bundle_declarations(repo)
+  guard out is Ok(records) else { fail("expected richer openapi declaration records") }
+  inspect(records.length(), content="1")
+  guard records[0] is Object(record) else { fail("expected openapi declaration object") }
+  guard record.get("language_specific") is Some(Object(language_specific)) else {
+    fail("expected language_specific")
+  }
+  guard language_specific.get("openapi") is Some(Object(openapi_fields)) else {
+    fail("expected openapi fields")
+  }
+  guard openapi_fields.get("statusCodes") is Some(Array(status_codes)) else {
+    fail("expected statusCodes")
+  }
+  inspect(status_codes.length(), content="1")
+  guard openapi_fields.get("mediaTypes") is Some(Array(media_types)) else {
+    fail("expected mediaTypes")
+  }
+  inspect(media_types.length(), content="1")
+  guard openapi_fields.get("callbackExpression") is Some(String(callback_expression)) else {
+    fail("expected callbackExpression")
+  }
+  assert_true(callback_expression.contains("callbackUrl"))
+  guard openapi_fields.get("memberRefs") is Some(Array(member_refs)) else {
+    fail("expected memberRefs")
+  }
+  inspect(member_refs.length(), content="1")
+
+  @fs.remove_file("\{repo}/dist/declarations.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_dir("\{repo}/dist") catch {
     _ => ()
   }
   @fs.remove_dir(repo) catch {

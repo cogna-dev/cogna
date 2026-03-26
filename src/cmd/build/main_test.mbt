@@ -21,6 +21,9 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   ensure_file_removed("\{repo}/dist/manifest.json")
   ensure_file_removed("\{repo}/dist/declarations.ndjson")
   ensure_file_removed("\{repo}/dist/symbols.ndjson")
+  ensure_file_removed("\{repo}/dist/software-components.ndjson")
+  ensure_file_removed("\{repo}/dist/sbom.cdx.json")
+  ensure_file_removed("\{repo}/dist/sbom.spdx.json")
   ensure_file_removed("\{repo}/dist/metadata.json")
   ensure_file_removed("\{repo}/dist/checksums.txt")
   ensure_file_removed("\{repo}/dist/opa-bundle.tar.gz")
@@ -160,6 +163,9 @@ test "build creates bundle skeleton files" {
   assert_true(has_64_hex(checksum_for(checksums, "manifest.json")))
   assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson")))
   assert_true(has_64_hex(checksum_for(checksums, "symbols.ndjson")))
+  assert_true(has_64_hex(checksum_for(checksums, "software-components.ndjson")))
+  assert_true(has_64_hex(checksum_for(checksums, "sbom.cdx.json")))
+  assert_true(has_64_hex(checksum_for(checksums, "sbom.spdx.json")))
   assert_true(has_64_hex(checksum_for(checksums, "metadata.json")))
 
   let declarations = read_text_main(
@@ -173,6 +179,21 @@ test "build creates bundle skeleton files" {
     "symbols should exist",
   )
   assert_true(symbols.contains("\"id\":\"sym:openapi-spec:"))
+  let components = read_text_main(
+    "\{repo}/dist/software-components.ndjson",
+    "software components should exist",
+  )
+  assert_true(components.contains("\"kind\":\"component\""))
+  let cyclonedx = read_text_main(
+    "\{repo}/dist/sbom.cdx.json",
+    "cyclonedx sbom should exist",
+  )
+  assert_true(cyclonedx.contains("\"bomFormat\": \"CycloneDX\""))
+  let spdx = read_text_main(
+    "\{repo}/dist/sbom.spdx.json",
+    "spdx sbom should exist",
+  )
+  assert_true(spdx.contains("\"@context\": \"https://spdx.org/rdf/3.0.1/spdx-context.jsonld\""))
 
   let bundle = @fs.read_file_to_bytes("\{repo}/dist/bundle.ciq.tgz") catch {
     _ => {
@@ -251,6 +272,9 @@ test "build creates policy-bundle artifacts and opa manifest" {
   assert_true(manifest.contains("\"status\": \"unsigned\""))
   assert_true(manifest.contains("\"path\": \"opa-bundle.tar.gz\""))
   assert_true(manifest.contains("\"path\": \"policy.rules.json\""))
+  assert_true(manifest.contains("\"path\": \"software-components.ndjson\""))
+  assert_true(manifest.contains("\"path\": \"sbom.cdx.json\""))
+  assert_true(manifest.contains("\"path\": \"sbom.spdx.json\""))
   assert_true(!manifest.contains("\"declarationSchema\""))
 
   let opa_bundle = @fs.read_file_to_bytes("\{repo}/dist/opa-bundle.tar.gz") catch {
@@ -283,6 +307,9 @@ test "build creates policy-bundle artifacts and opa manifest" {
   }
   assert_true(has_64_hex(checksum_for(checksums, "opa-bundle.tar.gz")))
   assert_true(has_64_hex(checksum_for(checksums, "policy.rules.json")))
+  assert_true(has_64_hex(checksum_for(checksums, "software-components.ndjson")))
+  assert_true(has_64_hex(checksum_for(checksums, "sbom.cdx.json")))
+  assert_true(has_64_hex(checksum_for(checksums, "sbom.spdx.json")))
 
   cleanup_tmp_repo(repo)
 }

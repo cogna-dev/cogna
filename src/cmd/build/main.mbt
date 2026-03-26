@@ -110,6 +110,9 @@ fn manifest_json(
   config : @config.Config,
   declarations_sha : String,
   symbols_sha : String,
+  components_sha : String?,
+  cyclonedx_sha : String?,
+  spdx_sha : String?,
   commit : String,
   opa_bundle_sha : String?,
   policy_rules_sha : String?,
@@ -118,6 +121,19 @@ fn manifest_json(
     artifact_with_sha("declarations.ndjson", "none", declarations_sha),
     artifact_with_sha("symbols.ndjson", "none", symbols_sha),
   ]
+  match components_sha {
+    Some(sha) =>
+      base_artifacts.push(artifact_with_sha("software-components.ndjson", "none", sha))
+    None => ()
+  }
+  match cyclonedx_sha {
+    Some(sha) => base_artifacts.push(artifact_with_sha("sbom.cdx.json", "none", sha))
+    None => ()
+  }
+  match spdx_sha {
+    Some(sha) => base_artifacts.push(artifact_with_sha("sbom.spdx.json", "none", sha))
+    None => ()
+  }
   if config.profile == "policy-bundle" {
     match opa_bundle_sha {
       Some(sha) =>
@@ -195,14 +211,29 @@ fn checksums_text(
   manifest_sha : String,
   declarations_sha : String,
   symbols_sha : String,
+  components_sha : String?,
+  cyclonedx_sha : String?,
+  spdx_sha : String?,
   metadata_sha : String,
   opa_bundle_sha : String?,
   policy_rules_sha : String?,
 ) -> String {
-  let base = "manifest.json  \{manifest_sha}\n" +
+  let mut base = "manifest.json  \{manifest_sha}\n" +
     "declarations.ndjson  \{declarations_sha}\n" +
     "symbols.ndjson  \{symbols_sha}\n" +
     "metadata.json  \{metadata_sha}\n"
+  match components_sha {
+    Some(sha) => base = base + "software-components.ndjson  \{sha}\n"
+    None => ()
+  }
+  match cyclonedx_sha {
+    Some(sha) => base = base + "sbom.cdx.json  \{sha}\n"
+    None => ()
+  }
+  match spdx_sha {
+    Some(sha) => base = base + "sbom.spdx.json  \{sha}\n"
+    None => ()
+  }
   let with_opa = match opa_bundle_sha {
     Some(sha) => base + "opa-bundle.tar.gz  \{sha}\n"
     None => base
@@ -370,6 +401,9 @@ fn build_tar_payload(
   manifest_text : String,
   declarations_artifact : Bytes,
   symbols_artifact : Bytes,
+  components_artifact : Bytes?,
+  cyclonedx_artifact : Bytes?,
+  spdx_artifact : Bytes?,
   metadata_text : String,
   checksums : String,
   opa_bundle : Bytes?,
@@ -382,6 +416,18 @@ fn build_tar_payload(
     ("metadata.json", utf8_bytes(metadata_text)),
     ("checksums.txt", utf8_bytes(checksums)),
   ]
+  match components_artifact {
+    Some(content) => entries.push(("software-components.ndjson", content))
+    None => ()
+  }
+  match cyclonedx_artifact {
+    Some(content) => entries.push(("sbom.cdx.json", content))
+    None => ()
+  }
+  match spdx_artifact {
+    Some(content) => entries.push(("sbom.spdx.json", content))
+    None => ()
+  }
   match opa_bundle {
     Some(content) => entries.push(("opa-bundle.tar.gz", content))
     None => ()
@@ -488,6 +534,17 @@ fn write_bundle_skeleton(
 
   let declarations_sha = sha256_hex(declarations_artifact)
   let symbols_sha = sha256_hex(symbols_artifact)
+  let sbom_components_out = @sbom.collect_components(config, repo)
+  guard sbom_components_out is Ok(sbom_components) else {
+    return Err(build_error(sbom_components_out.unwrap_err()))
+  }
+  let sbom_artifacts = @sbom.build_sbom_artifacts(sbom_components)
+  let components_artifact = utf8_bytes(sbom_artifacts.components_ndjson)
+  let cyclonedx_artifact = utf8_bytes(sbom_artifacts.cyclonedx_json)
+  let spdx_artifact = utf8_bytes(sbom_artifacts.spdx_json)
+  let components_sha = sha256_hex(components_artifact)
+  let cyclonedx_sha = sha256_hex(cyclonedx_artifact)
+  let spdx_sha = sha256_hex(spdx_artifact)
   let mut policy_rules_out : String? = None
   let opa_bundle_out = if config.profile == "policy-bundle" {
     let built = build_opa_bundle_tar_gz(config, repo)
@@ -513,6 +570,9 @@ fn write_bundle_skeleton(
     config,
     declarations_sha,
     symbols_sha,
+    Some(components_sha),
+    Some(cyclonedx_sha),
+    Some(spdx_sha),
     extract.commit,
     opa_bundle_sha,
     policy_rules_sha,
@@ -539,7 +599,15 @@ fn write_bundle_skeleton(
   let manifest_sha = sha256_hex(utf8_bytes(manifest))
   let metadata_sha = sha256_hex(utf8_bytes(metadata))
   let checksums = checksums_text(
-    manifest_sha, declarations_sha, symbols_sha, metadata_sha, opa_bundle_sha, policy_rules_sha,
+    manifest_sha,
+    declarations_sha,
+    symbols_sha,
+    Some(components_sha),
+    Some(cyclonedx_sha),
+    Some(spdx_sha),
+    metadata_sha,
+    opa_bundle_sha,
+    policy_rules_sha,
   )
 
   let dir_out = ensure_dir(dist_dir)
@@ -554,6 +622,15 @@ fn write_bundle_skeleton(
   guard decl_out is Ok(_) else { return Err(decl_out.unwrap_err()) }
   let symbols_out = write_bytes("\{dist_dir}/symbols.ndjson", symbols_artifact)
   guard symbols_out is Ok(_) else { return Err(symbols_out.unwrap_err()) }
+  let components_out = write_bytes(
+    "\{dist_dir}/software-components.ndjson",
+    components_artifact,
+  )
+  guard components_out is Ok(_) else { return Err(components_out.unwrap_err()) }
+  let cyclonedx_out = write_bytes("\{dist_dir}/sbom.cdx.json", cyclonedx_artifact)
+  guard cyclonedx_out is Ok(_) else { return Err(cyclonedx_out.unwrap_err()) }
+  let spdx_out = write_bytes("\{dist_dir}/sbom.spdx.json", spdx_artifact)
+  guard spdx_out is Ok(_) else { return Err(spdx_out.unwrap_err()) }
   let metadata_out = write_text("\{dist_dir}/metadata.json", metadata)
   guard metadata_out is Ok(_) else { return Err(metadata_out.unwrap_err()) }
   let checksums_out = write_text("\{dist_dir}/checksums.txt", checksums)
@@ -568,7 +645,15 @@ fn write_bundle_skeleton(
   }
 
   let tar_payload = build_tar_payload(
-    manifest, declarations_artifact, symbols_artifact, metadata, checksums, opa_bundle_out,
+    manifest,
+    declarations_artifact,
+    symbols_artifact,
+    Some(components_artifact),
+    Some(cyclonedx_artifact),
+    Some(spdx_artifact),
+    metadata,
+    checksums,
+    opa_bundle_out,
     policy_rules_out,
   )
   let gz = @gio.Buffer::new()
