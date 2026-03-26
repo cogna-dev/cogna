@@ -122,6 +122,193 @@ test "ciq-diff schema rejects malformed test changes" {
 }
 
 ///|
+test "ciq-result schema accepts richer declaration matches" {
+  let result = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "ciq-result/v1",
+      #|  "purl": "pkg:golang/example/demo@0.1.0",
+      #|  "matches": [
+      #|    {
+      #|      "id": "decl:go-module:go-module::main.go::Greet",
+      #|      "kind": "method",
+      #|      "path": "main.go",
+      #|      "name": "Greet",
+      #|      "canonical_name": "go-module::main.go::Greet",
+      #|      "language": "go",
+      #|      "baselineRole": "baseline",
+      #|      "source_refs": [
+      #|        {"uri": "main.go", "startLine": 58, "endLine": 58}
+      #|      ],
+      #|      "relations": [
+      #|        {"kind": "declared_in", "target": "file:main.go"}
+      #|      ],
+      #|      "visibility": "public",
+      #|      "docs": "",
+      #|      "signature": "func (g *Greeter) Greet(name string) Message {",
+      #|      "shape": {
+      #|        "kind": "method",
+      #|        "subkind": "method",
+      #|        "form": "callable",
+      #|        "signature": "func (g *Greeter) Greet(name string) Message {",
+      #|        "owner": "Greeter",
+      #|        "parameters": ["string"],
+      #|        "returns": ["Message"]
+      #|      },
+      #|      "language_specific": {
+      #|        "profile": "go-module",
+      #|        "server": "gopls",
+      #|        "go": {
+      #|          "receiver": "Greeter",
+      #|          "pointerReceiver": true
+      #|        }
+      #|      },
+      #|      "location": {"uri": "main.go", "startLine": 58, "endLine": 58}
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  guard validate_ciq_result_v1(result) is Ok(_) else {
+    fail("ciq-result should allow richer shape and language_specific payloads")
+  }
+}
+
+///|
+test "ciq-diff schema accepts richer before and after record payloads" {
+  let diff = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "ciq-diff/v1",
+      #|  "basePurl": "pkg:openapi/acme/payment-api@2026.03.01",
+      #|  "targetPurl": "pkg:openapi/acme/payment-api@2026.04.01",
+      #|  "summary": {"added":0,"removed":0,"changed":1,"deprecated":1},
+      #|  "changes": [
+      #|    {
+      #|      "kind": "changed",
+      #|      "id": "decl:openapi-spec:openapi-spec::openapi::payment.yaml::createPayment",
+      #|      "path": "openapi/payment.yaml",
+      #|      "level": "warning",
+      #|      "before": "operation createPayment",
+      #|      "after": "operation createPayment",
+      #|      "beforeRecord": {
+      #|        "id": "decl:openapi-spec:openapi-spec::openapi::payment.yaml::createPayment",
+      #|        "kind": "operation",
+      #|        "path": "openapi/payment.yaml",
+      #|        "signature": "operation createPayment",
+      #|        "location": {"uri": "openapi/payment.yaml", "startLine": 26, "endLine": 26}
+      #|      },
+      #|      "afterRecord": {
+      #|        "id": "decl:openapi-spec:openapi-spec::openapi::payment.yaml::createPayment",
+      #|        "kind": "operation",
+      #|        "path": "openapi/payment.yaml",
+      #|        "signature": "operation createPayment",
+      #|        "language_specific": {
+      #|          "profile": "openapi-spec",
+      #|          "server": "none",
+      #|          "openapi": {"statusCodes": ["201"]}
+      #|        },
+      #|        "location": {"uri": "openapi/payment.yaml", "startLine": 26, "endLine": 26}
+      #|      }
+      #|    },
+      #|    {
+      #|      "kind": "deprecated",
+      #|      "id": "decl:go-module:go-module::main.go::OldGreet",
+      #|      "path": "main.go",
+      #|      "level": "warning",
+      #|      "afterRecord": {
+      #|        "id": "decl:go-module:go-module::main.go::OldGreet",
+      #|        "kind": "method",
+      #|        "path": "main.go",
+      #|        "signature": "func (g *Greeter) OldGreet(name string) Message {",
+      #|        "location": {"uri": "main.go", "startLine": 58, "endLine": 58}
+      #|      }
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  guard validate_ciq_diff_v1(diff) is Ok(_) else {
+    fail("ciq-diff should allow additive beforeRecord and afterRecord payloads")
+  }
+}
+
+///|
+test "ciq-diff schema accepts semanticCategory on change entries" {
+  let diff = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "ciq-diff/v1",
+      #|  "basePurl": "pkg:cargo/example/demo@0.1.0",
+      #|  "targetPurl": "pkg:cargo/example/demo@0.2.0",
+      #|  "summary": {"added":0,"removed":1,"changed":1,"deprecated":0},
+      #|  "changes": [
+      #|    {
+      #|      "kind": "changed",
+      #|      "id": "decl:rust-crate:rust-crate::lib.rs::dangerous",
+      #|      "path": "lib.rs",
+      #|      "level": "breaking",
+      #|      "semanticCategory": "rust-became-unsafe",
+      #|      "before": "pub fn dangerous() -> i32",
+      #|      "after": "pub unsafe fn dangerous() -> i32",
+      #|      "beforeRecord": {"id": "decl:rust-crate:rust-crate::lib.rs::dangerous"},
+      #|      "afterRecord": {"id": "decl:rust-crate:rust-crate::lib.rs::dangerous"}
+      #|    },
+      #|    {
+      #|      "kind": "removed",
+      #|      "id": "decl:rust-crate:rust-crate::lib.rs::old_fn",
+      #|      "path": "lib.rs",
+      #|      "level": "breaking",
+      #|      "semanticCategory": "removed-declaration",
+      #|      "beforeRecord": {"id": "decl:rust-crate:rust-crate::lib.rs::old_fn"}
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  guard validate_ciq_diff_v1(diff) is Ok(_) else {
+    fail("ciq-diff should accept semanticCategory on change entries")
+  }
+}
+
+///|
+test "ciq-diff schema accepts componentDiff on change entries" {
+  let diff = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "ciq-diff/v1",
+      #|  "basePurl": "pkg:npm/example/demo@0.1.0",
+      #|  "targetPurl": "pkg:npm/example/demo@0.2.0",
+      #|  "summary": {"added":0,"removed":0,"changed":1,"deprecated":0},
+      #|  "changes": [
+      #|    {
+      #|      "kind": "changed",
+      #|      "id": "pkg:npm/react@19.0.0",
+      #|      "path": "package.json",
+      #|      "level": "warning",
+      #|      "semanticCategory": "component-version-upgrade",
+      #|      "componentDiff": {
+      #|        "changedFields": ["version", "purl"],
+      #|        "upgradeKind": "version-upgrade",
+      #|        "beforeVersion": "18.2.0",
+      #|        "afterVersion": "19.0.0",
+      #|        "beforePurl": "pkg:npm/react@18.2.0",
+      #|        "afterPurl": "pkg:npm/react@19.0.0"
+      #|      },
+      #|      "beforeRecord": {"id": "pkg:npm/react@18.2.0"},
+      #|      "afterRecord": {"id": "pkg:npm/react@19.0.0"}
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  guard validate_ciq_diff_v1(diff) is Ok(_) else {
+    fail("ciq-diff should accept componentDiff on change entries")
+  }
+}
+
+
+///|
 test "sarif minimal schema validates skeleton output" {
   let sarif = must_parse_json_contract(
     (
@@ -343,10 +530,10 @@ test "publish-receipt schema validates success receipt" {
       #|  "purl": "pkg:generic/acme/compat-policy@2026.03.01",
       #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "bundleType": "ciq-opa-bundle",
-      #|  "downloadUrl": "https://registry.acme.dev/api/v1/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "status": "published",
       #|  "provenance": {
-      #|    "source": "remote-registry",
+      #|    "source": "local-registry",
       #|    "digestVerified": true,
       #|    "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""
       #|  }
@@ -369,10 +556,10 @@ test "publish-receipt schema validates signature status" {
       #|  "purl": "pkg:generic/acme/compat-policy@2026.03.01",
       #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "bundleType": "ciq-opa-bundle",
-      #|  "downloadUrl": "https://registry.acme.dev/api/v1/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "status": "published",
       #|  "provenance": {
-      #|    "source": "remote-registry",
+      #|    "source": "local-registry",
       #|    "digestVerified": true,
       #|    "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
       #|    "signature": {
@@ -400,10 +587,10 @@ test "publish-receipt schema validates signature value" {
       #|  "purl": "pkg:generic/acme/compat-policy@2026.03.01",
       #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "bundleType": "ciq-opa-bundle",
-      #|  "downloadUrl": "https://registry.acme.dev/api/v1/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "status": "published",
       #|  "provenance": {
-      #|    "source": "remote-registry",
+      #|    "source": "local-registry",
       #|    "digestVerified": true,
       #|    "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
       #|    "signature": {
@@ -432,7 +619,7 @@ test "registry-download schema validates 304 response" {
       #|  "bundleId": "bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
-      #|  "downloadUrl": "local://.codeiq/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "notModified": true
       #|}
     ),
@@ -455,7 +642,7 @@ test "registry-download schema validates signature metadata" {
       #|  "bundleId": "bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
-      #|  "downloadUrl": "local://.codeiq/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "notModified": false,
       #|  "signature": {
       #|    "status": "untrusted",
@@ -481,7 +668,7 @@ test "registry-download schema validates signature value" {
       #|  "bundleId": "bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
-      #|  "downloadUrl": "local://.codeiq/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "notModified": false,
       #|  "signature": {
       #|    "status": "verified",
@@ -533,7 +720,7 @@ test "registry-download schema rejects missing digest" {
       #|  "purl": "pkg:generic/acme/compat-policy@2026.03.01",
       #|  "bundleId": "bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       #|  "etag": "\"bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
-      #|  "downloadUrl": "local://.codeiq/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
       #|  "notModified": false,
       #|  "contentLength": 1234
       #|}

@@ -138,12 +138,25 @@ fn artifact_records(root : String) -> Result[Array[Json], @cli.CliError] {
   }
   guard symbol_out is Ok(symbols) else { return Err(symbol_out.unwrap_err()) }
 
+  let component_path_plain = "\{root}/software-components.ndjson"
+  let component_out = if @fs.path_exists(component_path_plain) {
+    read_ndjson(component_path_plain)
+  } else {
+    Ok([])
+  }
+  guard component_out is Ok(components) else {
+    return Err(component_out.unwrap_err())
+  }
+
   let records : Array[Json] = []
   for i in 0..<declarations.length() {
     records.push(declarations[i])
   }
   for i in 0..<symbols.length() {
     records.push(symbols[i])
+  }
+  for i in 0..<components.length() {
+    records.push(components[i])
   }
   Ok(records)
 }
@@ -152,8 +165,8 @@ fn artifact_records(root : String) -> Result[Array[Json], @cli.CliError] {
 fn record_index(records : Array[Json]) -> Map[String, Json] {
   let index : Map[String, Json] = {}
   for i in 0..<records.length() {
-    let id = record_string(records[i], "id")
-    guard id is Some(key) else { continue }
+    let key = record_match_key(records[i])
+    guard key != "" else { continue }
     index[key] = records[i]
   }
   index
@@ -385,6 +398,14 @@ fn test_changes(
 
 ///|
 fn has_shape_change(base : Json, target : Json) -> Bool {
+  guard base is Object(base_object) else { return base != target }
+  guard target is Object(target_object) else { return true }
+  if base_object.get("shape") != target_object.get("shape") {
+    return true
+  }
+  if base_object.get("language_specific") != target_object.get("language_specific") {
+    return true
+  }
   let base_signature = record_string(base, "signature")
   let target_signature = record_string(target, "signature")
   if base_signature != target_signature {
@@ -401,6 +422,365 @@ fn has_shape_change(base : Json, target : Json) -> Bool {
 }
 
 ///|
+fn change_record_payload(record : Json) -> Json {
+  record
+}
+
+///|
+fn component_identity_name(record : Json) -> String {
+  match record_string(record, "name") {
+    Some(value) if value != "" => value
+    _ => {
+      let candidate = match record_string(record, "purl") {
+        Some(value) if value != "" => value
+        _ => record_string(record, "id").unwrap_or("unknown-component")
+      }
+      match candidate.find("@") {
+        Some(index) if candidate.has_prefix("pkg:") => candidate[:index].to_string()
+        _ => candidate
+      }
+    }
+  }
+}
+
+///|
+fn record_match_key(record : Json) -> String {
+  if is_component_record(record) {
+    let path = record_path(record)
+    let component_type = record_string(record, "componentType").unwrap_or(
+      "component",
+    )
+    let scope = record_string(record, "scope").unwrap_or("unknown")
+    let name = component_identity_name(record)
+    "component:\{path}:\{component_type}:\{scope}:\{name}"
+  } else {
+    record_string(record, "id").unwrap_or("")
+  }
+}
+
+///|
+fn json_object_get(obj : Json, key : String) -> Json? {
+  guard obj is Object(m) else { return None }
+  m.get(key)
+}
+
+///|
+fn semantic_diff(base : Json, target : Json) -> Json {
+  let changed_fields : Array[Json] = []
+
+  // signature change
+  let base_sig = record_string(base, "signature")
+  let target_sig = record_string(target, "signature")
+  if base_sig != target_sig {
+    changed_fields.push(Json::string("signature"))
+  }
+
+  // kind change
+  let base_kind = record_string(base, "kind")
+  let target_kind = record_string(target, "kind")
+  if base_kind != target_kind {
+    changed_fields.push(Json::string("kind"))
+  }
+
+  // path/move change
+  let base_path = record_string(base, "path")
+  let target_path = record_string(target, "path")
+  if base_path != target_path {
+    changed_fields.push(Json::string("path"))
+  }
+
+  // shape change
+  let base_shape = json_object_get(base, "shape")
+  let target_shape = json_object_get(target, "shape")
+  if base_shape != target_shape {
+    changed_fields.push(Json::string("shape"))
+  }
+
+  // language_specific change
+  let base_ls = json_object_get(base, "language_specific")
+  let target_ls = json_object_get(target, "language_specific")
+  if base_ls != target_ls {
+    changed_fields.push(Json::string("language_specific"))
+  }
+
+  let result : Map[String, Json] = { "changedFields": Json::array(changed_fields) }
+
+  // include shape before/after when changed
+  if base_shape != target_shape {
+    result["shapeDiff"] = {
+      "before": match base_shape {
+        Some(v) => v
+        None => Json::null()
+      },
+      "after": match target_shape {
+        Some(v) => v
+        None => Json::null()
+      },
+    }
+  }
+
+  // include language_specific before/after when changed
+  if base_ls != target_ls {
+    result["languageSpecificDiff"] = {
+      "before": match base_ls {
+        Some(v) => v
+        None => Json::null()
+      },
+      "after": match target_ls {
+        Some(v) => v
+        None => Json::null()
+      },
+    }
+  }
+
+  Json::object(result)
+}
+
+///|
+fn is_component_record(record : Json) -> Bool {
+  match record_string(record, "kind") {
+    Some("component") => true
+    _ => false
+  }
+}
+
+///|
+fn component_diff(base : Json, target : Json) -> Json {
+  let changed_fields : Array[Json] = []
+
+  // version change
+  let base_version = record_string(base, "version")
+  let target_version = record_string(target, "version")
+  if base_version != target_version {
+    changed_fields.push(Json::string("version"))
+  }
+
+  // purl change (covers version + name change)
+  let base_purl = record_string(base, "purl")
+  let target_purl = record_string(target, "purl")
+  if base_purl != target_purl {
+    changed_fields.push(Json::string("purl"))
+  }
+
+  // componentType change
+  let base_type = record_string(base, "componentType")
+  let target_type = record_string(target, "componentType")
+  if base_type != target_type {
+    changed_fields.push(Json::string("componentType"))
+  }
+
+  // scope change
+  let base_scope = record_string(base, "scope")
+  let target_scope = record_string(target, "scope")
+  if base_scope != target_scope {
+    changed_fields.push(Json::string("scope"))
+  }
+
+  // determine upgrade kind
+  let upgrade_kind = if base_version != target_version {
+    "version-upgrade"
+  } else if base_purl != target_purl {
+    "purl-change"
+  } else {
+    "metadata-change"
+  }
+
+  {
+    "changedFields": Json::array(changed_fields),
+    "upgradeKind": upgrade_kind,
+    "beforeVersion": match base_version {
+      Some(v) => Json::string(v)
+      None => Json::null()
+    },
+    "afterVersion": match target_version {
+      Some(v) => Json::string(v)
+      None => Json::null()
+    },
+    "beforePurl": match base_purl {
+      Some(v) => Json::string(v)
+      None => Json::null()
+    },
+    "afterPurl": match target_purl {
+      Some(v) => Json::string(v)
+      None => Json::null()
+    },
+  }
+}
+
+///|
+fn json_bool_val(obj : Json, key : String) -> Bool {
+  guard obj is Object(m) else { return false }
+  match m.get(key) {
+    Some(True) => true
+    _ => false
+  }
+}
+
+///|
+fn json_array_len(obj : Json, key : String) -> Int {
+  guard obj is Object(m) else { return 0 }
+  match m.get(key) {
+    Some(Array(arr)) => arr.length()
+    _ => 0
+  }
+}
+
+///|
+fn get_lang_specific(record : Json, lang : String) -> Json {
+  guard record is Object(m) else { return Json::null() }
+  match m.get("language_specific") {
+    Some(Object(ls)) =>
+      match ls.get(lang) {
+        Some(v) => v
+        None => Json::null()
+      }
+    _ => Json::null()
+  }
+}
+
+///|
+fn go_method_set_len(go_obj : Json) -> Int {
+  guard go_obj is Object(m) else { return 0 }
+  match m.get("methodSetTypes") {
+    Some(Array(arr)) => arr.length()
+    _ => 0
+  }
+}
+
+///|
+fn classify_rust_change(base : Json, target : Json) -> (String, String) {
+  let base_rust = get_lang_specific(base, "rust")
+  let target_rust = get_lang_specific(target, "rust")
+  let base_unsafe = json_bool_val(base_rust, "unsafe")
+  let target_unsafe = json_bool_val(target_rust, "unsafe")
+  if !base_unsafe && target_unsafe {
+    return ("breaking", "rust-became-unsafe")
+  }
+  let base_abi = record_string(base_rust, "externAbi")
+  let target_abi = record_string(target_rust, "externAbi")
+  if base_abi is None && target_abi is Some(_) {
+    return ("breaking", "rust-extern-abi-added")
+  }
+  if base_abi != target_abi && target_abi is Some(_) {
+    return ("breaking", "rust-extern-abi-changed")
+  }
+  let base_where = record_string(base_rust, "whereClause")
+  let target_where = record_string(target_rust, "whereClause")
+  if base_where != target_where {
+    return ("warning", "rust-where-clause-changed")
+  }
+  ("warning", "rust-signature-changed")
+}
+
+///|
+fn classify_go_change(base : Json, target : Json) -> (String, String) {
+  let base_go = get_lang_specific(base, "go")
+  let target_go = get_lang_specific(target, "go")
+  let base_ptr = json_bool_val(base_go, "pointerReceiver")
+  let target_ptr = json_bool_val(target_go, "pointerReceiver")
+  if base_ptr != target_ptr {
+    return ("breaking", "go-pointer-receiver-changed")
+  }
+  let base_recv = record_string(base_go, "receiver")
+  let target_recv = record_string(target_go, "receiver")
+  if base_recv != target_recv {
+    return ("breaking", "go-receiver-changed")
+  }
+  let base_ms = go_method_set_len(base_go)
+  let target_ms = go_method_set_len(target_go)
+  if target_ms < base_ms {
+    return ("breaking", "go-method-set-shrunk")
+  }
+  if target_ms > base_ms {
+    return ("warning", "go-method-set-expanded")
+  }
+  ("warning", "go-signature-changed")
+}
+
+///|
+fn classify_terraform_change(base : Json, target : Json) -> (String, String) {
+  let base_tf = get_lang_specific(base, "terraform")
+  let target_tf = get_lang_specific(target, "terraform")
+  let base_pref = record_string(base_tf, "providerRef")
+  let target_pref = record_string(target_tf, "providerRef")
+  if base_pref != target_pref {
+    return ("breaking", "terraform-provider-ref-changed")
+  }
+  let base_pd = json_bool_val(base_tf, "preventDestroy")
+  let target_pd = json_bool_val(target_tf, "preventDestroy")
+  if !base_pd && target_pd {
+    return ("warning", "terraform-prevent-destroy-added")
+  }
+  let base_cbd = json_bool_val(base_tf, "createBeforeDestroy")
+  let target_cbd = json_bool_val(target_tf, "createBeforeDestroy")
+  if !base_cbd && target_cbd {
+    return ("warning", "terraform-create-before-destroy-added")
+  }
+  let base_ic = json_array_len(base_tf, "ignoreChanges")
+  let target_ic = json_array_len(target_tf, "ignoreChanges")
+  if target_ic > base_ic {
+    return ("note", "terraform-ignore-changes-expanded")
+  }
+  ("warning", "terraform-lifecycle-changed")
+}
+
+///|
+fn classify_openapi_change(base : Json, target : Json) -> (String, String) {
+  let base_oa = get_lang_specific(base, "openapi")
+  let target_oa = get_lang_specific(target, "openapi")
+  let base_method = record_string(base_oa, "httpMethod")
+  let target_method = record_string(target_oa, "httpMethod")
+  if base_method != target_method && target_method is Some(_) {
+    return ("breaking", "openapi-http-method-changed")
+  }
+  let base_req = json_bool_val(base_oa, "required")
+  let target_req = json_bool_val(target_oa, "required")
+  if !base_req && target_req {
+    return ("breaking", "openapi-became-required")
+  }
+  let base_sc = json_array_len(base_oa, "statusCodes")
+  let target_sc = json_array_len(target_oa, "statusCodes")
+  if target_sc > base_sc {
+    return ("warning", "openapi-status-codes-added")
+  }
+  let base_mt = json_array_len(base_oa, "mediaTypes")
+  let target_mt = json_array_len(target_oa, "mediaTypes")
+  if target_mt > base_mt {
+    return ("note", "openapi-media-types-added")
+  }
+  ("warning", "openapi-operation-changed")
+}
+
+///|
+// Classify the semantic level for a "changed" diff entry based on provider-specific rules.
+// Returns (level, semanticCategory) where level is "breaking"/"warning"/"note".
+fn classify_change_level(base : Json, target : Json) -> (String, String) {
+  if is_component_record(target) {
+    let base_version = record_string(base, "version")
+    let target_version = record_string(target, "version")
+    if base_version != target_version {
+      return ("warning", "component-version-upgrade")
+    }
+    return ("warning", "component-metadata-changed")
+  }
+  let profile = match json_object_get(target, "language_specific") {
+    Some(Object(ls)) =>
+      match ls.get("profile") {
+        Some(String(p)) => p
+        _ => ""
+      }
+    _ => ""
+  }
+  match profile {
+    "rust-crate" => classify_rust_change(base, target)
+    "go-module" => classify_go_change(base, target)
+    "terraform-module" => classify_terraform_change(base, target)
+    "openapi-spec" => classify_openapi_change(base, target)
+    _ => ("warning", "generic-change")
+  }
+}
+
+///|
 fn declaration_changes(
   base_records : Array[Json],
   target_records : Array[Json],
@@ -410,44 +790,62 @@ fn declaration_changes(
   let target_index = record_index(target_records)
 
   for id, target in target_index {
+    let target_id = record_string(target, "id").unwrap_or(id)
     match base_index.get(id) {
       Some(base) => {
+        let base_id = record_string(base, "id").unwrap_or(id)
         if has_shape_change(base, target) {
-          changes.push({
+          let (level, sem_cat) = classify_change_level(base, target)
+          let change_obj : Map[String, Json] = {
             "kind": "changed",
-            "id": id,
+            "id": target_id,
             "path": record_path(target),
-            "level": "warning",
+            "level": level,
+            "semanticCategory": sem_cat,
             "before": record_string(base, "signature").unwrap_or("unknown"),
             "after": record_string(target, "signature").unwrap_or("unknown"),
-          })
+            "beforeRecord": change_record_payload(base),
+            "afterRecord": change_record_payload(target),
+            "semanticDiff": semantic_diff(base, target),
+          }
+          if is_component_record(target) {
+            change_obj["componentDiff"] = component_diff(base, target)
+          }
+          changes.push(Json::object(change_obj))
         }
         if record_bool(target, "deprecated") && !record_bool(base, "deprecated") {
           changes.push({
             "kind": "deprecated",
-            "id": id,
+            "id": if target_id != "" { target_id } else { base_id },
             "path": record_path(target),
             "level": "warning",
+            "semanticCategory": "deprecated-declaration",
+            "afterRecord": change_record_payload(target),
           })
         }
       }
       None =>
         changes.push({
           "kind": "added",
-          "id": id,
+          "id": target_id,
           "path": record_path(target),
           "level": "note",
+          "semanticCategory": "new-declaration",
+          "afterRecord": change_record_payload(target),
         })
     }
   }
 
   for id, base in base_index {
     if !target_index.contains(id) {
+      let base_id = record_string(base, "id").unwrap_or(id)
       changes.push({
         "kind": "removed",
-        "id": id,
+        "id": base_id,
         "path": record_path(base),
         "level": "breaking",
+        "semanticCategory": "removed-declaration",
+        "beforeRecord": change_record_payload(base),
       })
     }
   }

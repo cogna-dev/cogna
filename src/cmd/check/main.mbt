@@ -169,9 +169,154 @@ fn sarif_results_from_policy(policy_results : Array[Json]) -> Array[Json] {
 }
 
 ///|
+/// Shapes a ciq-diff/v1 Json document into a flat OPA-friendly input envelope.
+///
+/// Produces:
+/// ```json
+/// {
+///   "schemaVersion": "ciq-diff/v1",
+///   "basePurl": "...",
+///   "targetPurl": "...",
+///   "summary": { ... },
+///   "changes": [
+///     {
+///       "id": "...", "kind": "...", "level": "...",
+///       "semanticCategory": "...",
+///       "path": "...", "before": "...", "after": "...",
+///       "semanticDiff": { ... }
+///     }
+///   ],
+///   "componentChanges": [
+///     {
+///       "id": "...", "kind": "...", "level": "...",
+///       "semanticCategory": "...",
+///       "path": "...",
+///       "upgradeKind": "...",
+///       "beforeVersion": "...", "afterVersion": "...",
+///       "beforePurl": "...", "afterPurl": "..."
+///     }
+///   ]
+/// }
+/// ```
+fn prepare_opa_input(diff : Json) -> Json {
+  guard diff is Object(diff_object) else { return diff }
+
+  let changes : Array[Json] = []
+  let component_changes : Array[Json] = []
+
+  match diff_object.get("changes") {
+    Some(Array(raw_changes)) =>
+      for change in raw_changes {
+        guard change is Object(co) else { continue }
+        let id = match co.get("id") {
+          Some(String(v)) => v
+          _ => "unknown"
+        }
+        let kind = match co.get("kind") {
+          Some(String(v)) => v
+          _ => "changed"
+        }
+        let level = match co.get("level") {
+          Some(String(v)) => v
+          _ => "warning"
+        }
+        let path = match co.get("path") {
+          Some(String(v)) => v
+          _ => "unknown"
+        }
+        let semantic_category = match co.get("semanticCategory") {
+          Some(String(v)) => v
+          _ => ""
+        }
+        let before = match co.get("before") {
+          Some(v) => v
+          None => Json::null()
+        }
+        let after = match co.get("after") {
+          Some(v) => v
+          None => Json::null()
+        }
+        let semantic_diff = match co.get("semanticDiff") {
+          Some(v) => v
+          None => Json::null()
+        }
+        // Component-level changes go to componentChanges
+        if co.get("componentDiff") is Some(Object(cd)) {
+          let upgrade_kind = match cd.get("upgradeKind") {
+            Some(String(v)) => v
+            _ => "unknown"
+          }
+          component_changes.push({
+            "id": id,
+            "kind": kind,
+            "level": level,
+            "semanticCategory": semantic_category,
+            "path": path,
+            "upgradeKind": upgrade_kind,
+            "beforeVersion": match cd.get("beforeVersion") {
+              Some(v) => v
+              None => Json::null()
+            },
+            "afterVersion": match cd.get("afterVersion") {
+              Some(v) => v
+              None => Json::null()
+            },
+            "beforePurl": match cd.get("beforePurl") {
+              Some(v) => v
+              None => Json::null()
+            },
+            "afterPurl": match cd.get("afterPurl") {
+              Some(v) => v
+              None => Json::null()
+            },
+          })
+        } else {
+          changes.push({
+            "id": id,
+            "kind": kind,
+            "level": level,
+            "semanticCategory": semantic_category,
+            "path": path,
+            "before": before,
+            "after": after,
+            "semanticDiff": semantic_diff,
+          })
+        }
+      }
+    _ => ()
+  }
+
+  // Build output preserving top-level fields and replacing changes
+  let out : Map[String, Json] = {}
+  for k, v in diff_object {
+    if k != "changes" {
+      out[k] = v
+    }
+  }
+  out["changes"] = Json::array(changes)
+  out["componentChanges"] = Json::array(component_changes)
+  Json::object(out)
+}
+
+///|
+fn write_temp_json(
+  path : String,
+  content : Json,
+) -> Result[Unit, @cli.CliError] {
+  @fs.write_string_to_file(path, content.stringify(indent=2)) catch {
+    err =>
+      return Err(
+        check_error("cannot write temp file \{path}: \{err.to_string()}"),
+      )
+  }
+  Ok(())
+}
+
+///|
 fn evaluate_policy_with_opa(
   policy_bundle : String,
   diff_file : String,
+  diff : Json,
 ) -> Result[Array[Json], @cli.CliError] {
   let eval_json_override = @sys.get_env_var("CODEIQ_OPA_EVAL_JSON")
   if eval_json_override is Some(text) {
@@ -186,8 +331,15 @@ fn evaluate_policy_with_opa(
     return Err(check_error("missing policy bundle file: \{policy_bundle}"))
   }
 
-  let command = "opa eval --bundle \{shell_escape(policy_bundle)} --input \{shell_escape(diff_file)} --format json data.codeiq.compat.deny"
+  // Write OPA-shaped input to a temp file for OPA eval
+  let enriched = prepare_opa_input(diff)
+  let temp_input = "\{diff_file}.opa-input.json"
+  let write_out = write_temp_json(temp_input, enriched)
+  guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
+
+  let command = "opa eval --bundle \{shell_escape(policy_bundle)} --input \{shell_escape(temp_input)} --format json data.codeiq.compat.deny"
   let (exit_code, stdout, stderr) = @shell.run_command_capture(command)
+  @fs.remove_file(temp_input) catch { _ => () }
   if exit_code != 0 {
     let details = if stderr != "" { stderr } else { stdout }
     return Err(check_error("opa eval failed (exit \{exit_code}): \{details}"))
@@ -233,6 +385,44 @@ fn ensure_diff_shape(
 }
 
 ///|
+/// Extract source file URI from a declaration record's `location` field.
+/// Falls back to `path` if no location is present in the record.
+fn location_uri_from_record(record : Json, fallback : String) -> String {
+  guard record is Object(obj) else { return fallback }
+  match obj.get("location") {
+    Some(Object(loc)) =>
+      match loc.get("uri") {
+        Some(String(uri)) if uri != "" => uri
+        _ =>
+          match loc.get("file") {
+            Some(String(f)) if f != "" => f
+            _ => fallback
+          }
+      }
+    Some(String(f)) if f != "" => f
+    _ => fallback
+  }
+}
+
+///|
+/// Extract start line from a declaration record's `location` field.
+fn location_line_from_record(record : Json) -> Int {
+  guard record is Object(obj) else { return 1 }
+  match obj.get("location") {
+    Some(Object(loc)) =>
+      match loc.get("startLine") {
+        Some(Number(n, ..)) => n.to_int()
+        _ =>
+          match loc.get("line") {
+            Some(Number(n, ..)) => n.to_int()
+            _ => 1
+          }
+      }
+    _ => 1
+  }
+}
+
+///|
 fn sarif_results_from_diff(diff : Json) -> Array[Json] {
   guard diff is Object(diff_object) else { return [] }
   guard diff_object.get("changes") is Some(Array(changes)) else { return [] }
@@ -258,16 +448,51 @@ fn sarif_results_from_diff(diff : Json) -> Array[Json] {
       Some(String(value)) => value
       _ => "unknown"
     }
+    let semantic_category = match change_object.get("semanticCategory") {
+      Some(String(value)) if value != "" => value
+      _ => ""
+    }
+
+    // Prefer location from beforeRecord (for changed/removed) or afterRecord (for added)
+    let before_record = match change_object.get("beforeRecord") {
+      Some(v) => v
+      None => Json::null()
+    }
+    let after_record = match change_object.get("afterRecord") {
+      Some(v) => v
+      None => Json::null()
+    }
+    let location_uri = if before_record != Json::null() {
+      location_uri_from_record(before_record, path)
+    } else if after_record != Json::null() {
+      location_uri_from_record(after_record, path)
+    } else {
+      path
+    }
+    let start_line = if before_record != Json::null() {
+      location_line_from_record(before_record)
+    } else if after_record != Json::null() {
+      location_line_from_record(after_record)
+    } else {
+      1
+    }
+
+    // Build semantic-aware message
+    let base_msg = if semantic_category != "" {
+      "Detected \{kind} change for \{path} (\{id}) [\{semantic_category}]"
+    } else {
+      "Detected \{kind} change for \{path} (\{id})"
+    }
 
     results.push({
       "ruleId": "compat.\{kind}",
       "level": level,
-      "message": { "text": "Detected \{kind} change for \{path} (\{id})" },
+      "message": { "text": base_msg },
       "locations": [
         {
           "physicalLocation": {
-            "artifactLocation": { "uri": path },
-            "region": { "startLine": 1, "endLine": 1 },
+            "artifactLocation": { "uri": location_uri },
+            "region": { "startLine": start_line, "endLine": start_line },
           },
         },
       ],
@@ -332,6 +557,7 @@ pub fn run(params : CheckParams) -> @cli.CliResult[CheckResult, @cli.CliError] {
   let policy_results_out = evaluate_policy_with_opa(
     params.policy_bundle,
     params.diff_file,
+    diff,
   )
   guard policy_results_out is Ok(policy_results) else {
     return Err(policy_results_out.unwrap_err())
