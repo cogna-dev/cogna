@@ -35,8 +35,20 @@ variable "settings" {
   type = object({ env = string, retries = number })
 }
 
+variable "env" {
+  type    = string
+  default = "dev"
+}
+
+variable "secret_key" {
+  type      = string
+  sensitive = true
+}
+
 module "network_labels" {
-  source = "./modules/labels"
+  source     = "./modules/labels"
+  depends_on = [data.aws_caller_identity.current]
+  providers  = { aws = aws.east }
 }
 
 data "aws_caller_identity" "current" {}
@@ -48,6 +60,9 @@ resource "aws_vpc" "main" {
   depends_on = [module.network_labels]
 
   lifecycle {
+    prevent_destroy       = true
+    create_before_destroy = true
+    ignore_changes        = [tags]
     precondition {
       condition     = var.cidr != ""
       error_message = "cidr cannot be blank"
@@ -61,6 +76,7 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_subnet" "this" {
+  depends_on = [data.aws_caller_identity.current]
   for_each   = var.subnets
   vpc_id     = aws_vpc.main[0].id
   cidr_block = each.value
@@ -90,4 +106,10 @@ check "subnet_count" {
 
 output "vpc_id" {
   value = aws_vpc.main[0].id
+}
+
+output "vpc_id_sensitive" {
+  value      = aws_vpc.main[0].id
+  sensitive  = true
+  depends_on = [aws_vpc.main]
 }

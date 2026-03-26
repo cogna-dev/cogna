@@ -63,6 +63,13 @@ func (g *Greeter) Greet(name string) Message {
 	return Message(g.Prefix + " " + string(payload))
 }
 
+func (g Greeter) Label() string {
+	if g.Prefix == "" {
+		return "label:hi"
+	}
+	return "label:" + g.Prefix
+}
+
 func NewGreeter(prefix string) *Greeter {
 	return &Greeter{Prefix: prefix}
 }

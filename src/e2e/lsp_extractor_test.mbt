@@ -125,6 +125,11 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   assert_true(declarations.contains("\"kind\":\"operation\""))
   assert_true(declarations.contains("\"kind\":\"path\""))
   assert_true(declarations.contains("\"name\":\"Payment.discriminator\""))
+  assert_true(declarations.contains("\"statusCodes\":[\"200\"]") || declarations.contains("\"statusCodes\": [\"200\"]"))
+  assert_true(declarations.contains("\"mediaTypes\":[\"application/json\"]") || declarations.contains("\"mediaTypes\": [\"application/json\"]"))
+  assert_true(declarations.contains("callbackUrl"))
+  assert_true(declarations.contains("\"discriminatorProperty\":\"type\"") || declarations.contains("\"discriminatorProperty\": \"type\""))
+  assert_true(declarations.contains("\"securitySchemeType\":\"apiKey\"") || declarations.contains("\"securitySchemeType\": \"apiKey\""))
   assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
   assert_true(declarations.contains("\"shape\":{\"kind\":"))
   assert_true(declarations.contains("\"relations\":[{\"kind\":\"declared_in\""))
@@ -196,14 +201,21 @@ test "e2e go extractor includes richer relations" {
   assert_true(declarations.contains("\"name\":\"Box\""))
   assert_true(declarations.contains("\"kind\":\"embedded_field\""))
   assert_true(declarations.contains("\"name\":\"MapValue\""))
+  assert_true(declarations.contains("\"name\":\"Label\""))
   assert_true(declarations.contains("Deprecated: use Hello instead."))
   assert_true(declarations.contains("\"relations\":[{"))
   assert_true(declarations.contains("\"kind\":\"declared_in\""))
   assert_true(
     declarations.contains("\"kind\":\"has_parameter\"") ||
     declarations.contains("\"kind\":\"returns\"") ||
-    declarations.contains("\"kind\":\"references_type\""),
+      declarations.contains("\"kind\":\"references_type\""),
   )
+  assert_true(declarations.contains("\"pointerReceiver\":true"))
+  assert_true(declarations.contains("\"pointerReceiver\":false"))
+  assert_true(declarations.contains("\"methodSetTypes\":[\"Greeter\",\"*Greeter\",\"Box\",\"*Box\"]"))
+  assert_true(declarations.contains("\"methodSetTypes\":[\"*Greeter\",\"*Box\"]"))
+  assert_true(declarations.contains("\"kind\":\"has_member\",\"target\":\"decl:go-module:go-module::main.go::Greet\""))
+  assert_true(declarations.contains("\"kind\":\"has_member\",\"target\":\"decl:go-module:go-module::main.go::Label\""))
 
   cleanup_lsp_e2e(path)
 }
@@ -275,12 +287,20 @@ test "e2e rust extractor carries doc comments" {
   assert_true(declarations.contains("Public module doc sample."))
   assert_true(declarations.contains("ApiItem doc comment.\\nDeprecated"))
   assert_true(declarations.contains("Constructor doc comment."))
+  assert_true(declarations.contains("\"name\":\"Borrowed<'a, const N: usize>\"") || declarations.contains("Borrowed<'a, const N: usize>"))
+  assert_true(declarations.contains("\"typeParams\":[\"'a\",\"const N: usize\"]"))
+  assert_true(declarations.contains("\"unsafe\":true"))
+  assert_true(declarations.contains("\"externAbi\":\"C\""))
+  assert_true(declarations.contains("\"traitTarget\":\"Service<T>\""))
+  assert_true(declarations.contains("\"implTarget\":\"ApiItem<T>\""))
+  assert_true(declarations.contains("\"kind\":\"implements\",\"target\":\"type:rust-crate::Service<T>\""))
+  assert_true(declarations.contains("\"kind\":\"has_member\",\"target\":\"decl:rust-crate:rust-crate::lib.rs::new\""))
 
   cleanup_lsp_e2e(path)
 }
 
 ///|
-test "e2e terraform extractor covers data source and object type" {
+test "e2e terraform extractor covers contract depth" {
   let path = "src/e2e/tmp_lsp_extractor_terraform"
   cleanup_lsp_e2e(path)
   write_fixture_repo(path, "examples/terraform-module/full/repo/main.tf")
@@ -300,6 +320,23 @@ test "e2e terraform extractor covers data source and object type" {
   assert_true(
     declarations.contains("type = object({ env = string, retries = number })"),
   )
+  assert_true(declarations.contains("\"kind\":\"uses_provider\""))
+  assert_true(declarations.contains("\"kind\":\"provided_by\""))
+  assert_true(declarations.contains("\"source\":\"hashicorp/aws\""))
+  assert_true(declarations.contains("\"version\":\">= 5.0.0\""))
+  assert_true(declarations.contains("\"alias\":\"east\""))
+  assert_true(declarations.contains("\"name\":\"env\""))
+  assert_true(declarations.contains("\"required\":false"))
+  assert_true(declarations.contains("\"name\":\"secret_key\""))
+  assert_true(declarations.contains("\"sensitive\":true"))
+  assert_true(declarations.contains("\"moduleSource\":\"./modules/labels\""))
+  assert_true(declarations.contains("\"providerRef\":\"aws.east\""))
+  assert_true(declarations.contains("data.aws_caller_identity.current"))
+  assert_true(declarations.contains("\"preventDestroy\":true"))
+  assert_true(declarations.contains("\"createBeforeDestroy\":true"))
+  assert_true(declarations.contains("\"ignoreChanges\":[\"tags\"]"))
+  assert_true(declarations.contains("\"name\":\"vpc_id_sensitive\""))
+  assert_true(declarations.contains("\"dependsOn\":[\"aws_vpc.main\"]"))
 
   cleanup_lsp_e2e(path)
 }

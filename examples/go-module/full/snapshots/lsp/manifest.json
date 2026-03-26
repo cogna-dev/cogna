@@ -77,6 +77,31 @@
             "signature": {
               "type": "string",
               "minLength": 1
+            },
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type_params": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "parameters": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "returns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "additionalProperties": false
@@ -140,7 +165,9 @@
                   "has_parameter",
                   "returns",
                   "references_type",
-                  "implements"
+                  "implements",
+                  "uses_provider",
+                  "provided_by"
                 ]
               },
               "target": {
@@ -186,6 +213,238 @@
             "server": {
               "type": "string",
               "minLength": 1
+            },
+            "providers": {
+              "type": "object",
+              "properties": {
+                "terraform": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "name"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "alias": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": true
+            },
+            "go": {
+              "type": "object",
+              "properties": {
+                "receiver": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "pointerReceiver": {
+                  "type": "boolean"
+                },
+                "embedded": {
+                  "type": "boolean"
+                },
+                "owner": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "fieldType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "importPath": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "importAlias": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "typeParams": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "methodSetTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "rust": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "typeParams": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "whereClause": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "traitTarget": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "implTarget": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "associated": {
+                  "type": "boolean"
+                },
+                "unsafe": {
+                  "type": "boolean"
+                },
+                "externAbi": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "terraform": {
+              "type": "object",
+              "properties": {
+                "required": {
+                  "type": "boolean"
+                },
+                "sensitive": {
+                  "type": "boolean"
+                },
+                "moduleSource": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "providerRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "dependsOn": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "preventDestroy": {
+                  "type": "boolean"
+                },
+                "createBeforeDestroy": {
+                  "type": "boolean"
+                },
+                "ignoreChanges": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "openapi": {
+              "type": "object",
+              "properties": {
+                "httpMethod": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "operationId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "parameterIn": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "mediaTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "statusCodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "callbackExpression": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "discriminatorProperty": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "discriminatorMapping": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "memberRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "securitySchemeType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "securitySchemeIn": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "securitySchemeName": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": true
@@ -202,12 +461,27 @@
   "artifacts": [
     {
       "path": "declarations.ndjson",
-      "sha256": "3b256aae210f5cb1ed8092f2ab28e01b1e6ba82d188ef628c584433073795734",
+      "sha256": "37e9cfc60ae0313a929e5599dfeaeb5fe7efafe12a5cf5b33444c2d22ecbd663",
       "compression": "none"
     },
     {
       "path": "symbols.ndjson",
-      "sha256": "94d63fc0a2ef3ebd7c13bbbb3fc7e7b68c8bb65596b8914054a9c75aa9dedf76",
+      "sha256": "517a3f6758390fe181e8cbfa5eb65a7d92fad58c43c483fa5727494ec8df132b",
+      "compression": "none"
+    },
+    {
+      "path": "software-components.ndjson",
+      "sha256": "cf05c96259ff6ec1bfaf8d20180efb28dfc3a71539d86fb76aab67545253426b",
+      "compression": "none"
+    },
+    {
+      "path": "sbom.cdx.json",
+      "sha256": "42fe04210ca30a8b533edb4afa24e9a5ff9d9162c188e327188607ed1d369958",
+      "compression": "none"
+    },
+    {
+      "path": "sbom.spdx.json",
+      "sha256": "02f1067e0f1cd26698b2f2e61fdb4eb6a98c4726cfece619102b5a970c40e75a",
       "compression": "none"
     }
   ]

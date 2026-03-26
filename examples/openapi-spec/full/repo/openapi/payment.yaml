@@ -51,6 +51,10 @@ paths:
               responses:
                 "200":
                   description: callback received
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Payment'
   /payments/{paymentId}:
     parameters:
       - name: paymentId
@@ -83,6 +87,10 @@ webhooks:
       responses:
         "200":
           description: received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
 
 components:
   parameters:

@@ -52,6 +52,30 @@ where
     }
 }
 
+impl<T> Service<T> for ApiItem<T>
+where
+    T: Clone,
+{
+    type Output = T;
+    const VERSION: u32 = API_VERSION;
+
+    fn call(&self, _input: T) -> Self::Output {
+        self.field.clone()
+    }
+}
+
+pub struct Borrowed<'a, const N: usize> {
+    pub slice: &'a [u8; N],
+}
+
+pub unsafe fn dangerous() -> i32 {
+    42
+}
+
+pub extern "C" fn c_add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
 /// Public alias doc comment.
 pub type Id = u64;
 

@@ -22,6 +22,19 @@ pub fn ciq_declaration_v1_schema() -> @json_schema.JsonSchema {
           "subkind": { "type": "string", "minLength": 1 },
           "form": { "type": "string", "enum": ["symbol", "callable"] },
           "signature": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "type_params": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+          },
+          "parameters": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+          },
+          "returns": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+          },
         },
         "additionalProperties": false,
       },
@@ -54,7 +67,7 @@ pub fn ciq_declaration_v1_schema() -> @json_schema.JsonSchema {
               "type": "string",
               "enum": [
                 "declared_in", "contains", "has_member", "has_parameter", "returns",
-                "references_type", "implements",
+                "references_type", "implements", "uses_provider", "provided_by",
               ],
             },
             "target": { "type": "string", "minLength": 1 },
@@ -78,6 +91,116 @@ pub fn ciq_declaration_v1_schema() -> @json_schema.JsonSchema {
         "properties": {
           "profile": { "type": "string", "minLength": 1 },
           "server": { "type": "string", "minLength": 1 },
+          "providers": {
+            "type": "object",
+            "properties": {
+              "terraform": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "source": { "type": "string", "minLength": 1 },
+                    "version": { "type": "string", "minLength": 1 },
+                    "alias": { "type": "string", "minLength": 1 },
+                  },
+                  "additionalProperties": false,
+                },
+              },
+            },
+            "additionalProperties": true,
+          },
+          "go": {
+            "type": "object",
+            "properties": {
+              "receiver": { "type": "string", "minLength": 1 },
+              "pointerReceiver": { "type": "boolean" },
+              "embedded": { "type": "boolean" },
+              "owner": { "type": "string", "minLength": 1 },
+              "fieldType": { "type": "string", "minLength": 1 },
+              "importPath": { "type": "string", "minLength": 1 },
+              "importAlias": { "type": "string", "minLength": 1 },
+              "typeParams": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+              "methodSetTypes": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+            },
+            "additionalProperties": false,
+          },
+          "rust": {
+            "type": "object",
+            "properties": {
+              "owner": { "type": "string", "minLength": 1 },
+              "typeParams": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+              "whereClause": { "type": "string", "minLength": 1 },
+              "traitTarget": { "type": "string", "minLength": 1 },
+              "implTarget": { "type": "string", "minLength": 1 },
+              "associated": { "type": "boolean" },
+              "unsafe": { "type": "boolean" },
+              "externAbi": { "type": "string", "minLength": 1 },
+            },
+            "additionalProperties": false,
+          },
+          "terraform": {
+            "type": "object",
+            "properties": {
+              "required": { "type": "boolean" },
+              "sensitive": { "type": "boolean" },
+              "moduleSource": { "type": "string", "minLength": 1 },
+              "providerRef": { "type": "string", "minLength": 1 },
+              "dependsOn": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+              "preventDestroy": { "type": "boolean" },
+              "createBeforeDestroy": { "type": "boolean" },
+              "ignoreChanges": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+            },
+            "additionalProperties": false,
+          },
+          "openapi": {
+            "type": "object",
+            "properties": {
+              "httpMethod": { "type": "string", "minLength": 1 },
+              "operationId": { "type": "string", "minLength": 1 },
+              "parameterIn": { "type": "string", "minLength": 1 },
+              "required": { "type": "boolean" },
+              "mediaTypes": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+              "statusCodes": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+              "ref": { "type": "string", "minLength": 1 },
+              "callbackExpression": { "type": "string", "minLength": 1 },
+              "discriminatorProperty": { "type": "string", "minLength": 1 },
+              "discriminatorMapping": {
+                "type": "object",
+                "additionalProperties": { "type": "string", "minLength": 1 },
+              },
+              "memberRefs": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+              },
+              "securitySchemeType": { "type": "string", "minLength": 1 },
+              "securitySchemeIn": { "type": "string", "minLength": 1 },
+              "securitySchemeName": { "type": "string", "minLength": 1 },
+            },
+            "additionalProperties": false,
+          },
         },
         "additionalProperties": true,
       },
