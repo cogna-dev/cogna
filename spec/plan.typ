@@ -4,35 +4,34 @@
 #show table.cell: set align(left)
 
 #show: arkheion.with(
-  title: "CodeIQ：单机 Local Registry、SBOM 与语义深度计划",
+  title: "CodeIQ：单机工作流与内置 OPA 兼容性策略计划",
   authors: (
     (name: "Yufei Li", email: "yufeiminds@gmail.com", affiliation: ""),
   ),
   abstract: [
-    CodeIQ 当前不再把 trust verifier、hosted registry、distributed distribution 或多节点 productization 作为产品方向。新的产品范围被固化为 #strong[单机 CLI + Local Registry]：CLI、Local Registry 与 MCP 共享同一套本地 bundle store，并以 `src/lib/sbom/*` 为新的组件分析基础层，从源码与包管理器文件提取标准化软件成分，导出 CycloneDX / SPDX，并基于软件成分与声明事实共同构建 bundle。在这一新范围下，后续主线不再是 remote / trust / hosted hardening，而是 #strong[共享本地存储收敛]、#strong[SBOM foundation]、#strong[provider semantic depth + CIQ schema richness] 与 #strong[OPA diff enrichment]。
+    CodeIQ 当前已经完成单机 Local Registry、SBOM foundation、provider semantic depth 与 OPA diff enrichment 的主线收口。接下来的 active plan 不再回到 trust verifier、remote registry 或 distributed productization，而是基于现有 `CIQ OPA Bundle`、`check --policy`、`semanticDiff` / `componentDiff` 与最小 SARIF runtime，推进 #strong[A002：内置 OPA 规则集]。这一阶段的目标，是把当前仍停留在浅层 `added/changed/removed/deprecated` 的默认规则，升级为覆盖 Go、Rust、Terraform 与 OpenAPI 的稳定 built-in OPA rules baseline，同时把用户文档继续收敛为 Divio 四象限结构，并保持所有对外说明与 repo reality 一致。
   ],
   keywords: (
     "CodeIQ",
     "Plan",
-    "Local Registry",
-    "SBOM",
-    "CycloneDX",
-    "SPDX",
     "OPA",
+    "Compatibility",
+    "SARIF",
+    "Local Registry",
+    "MCP",
   ),
-  date: "March 26, 2026",
+  date: "March 27, 2026",
 )
 
-= 产品范围重置
+= 当前 active boundary
 
-从当前版本开始，CodeIQ 的产品边界改为：
+从当前版本开始，CodeIQ 的 active boundary 固定为：#strong[单机 CLI + Local Registry + local query runtime]。
 
-- #strong[单机优先]：只面向单台机器上的 CLI、Local Registry 与 MCP 工作流；
-- #strong[单一共享存储]：本地 bundle cache 目录是唯一 authoritative storage，CLI / Local Registry / MCP 共享同一套本地 bundle store；
-- #strong[不再支持 trust verifier]：不再把签名校验、trust root、KMS、verified/untrusted policy 视为产品范围；
-- #strong[不再支持 distributed / hosted]：不再把 remote registry、分布式同步、多节点 HA、hosted deployment 视为目标能力；
-- #strong[新增 `src/lib/sbom/*`]：从源码与包管理器文件抽取标准化软件成分，支持 CycloneDX / SPDX 导出，并把软件成分信息纳入 bundle 构建输入；
-- #strong[继续推进语义与 policy]：在本地产品边界内，继续推进 provider semantic depth、CIQ schema richness 与 OPA diff。
+- #strong[单机优先]：`init / build / diff / check / query / publish / registry / mcp` 都服务于单台机器上的本地工作流；
+- #strong[共享本地存储]：CLI、Local Registry 与 MCP 共享同一套本地 bundle store，而不是面向 hosted / distributed deployment；
+- #strong[本地策略执行]：`check` 继续使用本地 `opa eval --bundle ... data.codeiq.compat.deny`，不引入 hosted policy runtime；
+- #strong[继续推进语义治理]：后续主线集中在 semantic diff、built-in policy、SARIF 可解释性和用户文档，而不是远端签名与多节点治理；
+- #strong[文档分层]：用户文档按 Divio 四象限组织，贡献者文档承接架构边界、计划与 proposal 对账。
 
 = 当前 repo 基线（可复用，不回退）
 
@@ -42,236 +41,144 @@
   stroke: 0.4pt,
   [*能力*], [*状态*], [*当前结论*], [*关键证据*],
 
-  [`workflow + CIQ artifacts`], [#strong[已完成]], [`init/build/diff/check/query`、CIQ Bundle / Diff / Result 与最小 SARIF 已形成稳定 repo baseline], [`src/cmd/main/main.mbt`；`src/cmd/build/main_test.mbt`；`src/cmd/diff/main_test.mbt`；`src/cmd/check/main_test.mbt`；`src/cmd/query/main_test.mbt`；`src/e2e/init_test.mbt`],
+  [`workflow + CIQ artifacts`], [#strong[已完成]], [`init → build → diff → check → query` 与 `publish / registry / mcp` 已形成单机 baseline], [`src/cmd/main/main.mbt`；`src/cmd/build/main_test.mbt`；`src/cmd/diff/main_test.mbt`；`src/cmd/check/main_test.mbt`；`src/cmd/query/main_test.mbt`],
 
-  [`provider extraction baseline`], [#strong[已完成，可复用]], [Go / Rust / Terraform / OpenAPI 都已有 extractor、snapshot 与 e2e 证据，但当前仍停留在 baseline extraction，而非 richer semantic depth], [`src/cmd/build/extractor.mbt`；`src/schema/declarations.mbt`；`src/cmd/build/snapshot_test.mbt`；`src/e2e/lsp_extractor_test.mbt`；`examples/*/full/snapshots/lsp/*`],
+  [`CIQ Bundle / CIQ OPA Bundle`], [#strong[已完成，可复用]], [`build` 已稳定产出 `ciq-bundle/v1` 与 `ciq-opa-bundle/v1`；`policy-bundle` 已进入 config/runtime contract], [`src/config/schema.mbt`；`src/cmd/build/main.mbt`；`src/cmd/build/main_test.mbt`],
 
-  [`Local Registry baseline`], [#strong[已完成，可复用]], [本地 publish / resolve / versions / detail / download 与 loopback HTTP 证据已存在，但当前 authoritative store 仍分裂在 `.codeiq/registry/*` 与 `.codeiq/cache/registry/*`], [`src/registry/storage.mbt`；`src/lib/registry/client.mbt`；`src/registry/server.mbt`；`src/cmd/registry/main_test.mbt`；`src/e2e/registry_test.mbt`；`src/e2e/registry_server_test.mbt`],
+  [`Local Registry baseline`], [#strong[已完成，可复用]], [本地 publish / resolve / versions / detail / download 与 loopback HTTP server 已闭环，产品边界明确为 local private registry], [`src/registry/server.mbt`；`src/cmd/registry/main.mbt`；`src/cmd/publish/main.mbt`；`src/e2e/registry_test.mbt`],
 
-  [`MCP local query runtime`], [#strong[已完成，可复用]], [`mcp start / status / stop / serve` 已切到真实 HTTP JSON-RPC runtime，并提供 `codeiq.query.outlines` / `codeiq.query.symbol`], [`src/lib/mcp-sdk/*`；`src/lib/server-runtime/*`；`src/cmd/mcp/main.mbt`；`src/cmd/mcp/core/main.mbt`；`src/cmd/mcp/main_test.mbt`；`src/cmd/mcp/core/main_test.mbt`],
+  [`MCP local query runtime`], [#strong[已完成，可复用]], [`mcp start / serve / status / stop` 已切到本地 JSON-RPC runtime，并暴露 `codeiq.query.outlines` / `codeiq.query.symbol` / `codeiq.runtime.context`], [`src/cmd/mcp/core/main.mbt`；`src/cmd/mcp/main_test.mbt`；`src/e2e/review/main_test.mbt`],
 
-  [`policy + diff baseline`], [#strong[已完成，可复用]], [`diff` / `check` / `CIQ OPA Bundle` 已可用，但当前仍是 `dist/base|target` + `opa eval --bundle ... data.codeiq.compat.deny` baseline], [`src/cmd/diff/main.mbt`；`src/cmd/check/main.mbt`；`src/schema/contracts.mbt`；`src/cmd/check/main_test.mbt`],
+  [`semantic diff + policy baseline`], [#strong[已完成，可复用]], [`diff` 已输出 `semanticCategory`、`semanticDiff`、`componentDiff`；`check` 已整形成 OPA-friendly input 并输出最小 SARIF], [`src/cmd/diff/main.mbt`；`src/cmd/check/main.mbt`；`src/schema/contracts.mbt`；`src/cmd/check/main_test.mbt`],
 
-  [`legacy remote / trust machinery`], [#strong[legacy，待退出 active scope]], [repo 里仍保留 `CODEIQ_REGISTRY_BASE_URL`、remote/inproc transport、OpenSSL verifier 与 hosted wording；它们是迁移输入，不再是产品目标], [`src/lib/registry/client.mbt`；`src/lib/registry/main.mbt`；`src/cmd/publish/main.mbt`；`docs/src/content/docs/cli.mdx`；`spec/proposal.typ`],
+  [`built-in default policy rules`], [#strong[过浅，待升级]], [当前 `policy.rules.json` 仍只有 `compat.removed/changed/deprecated/added-public-api` 四条浅层规则，无法承接 Go / Rust / Terraform / OpenAPI richer semantic categories], [`src/cmd/build/main.mbt`；`src/cmd/build/main_test.mbt`],
+
+  [`docs information architecture`], [#strong[已完成 baseline，需继续充实]], [用户文档已按 Divio 四象限收口，但仍需继续补足 proposal 中对用户仍有价值的命令、产物、流程和边界信息], [`docs/src/pages/index.astro`；`docs/src/pages/docs/index.astro`；`docs/src/content/docs/*`],
 )
 
 = 范围收敛后的硬约束
 
-- #strong[唯一 authoritative storage 收敛到 `.codeiq/cache/*`]；
-- #strong[Local Registry 只是共享本地 bundle store 的命令 / HTTP façade，而不是独立产品]；
-- #strong[不再把 trust verifier / trust root / KMS 写入 active plan]；
-- #strong[不再把 remote / hosted / distributed support 写入 active plan]；
-- #strong[新的实现代码继续落在 `src/` 下，因此 SBOM library 规划为 `src/lib/sbom/*`]；
-- #strong[同一时刻只有一个 active release；只有当前 active release 保留详细执行清单]。
+- #strong[唯一 authoritative storage 继续收敛到本地 cache / registry store]；
+- #strong[Local Registry 只是共享本地 bundle store 的 façade，不是 hosted product]；
+- #strong[`check` 继续以本地 `opa eval --bundle ... data.codeiq.compat.deny` 为唯一 active runtime]；
+- #strong[新 policy 设计必须优先消费当前已经存在的 `semanticCategory` / `semanticDiff` / `componentDiff`]；
+- #strong[同一时刻只有一个 active detailed item；完成项和未来项保持 summary-only]；
+- #strong[用户文档必须优先描述 repo reality，而不是 proposal 中更宽的 aspiration wording]。
 
-= Release ledger（按新产品范围重排）
+= Delivery ledger（按当前边界重排）
 
 #table(
   columns: (18%, 18%, 28%, 36%),
   inset: 6pt,
   stroke: 0.4pt,
-  [*Release*], [*状态*], [*范围*], [*当前结论*],
+  [*Item*], [*状态*], [*范围*], [*当前结论*],
 
-  [`R5`], [#strong[completed]], [`Core Workflow Complete`], [`init → build → diff → check → query` 的 repo baseline 已闭环],
-  [`R6`], [#strong[completed]], [`Single-Machine Registry Baseline`], [本地 publish / registry baseline 已形成可回归闭环],
-  [`R7`], [#strong[completed]], [`Provider Baseline Coverage`], [provider evidence matrix 已冻结为 baseline 证据],
-  [`R8`], [#strong[completed]], [`历史 trust/verifier baseline`], [历史 shell verifier / trust hardening 已完成，但不再继续作为产品方向],
-  [`R9`], [#strong[completed]], [`历史 remote/security baseline`], [历史 remote auth / transport gate baseline 已完成，但不再继续作为产品方向],
-  [`R10`], [#strong[completed]], [`Local Server Capability & Shared Framework Extraction`], [MCP / Registry 本地 server capability、共享框架抽取与 zstd 移除已完成],
-  [`R11`], [#strong[completed]], [`Local-Only Storage + SBOM Foundation`], [共享本地 bundle store、SBOM foundation、bundle integration 与 docs sync 已完成],
-  [`R12`], [#strong[completed]], [`Provider Semantic Depth + CIQ Schema Richness`], [provider semantic depth、consumer readiness 与 R13 handoff 已完成],
-  [`R13`], [#strong[completed]], [`OPA Diff Enrichment`], [semantic diff、component diff、OPA input shaping 与 SARIF enrichment 已完成闭环],
+  [`R11`], [#strong[completed]], [`Local-Only Storage + SBOM Foundation`], [共享本地 store、SBOM foundation、bundle integration 与 docs sync 已完成],
+  [`R12`], [#strong[completed]], [`Provider Semantic Depth + CIQ Schema Richness`], [provider semantic depth、consumer readiness 与 richer declaration transport 已完成],
+  [`R13`], [#strong[completed]], [`OPA Diff Enrichment`], [`semanticCategory` / `semanticDiff` / `componentDiff`、OPA input shaping 与 SARIF enrichment 已完成闭环],
+  [`A002`], [#strong[active]], [`Built-in OPA Rules`], [下一阶段主线：把当前 shallow default policy rules 升级为 Go / Rust / Terraform / OpenAPI built-in OPA rules baseline，并同步 docs / dashboard],
 )
 
 == R11：Local-Only Storage + SBOM Foundation（completed summary）
 
-- #strong[Completed outcomes]：
-  - `.codeiq/cache/registry/*` 已成为 CLI / Local Registry / MCP 共用的 authoritative local store；
-  - trust verifier、remote registry 与 distributed / hosted wording 已从 active implementation 与 docs surface 移出；
-  - `src/lib/sbom/*` 已提供 component model、source + package-manager collection，以及 CycloneDX / SPDX exporter；
-  - build / bundle / query / diff 已消费 `software-components.ndjson`、`sbom.cdx.json`、`sbom.spdx.json`；
-  - active docs / dashboard / proposal 已按单机 Local Registry 范围同步。
+- `.codeiq/cache/*` 与 Local Registry baseline 已成为当前 bundle materialization / sharing 的 authoritative local surface；
+- `software-components.ndjson`、`sbom.cdx.json`、`sbom.spdx.json` 已成为 bundle contract 的稳定组成部分；
+- trust verifier、remote registry、distributed / hosted wording 已退出 active plan。
 
 == R12：Provider Semantic Depth + CIQ Schema Richness（completed summary）
 
-- #strong[Release focus]：把当前 `signature + shape + language_specific` baseline 推进到可稳定落盘、可被 query / diff / bundle reader 接受、并能为 R13 的 OPA diff 提供输入的 richer semantics；
-- #strong[Release principles]：
-  - 保持 `id / kind / path / signature / location` 作为当前 declaration identity / matching contract；
-  - 新语义优先以 #strong[additive] 方式落到 `shape`、`relations` 与 `language_specific`，避免破坏现有 bundle / query / diff 主链路；
-  - 每个 slice 都必须同时更新 #strong[schema + extractor + examples snapshots + tests + active docs]；
-  - `R12` 只解决 richer facts 与 consumer readiness，不把 declaration semantic diff / SBOM semantic diff 的完整 policy 判定提前到 `R13`。
-
-#table(
-  columns: (12%, 14%, 30%, 44%),
-  inset: 6pt,
-  stroke: 0.4pt,
-  [*Stage*], [*状态*], [*范围*], [*当前结论*],
-
-  [`R12-1`], [#strong[completed]], [`Terraform provider semantic depth`], [Terraform `provider` / `required_providers` / `resource` / `data` 已具备 `uses_provider` / `provided_by` relation，以及 `language_specific.providers.terraform[*]` 的 `name` / `source` / `version` / `alias` contract],
-
-  [`R12-2`], [#strong[completed]], [`Shared CIQ schema enrichment + relation-depth foundation`], [shared `shape` / `relations` / `language_specific` foundation、bundle/query/diff consumer readiness 与 richer snapshots/tests 已完成收口],
-
-  [`R12-3`], [#strong[completed]], [`Go semantic depth`], [receiver、pointer receiver、embedding、method ownership、method set 与 type relation 已提升为稳定 declaration facts，并完成 snapshots/tests/docs 收口],
-
-  [`R12-4`], [#strong[completed]], [`Rust semantic depth`], [trait / impl、associated item、generic、where clause、unsafe / extern 与 ownership/relations 已提升为稳定 additive declaration facts],
-
-  [`R12-5`], [#strong[completed]], [`Terraform contract depth`], [variable/output/module/lifecycle/meta-argument 的 parser-first contract semantics 已提升为稳定 additive declaration facts，并完成 snapshots/tests/docs 收口],
-
-  [`R12-6`], [#strong[completed]], [`OpenAPI semantic depth`], [parameter location / requiredness、request/response media types、statusCodes、discriminator mapping、composition member refs 与 callback/security parser-first contract 已完成收口],
-
-  [`R12-7`], [#strong[completed]], [`Consumer readiness + R13 handoff`], [`ciq-result` / `ciq-diff` handoff surface 已明确，richer declarations 已可被 bundle / query / diff 稳定 transport，并把 semantic interpretation 清晰移交给 `R13`],
-)
-
-=== R12-1：Terraform provider semantic depth（completed summary）
-
-- #strong[Goal]：在不改变当前 declaration stable identity 的前提下，把 Terraform provider-level facts 从 snapshot evidence 提升为 schema-backed contract；
-- #strong[Completed outcomes]：
-  - `src/schema/declarations.mbt` 已接受 `uses_provider` / `provided_by` relation；
-  - `language_specific.providers.terraform[*]` 已支持 `name`、`source`、`version`、`alias`；
-  - `src/cmd/build/extractor.mbt` 已把 `required_providers`、`provider`、`resource`、`data` 连接成 provider-aware facts；
-  - `src/schema/declarations_test.mbt`、`src/e2e/lsp_extractor_test.mbt` 与 `examples/terraform-module/full/snapshots/lsp/*` 已形成验证闭环。
-- #strong[Passed verify]：
-  - `moon test src/schema/declarations_test.mbt --target wasm -v`
-  - `moon test src/e2e/lsp_extractor_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/snapshot_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon check`
-
-=== R12-2：Shared CIQ schema enrichment + relation-depth foundation（completed summary）
-
-- #strong[Goal]：为 Go / Rust / Terraform / OpenAPI 的后续 richer semantics 建立统一、可验证、向后兼容的 declaration contract foundation；
-- #strong[Completed outcomes]：
-  - declaration schema 与 result contract 已稳定接受 shared richer `shape` / `language_specific` payload，并保持 `id / kind / path / signature / location` stable identity 不变；
-  - `src/cmd/build/extractor.mbt` 已把 Go / Rust / Terraform / OpenAPI 的 shared richer facts 落到稳定 snapshots，修正了一轮 heuristic 偏差；
-  - `src/cmd/bundle/reader.mbt`、`src/cmd/query/main.mbt`、`src/cmd/diff/main.mbt` 已形成“接受 / 透传 / 比较” richer declaration payload 的 consumer baseline；
-  - `src/schema/declarations_test.mbt`、`src/schema/contracts_test.mbt`、`src/cmd/query/main_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/cmd/bundle/reader_test.mbt`、`src/e2e/lsp_extractor_test.mbt` 与 `examples/*/full/snapshots/lsp/*` 已形成 shared foundation 验证闭环。
-- #strong[Passed verify]：
-  - `moon test src/schema/declarations_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/snapshot_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/e2e/lsp_extractor_test.mbt --target wasm -v`
-  - `moon check`
-
-=== R12-3：Go semantic depth（completed summary）
-
-- #strong[Goal]：把 Go 当前 examples 中已经存在的 receiver、embedding、generic 与 method-set 相关语义，从 baseline snapshot 提升为稳定 CIQ facts；
-- #strong[Completed outcomes]：
-  - `src/cmd/build/extractor.mbt` 已补齐 Go method/function/field 的 richer relation rewrite，并新增 method ownership、embedding index 与 method-set propagation；
-  - `src/schema/declarations.mbt` 已接受 `language_specific.go.methodSetTypes`，让 Go method-set 成为 schema-backed contract；
-  - `examples/go-module/full/repo/main.go`、`examples/go-module/full/snapshots/lsp/declarations.ndjson` 已补 value receiver fixture 与稳定 golden evidence；
-  - `src/e2e/lsp_extractor_test.mbt`、`src/cmd/query/main_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/cmd/bundle/reader_test.mbt` 已覆盖 richer Go facts 的 consumer compatibility。
-- #strong[Passed verify]：
-  - `moon test src/schema/declarations_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/snapshot_test.mbt --target wasm -v`
-  - `moon test src/e2e/lsp_extractor_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon build`
-  - `moon check`
-
-=== R12-4：Rust semantic depth（completed summary）
-
-- #strong[Goal]：把 Rust 当前 baseline 中的 trait / impl / associated item / generic surface 继续提升为稳定、可比较、可 query 的 richer CIQ facts；
-- #strong[Completed outcomes]：
-  - `src/cmd/build/extractor.mbt` 已补齐 Rust `unsafe` / `externAbi` / richer type params / owner normalization，并新增 Rust postprocess relation rewrite 与 owner/member/implements propagation；
-  - `examples/rust-crate/full/repo/lib.rs` 已补 trait impl、lifetime + const-generic、`unsafe fn` 与 `extern "C" fn` fixtures；
-  - `examples/rust-crate/full/snapshots/lsp/*` 已刷新为稳定 Rust semantic depth golden evidence，覆盖 trait impl、ownership、`implements` 与 `language_specific.rust` richer facts；
-  - `src/schema/declarations_test.mbt`、`src/e2e/lsp_extractor_test.mbt`、`src/cmd/query/main_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/cmd/bundle/reader_test.mbt` 已形成 schema + consumer readiness 验证闭环。
-- #strong[Passed verify]：
-  - `moon test src/schema/declarations_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/snapshot_test.mbt --target wasm -v`
-  - `moon test src/e2e/lsp_extractor_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon build`
-  - `moon check`
-
-=== R12-5：Terraform contract depth（completed summary）
-
-- #strong[Goal]：在已完成 provider slice 的基础上，继续把 Terraform 的 variable / output / module / lifecycle / meta-argument semantics 提升到稳定 declaration contract；
-- #strong[Completed outcomes]：
-  - `src/cmd/build/extractor.mbt` 已补 variable requiredness、module provider binding、output/meta `depends_on`、以及 lifecycle `preventDestroy` / `createBeforeDestroy` / `ignoreChanges` 的 parser-first richer facts；
-  - `src/schema/declarations.mbt` 已接受新增 Terraform lifecycle metadata，保持 `language_specific.terraform` additive contract；
-  - `examples/terraform-module/full/repo/main.tf` 与 `examples/terraform-module/full/snapshots/lsp/*` 已补 optional/sensitive variables、sensitive output、module provider binding、resource/module/output depends_on 与 lifecycle golden evidence；
-  - `src/schema/declarations_test.mbt`、`src/e2e/lsp_extractor_test.mbt`、`src/cmd/query/main_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/cmd/bundle/reader_test.mbt` 已验证 Terraform richer facts 的 schema 与 consumer compatibility。
-- #strong[Passed verify]：
-  - `moon test src/schema/declarations_test.mbt --target wasm -v`
-  - `moon test src/schema/contracts_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/snapshot_test.mbt --target wasm -v`
-  - `moon test src/e2e/lsp_extractor_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon build`
-  - `moon check`
-
-=== R12-6：OpenAPI semantic depth（completed summary）
-
-- #strong[Goal]：把 OpenAPI 当前已存在的 path / operation / schema baseline，推进到 parameter location、requiredness、media type、explicit statusCodes、discriminator / composition / callback scope 的稳定 declaration contract；
-- #strong[Completed outcomes]：
-  - `src/cmd/build/extractor.mbt` 已补齐 parameter location / requiredness、requestBody required/mediaTypes、response statusCodes/mediaTypes、callbackExpression、security scheme type/location/name、以及 composition member refs / discriminator mapping 的 parser-first richer facts；
-  - `src/schema/declarations.mbt` 已接受 `language_specific.openapi.discriminatorMapping` 与 `memberRefs`，保持 OpenAPI richer contract additive；
-  - `examples/openapi-spec/full/repo/openapi/payment.yaml` 与 `examples/openapi-spec/full/snapshots/lsp/*` 已补 callback/webhook response media-type evidence 并刷新 golden snapshots；
-  - `src/schema/declarations_test.mbt`、`src/e2e/lsp_extractor_test.mbt`、`src/cmd/query/main_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/cmd/bundle/reader_test.mbt` 已验证 OpenAPI richer facts 的 schema 与 consumer compatibility。
-- #strong[Passed verify]：
-  - `moon test src/schema/declarations_test.mbt --target wasm -v`
-  - `moon test src/cmd/build/snapshot_test.mbt --target wasm -v`
-  - `moon test src/e2e/lsp_extractor_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon build`
-  - `moon check`
-
-=== R12-7：Consumer readiness + R13 handoff（completed summary）
-
-- #strong[Goal]：确保 richer declaration facts 在 `build`、`bundle reader`、`query`、`diff` 与后续 OPA input 之间形成稳定 handoff，而不会提前把 `R13` 的 semantic diff 责任混入 `R12`；
-- #strong[Completed outcomes]：
-  - `src/schema/contracts.mbt` 已明确 `ciq-result/v1` 的 additive consumer payload surface，并允许 `ciq-diff/v1` change entries 稳定承载 `beforeRecord` / `afterRecord` handoff evidence；
-  - `src/cmd/query/main.mbt` 现在在不改变 selector / matching behavior 的前提下，稳定透传 `path`、`name`、`canonical_name`、`language`、`baselineRole`、`source_refs`、`relations`、`visibility`、`docs`、`shape` 与 `language_specific`；
-  - `src/cmd/diff/main.mbt` 继续使用 stable keys 做匹配，但对 `changed` / `added` / `removed` / `deprecated` 输出 additive richer before/after records，供 `R13` 直接消费；
-  - `src/schema/contracts_test.mbt`、`src/cmd/query/main_test.mbt`、`src/cmd/diff/main_test.mbt` 与 `src/cmd/bundle/reader_test.mbt` 已形成 consumer-readiness regression coverage，并证明 richer payload 是 transport surface 而非新 identity。
-- #strong[R12 → R13 handoff matrix]：
-  - stable identity 仍是 `id / kind / path / signature / location`；
-  - additive consumer payload 包括 `shape`、`language_specific`、`name`、`canonical_name`、`language`、`baselineRole`、`source_refs`、`relations`、`visibility`、`docs`；
-  - `ciq-diff/v1` 的 `beforeRecord` / `afterRecord` 只提供 richer evidence，不在 `R12` 内解释为 semantic policy judgement；
-  - provider semantic diff、SBOM diff、OPA input shaping 与 policy interpretation 明确留给 `R13`。
-- #strong[Passed verify]：
-  - `moon test src/schema/contracts_test.mbt --target wasm -v`
-  - `moon test src/cmd/query/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/bundle/reader_test.mbt --target wasm -v`
-  - `moon build`
-  - `moon check`
+- Go / Rust / Terraform / OpenAPI 的 richer declaration facts 已稳定落到 `shape`、`relations` 与 `language_specific` additive contract；
+- `build`、`bundle reader`、`query` 与 `diff` 已形成接收 / 透传 / 比较 richer payload 的 consumer baseline；
+- `beforeRecord` / `afterRecord` 已可作为 `ciq-diff/v1` richer evidence handoff。
 
 == R13：OPA Diff Enrichment（completed summary）
 
-- #strong[Release focus]：消费 `R12` 已交付的 richer declaration / component evidence，推进 declaration semantic diff、provider semantic diff 与 SBOM diff 的统一 policy input；
-- #strong[Completed outcomes]：
-  - `src/cmd/diff/main.mbt` 已对 changed declarations 输出 `semanticCategory` 与 `semanticDiff`，并对 component changes 输出 `componentDiff`；
-  - component diff 现在按稳定 component identity 聚合升级，不再把纯版本升级拆成 remove + add；
-  - `src/cmd/check/main.mbt` 已把 diff 整形成 OPA-friendly envelope（`changes` + `componentChanges`），并在 SARIF 中使用 semantic category 与 declaration record location enrichment；
-  - `src/schema/contracts.mbt` 已显式接受 `componentDiff`，相关 contract tests 已同步；
-  - `src/cmd/check/main_test.mbt` 已验证真实 diff record 的 `location.uri` / `startLine` 会进入 SARIF。
-- #strong[Passed verify]：
-  - `moon test src/schema/contracts_test.mbt --target wasm -v`
-  - `moon test src/cmd/diff/main_test.mbt --target wasm -v`
-  - `moon test src/cmd/check/main_test.mbt --target wasm -v`
-  - `moon build`
-  - `moon check`
+- `diff` 已对 declaration changes 输出 `semanticCategory` 与 `semanticDiff`，并对 component changes 输出 `componentDiff`；
+- `check` 已把 diff 整形成 OPA-friendly envelope（`changes` + `componentChanges`），并输出 local minimal SARIF v2.1.0；
+- 当前 policy runtime 已可消费本地 `CIQ OPA Bundle`，但 built-in 默认规则仍停留在 shallow baseline。
+
+= A002：Built-in OPA Rules（active）
+
+A002 的目标不是重新设计 policy runtime，而是：#strong[把当前 repo 已经存在的 `policy-bundle + opa eval + semantic diff + SARIF` 主线，提升为真正可工程化消费的 built-in OPA rules baseline]。
+
+== 为什么 A002 是下一阶段 active item
+
+#table(
+  columns: (22%, 18%, 60%),
+  inset: 6pt,
+  stroke: 0.4pt,
+  [*锚点*], [*当前状态*], [*A002 响应*],
+
+  [`policy-bundle profile`], [#strong[已实现]], [继续沿用 `ciq-opa-bundle/v1` 与 `codeiq/compat/deny` manifest contract，把 built-in rules 做成 canonical baseline],
+  [`check runtime`], [#strong[已实现]], [继续使用 `opa eval --bundle ... data.codeiq.compat.deny`，不引入 hosted 或 remote policy evaluation],
+  [`semanticDiff match surface`], [#strong[待统一]], [当前 diff 已有 enriched evidence；A002 的下一步是把 canonical match surface 收敛到 `semanticDiff.findings[]`，并清理不必要的重复 selector],
+  [`policy.rules.json`], [#strong[过浅]], [把当前四条浅层规则升级为 generated rule catalog，最小化字段并与 Rego authoring source 保持同源],
+  [`SARIF mapping`], [#strong[已实现 baseline]], [继续保持 `rule_id` / `level` / `message` / `path` / `docs` → SARIF 的稳定映射，不发明第二套 report format],
+)
+
+== A002 总体验收标准
+
+- #strong[规则 taxonomy 冻结]：至少覆盖 `compat.core.*`、`compat.go.*`、`compat.rust.*`、`compat.terraform.*`、`compat.openapi.*`、`compat.component.*`；
+- #strong[输入契约稳定]：stage-1 规则直接消费当前 `prepare_opa_input(diff)` 结构，stage-2 richer rules 只以 additive input 扩展推进；
+- #strong[输出契约稳定]：policy decision object 至少稳定承载 `rule_id`、`level`、`message`，并带 `path` / `docs` 作为 report enrichment；
+- #strong[docs 与 dashboard 对齐]：用户文档明确当前 local-only boundary、supported ecosystems、policy-bundle 用法与 built-in baseline 方向；
+- #strong[不回退 scope]：不把 trust verifier、remote registry、distributed replication 重新拉回 active plan。
+
+== A002 stage ledger
+
+#table(
+  columns: (14%, 16%, 30%, 40%),
+  inset: 6pt,
+  stroke: 0.4pt,
+  [*Stage*], [*状态*], [*范围*], [*验收结果*],
+
+  [`A002-1`], [#strong[completed]], [design freeze + spec authoring], [`spec/A002-opa-builtin-rules.typ` 冻结 `semanticDiff.findings[]` canonical contract、`data.codeiq.compat.deny`、Rego vs catalog 分工、deliverables 与 stage rollout],
+  [`A002-2`], [#strong[active]], [core + Go / Rust built-ins], [把 shallow built-in rules 升级为 `compat.core.*`、`compat.go.*`、`compat.rust.*` stage-1 baseline，并同步 tests / docs],
+  [`A002-3`], [pending], [OPA input enrichment], [把 `beforeRecord` / `afterRecord` 与 richer component evidence 以 additive 方式加入 OPA input],
+  [`A002-4`], [pending], [Terraform / OpenAPI deeper rules], [在 richer input ready 后实现 `compat.terraform.*` 与 `compat.openapi.*` stage-2 rules],
+  [`A002-5`], [pending], [override / catalog / acceptance], [完成 exact-rule overrides、catalog/docs 对齐与 SARIF acceptance regression],
+)
+
+=== A002-2：core + Go / Rust built-ins（active detailed checklist）
+
+- #strong[目标]：把 `default_policy_rules()` 当前输出的四条 shallow 规则，升级为与 `semanticDiff.findings[]` 对齐的 built-in OPA rules baseline；
+- #strong[必须交付]：
+  - built-in rule ids 至少覆盖 `compat.core.removed-declaration`、`compat.core.new-declaration`、`compat.core.deprecated-declaration`、`compat.go.*`、`compat.rust.*`；
+  - `policy.rules.json` 升级为真正的 generated rule catalog，而不是仅按 `kind` 分类的浅层目录；
+  - stage-1 built-in rules 统一通过 `findings[]` 匹配 normalized codes，而不是混用 top-level `semanticCategory` 与 raw `changedFields`；
+  - `build` / `check` tests 明确验证新的 rule ids、docs/helpUri 与 built-in catalog contract；
+  - 用户文档解释当前 built-in baseline 仍是 local-only policy library，而不是 hosted policy service。
+- #strong[实现原则]：
+  - 优先匹配 `semanticDiff.findings[]` 中的 normalized codes；
+  - 允许一个 change 因多个 findings 产出多条 policy result，但 generic shared rule 必须通过 selector 避免与更具体的 ecosystem rule 重复；
+  - 保持 `error / warning / note` severity model 与当前 SARIF runtime 一致；
+  - 继续让 `check --policy <bundle>` 成为用户侧显式入口，不在本阶段扩展自动 alias resolution。
+- #strong[通过标准]：
+  - `policy-bundle` build artifact 与 `policy.rules.json` contract 升级后仍满足 `ciq-opa-bundle/v1`；
+  - `check` 产出的 SARIF `ruleId` / `helpUri` 与 built-in catalog 一致；
+  - 新文档与 progress dashboard 只把 `A002-2` 作为 detailed active stage，已完成与未来阶段保持 summary-only。
+
+=== A002-3：OPA input enrichment（summary-only）
+
+- 仅在 `A002-2` built-in baseline 稳定后推进；
+- 目标是把 `beforeRecord` / `afterRecord` 与 richer component evidence 直接暴露给 OPA，以支撑 Terraform / OpenAPI deeper rules；
+- 不改变当前 `check` 命令入口和 OPA entrypoint。
+
+=== A002-4：Terraform / OpenAPI deeper rules（summary-only）
+
+- 依赖 richer input ready；
+- 重点覆盖 `input became required`、`output removed`、`response status removed`、`response schema narrowed` 等更深 breaking judgement；
+- 保持 `findings[] first`，只在需要时读取 before/after contract evidence。
+
+=== A002-5：override / catalog / acceptance（summary-only）
+
+- 仅支持 exact rule id 级别的 disable / level override；
+- 完成 built-in catalog、docs、schema/tests 与 SARIF acceptance 收口；
+- 不引入 wildcard family override、path-level suppression 或 remote policy layering。
 
 = Proposal 对账（proposal → implementation reconciliation）
 
-`spec/proposal.typ` 继续保留项目申报、问题定义与技术叙事价值，但它不再等同于当前 repo 的 active contract。当前计划文档以 #strong[实现 + schema + tests + docs] 为准，并把 proposal 中仍停留在历史样例、aspirational wording 或 broader narrative 的部分显式降格为背景说明。
+`spec/proposal.typ` 继续保留项目申报、问题定义、场景叙事与术语价值；但当前 active plan 以 #strong[实现 + schema + tests + docs] 为准，尤其不能再把更宽的 registry / trust / hosted / distributed wording 读成当前承诺。
 
 #table(
   columns: (20%, 16%, 28%, 36%),
@@ -279,34 +186,35 @@
   stroke: 0.4pt,
   [*Proposal surface*], [*状态*], [*当前对账结论*], [*关键证据*],
 
-  [`CIQ Config`], [#strong[implemented differently]], [proposal 只把 `profile` 写成 `go-module` / `rust-crate` / `terraform-module` / `openapi-spec`；当前 schema 与 build/runtime 已把 `policy-bundle` 纳入正式 contract], [`src/config/schema.mbt`；`src/cmd/build/main.mbt`；`src/cmd/build/main_test.mbt`],
+  [`CIQ Config`], [#strong[implemented differently]], [proposal 中 `profile` 只列四个生态；当前 schema 已把 `policy-bundle` 纳入正式 contract], [`src/config/schema.mbt`；`src/cmd/build/main.mbt`],
 
-  [`CIQ Bundle / declaration shape`], [#strong[implemented differently]], [proposal 仍把 `shape` 写成 reserved-for-future-design；当前 repo 已把 `shape`、`relations` 与 `language_specific` 落为稳定 additive declaration contract，并被 build / bundle reader / query / diff 共同消费], [`src/schema/declarations.mbt`；`src/cmd/build/extractor.mbt`；`src/cmd/bundle/reader.mbt`；`src/cmd/query/main.mbt`；`src/cmd/diff/main.mbt`],
+  [`CIQ Bundle / declaration contract`], [#strong[implemented differently]], [proposal 中把 `shape` 写作 reserved-for-future-design；当前 repo 已把 `shape`、`relations` 与 `language_specific` 落成 additive declaration contract], [`src/schema/declarations.mbt`；`src/cmd/build/extractor.mbt`；`src/cmd/query/main.mbt`],
 
-  [`CIQ OPA Bundle`], [#strong[implemented differently]], [当前 active path 是本地 policy bundle + `opa eval --bundle ...` 的 CLI runtime；proposal 中对 OPA bundle/signature/distribution 的更宽泛叙事不应再被读成当前 release promise], [`src/cmd/check/main.mbt`；`src/cmd/build/main.mbt`；`src/schema/contracts.mbt`],
+  [`CIQ OPA Bundle`], [#strong[implemented differently]], [proposal 用更宽的 OPA / policy distribution narrative；当前 repo reality 是本地 `ciq-opa-bundle/v1` + `opa eval --bundle ... data.codeiq.compat.deny`], [`src/cmd/build/main.mbt`；`src/cmd/check/main.mbt`],
 
-  [`CIQ Diff`], [#strong[implemented differently]], [proposal 样例仍以浅层 `kind` / `id` / `path` / `level` + `testChanges` 为主；当前 `R13` 基线已经稳定输出 `semanticCategory`、`semanticDiff`、`componentDiff`、`beforeRecord` / `afterRecord` 与 OPA-friendly handoff surface], [`src/cmd/diff/main.mbt`；`src/schema/contracts.mbt`；`src/cmd/diff/main_test.mbt`；`src/cmd/check/main_test.mbt`],
+  [`CIQ Diff`], [#strong[implemented differently]], [proposal 样例仍以浅层 `kind` / `level` 为主；当前 `R13` 已稳定输出 `semanticCategory`、`semanticDiff`、`componentDiff` 与 richer handoff evidence], [`src/cmd/diff/main.mbt`；`src/schema/contracts.mbt`；`src/cmd/diff/main_test.mbt`],
 
-  [`SARIF`], [#strong[implemented differently]], [当前 repo 承诺的是 #strong[本地 minimal SARIF v2.1.0 output]：由 diff + OPA runtime 合成并经最小 schema 校验；proposal 中任何关于 hosted ingestion / broad consumer compatibility 的含义，都不属于当前 active claim], [`src/cmd/check/main.mbt`；`src/cmd/check/main_test.mbt`；`spec/proposal.typ`],
+  [`SARIF`], [#strong[implemented differently]], [当前 repo 承诺的是 #strong[local minimal SARIF v2.1.0 output]，由 diff + policy runtime 合成，而不是 hosted ingestion promise], [`src/cmd/check/main.mbt`；`src/cmd/check/main_test.mbt`],
 
-  [`Local Registry`], [#strong[partially implemented]], [本地 publish / versions / detail / download 已闭环，但当前产品边界只能表述为 #strong[local private registry / local cache / shared local store]；proposal 中更宽的 registry narrative 只能作为背景，不再视为 hosted capability 承诺], [`src/registry/storage.mbt`；`src/lib/registry/client.mbt`；`src/cmd/registry/main_test.mbt`；`src/e2e/registry_test.mbt`],
+  [`Local Registry`], [#strong[partially implemented]], [当前产品边界只能表述为 local private registry / local cache / shared local store，不应再写成 hosted registry capability], [`src/registry/server.mbt`；`src/cmd/registry/main.mbt`；`src/cmd/publish/main.mbt`],
 
-  [`MCP Agent`], [#strong[implemented differently]], [当前实现是 single-machine local HTTP JSON-RPC query runtime，工具面除 `codeiq.query.outlines` / `codeiq.query.symbol` 外还包括 `codeiq.runtime.context`；proposal 中“按依赖自动发现并装载相关 bundle”的说法宽于当前 cache / cwd / PURL materialization 行为], [`src/cmd/mcp/core/main.mbt`；`src/cmd/mcp/core/main_test.mbt`；`src/e2e/review/main_test.mbt`],
+  [`MCP Agent`], [#strong[implemented differently]], [当前实现是 single-machine local query runtime，稳定工具面为 `codeiq.query.outlines` / `codeiq.query.symbol` / `codeiq.runtime.context`], [`src/cmd/mcp/core/main.mbt`；`src/cmd/mcp/core/main_test.mbt`],
 
-  [`PURL terminology`], [#strong[partially implemented]], [repo 继续把 PURL 作为 canonical identifier，但 `pkg:terraform` / `pkg:openapi` 仍应被视为 interoperability-sensitive wording；对外叙述必须保留 proposal 已提到的 `pkg:generic` fallback caveat], [`spec/proposal.typ`；`src/config/schema.mbt`；`src/cmd/build/snapshot_test.mbt`],
+  [`Built-in policy baseline`], [#strong[active gap，正在推进]], [proposal 只说明 `CIQ OPA Bundle` 的一般形态；A002 正把它落为覆盖多生态的 canonical built-in rules baseline], [`spec/A002-opa-builtin-rules.typ`；`src/cmd/build/main.mbt`；`src/cmd/check/main.mbt`],
 )
 
-- #strong[Planning rule]：后续 active release 一律以 repo 中已验证的 schema / tests / docs 为准，不再以 proposal 示例 JSON 或 aspiration wording 直接定义当前 contract；
-- #strong[Documentation rule]：继续保留 proposal 的问题定义与技术动机，但所有 reference / dashboard / release ledger 必须优先描述当前 local-only runtime reality；
-- #strong[Terminology rule]：Registry 统一写作 local private registry / local cache，MCP 统一写作 local query runtime，SARIF 统一写作 local minimal SARIF v2.1.0 output，避免再把 hosted / remote / broad-ecosystem compatibility 写成当前承诺。
+- #strong[Planning rule]：后续 active item 一律以 repo 中已验证的 schema / implementation / tests / docs 为准；
+- #strong[Documentation rule]：用户文档继续保留 proposal 中对用户仍有价值的目标、流程、命令、产物与边界信息，但不承诺 repo 尚未实现的 hosted / distributed capability；
+- #strong[Terminology rule]：Registry 统一写作 local private registry / local cache，MCP 统一写作 local query runtime，SARIF 统一写作 local minimal SARIF v2.1.0 output。
 
 = Non-goals（当前明确不做）
 
 - #strong[trust verifier / trust root / key rotation / KMS]；
 - #strong[remote registry / hosted registry / distributed replication / multi-node HA]；
-- #strong[把 remote auth / transport hardening 继续作为主线 roadmap]；
-- #strong[把 Local Registry 做成独立云产品，而不是本地 façade]。
+- #strong[把 remote auth / transport hardening 重新拉回主线 roadmap]；
+- #strong[把 MCP 扩展成 build / diff / check / publish 的替代入口]；
+- #strong[在 A002 中引入 path-based suppression、wildcard family overrides 或 remote policy layering]。
 
 = 当前阶段结论
 
-CodeIQ 的当前基线已经完成从本地存储收敛、SBOM foundation、provider semantic depth 到 OPA diff enrichment 的主线闭环；proposal 对账后，当前 active plan 也已经明确区分了 repo reality 与 broader narrative。后续 release 应继续在这一单机边界上推进，而不是回到 remote/trust/distributed hardening。
+R11–R13 已经把 CodeIQ 的单机工作流、SBOM、semantic diff 与本地 policy runtime 基线收口。当前 active plan 因此不再追求更宽的 hosted / trust / distributed 叙事，而是把下一阶段清晰收束为 #strong[A002 built-in OPA compatibility library]：先把 stage-1 built-ins、rule catalog、docs 与 dashboard 对齐，再逐步推进 richer input 和 Terraform / OpenAPI deeper rules。

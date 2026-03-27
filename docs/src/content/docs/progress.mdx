@@ -1,113 +1,50 @@
 ---
-title: Progress / Product Status
-description: 查看当前 release ledger、产品边界、proposal 对账结论，以及当前明确的非目标。
-order: 11
+title: 当前状态
+description: 解释今天的 CodeIQ 可以做什么、适合什么边界，以及当前 active stage 对用户意味着什么。
+order: 12
 ---
 
-# Progress / Product Status
+# 当前状态
 
-这一页只回答一个问题：#strong[今天的 CodeIQ 到底已经做到哪里，当前边界又在哪里？]
+这一页属于 #strong[Explanation]：它解释当前产品状态，而不是记录内部计划细节。
 
-它不是“怎么用”的第一入口，而是帮助你判断：
+> 最后更新时间：2026-03-27（Asia/Shanghai）
 
-- 当前成熟度够不够支撑你的使用场景；
-- 哪些能力已经形成稳定基线；
-- 哪些历史叙事不应再被理解为当前 active promise。
+## 当前适合做什么？
 
-> 最后更新时间：2026-03-26（Asia/Shanghai）
+- 本机 build / diff / check / query
+- 本机共享 bundle
+- 本机 AI / Agent 查询
 
-## 当前总览
+## 当前 active stage：A002-2 内置 OPA 规则集
 
-当前 CodeIQ 的产品边界已经明确收敛为：#strong[单机 CLI + Local Registry + local query runtime]。
+当前正在推进的不是新的 hosted 平台，而是：#strong[把已经存在的本地 OPA runtime 升级为更完整的 built-in OPA rules baseline]。
 
-这意味着当前主线围绕这些能力展开：
+这对用户意味着：
 
-- 共享本地 bundle store；
-- declaration facts + software component facts；
-- CycloneDX / SPDX SBOM 导出；
-- richer semantic diff；
-- local minimal SARIF v2.1.0 output；
-- 本机上的查询与复用工作流。
+- `check` 仍然是本地执行的 `opa eval --bundle ...`；
+- 当前 policy 的 authoring 形式仍然是本地 Rego 文件，经 `build` 打包成 OPA bundle；
+- `CIQ Diff` 的下一步重点不再是只给一个 primary category，而是提供统一的 `semanticDiff.findings[]`，让一个 change 可以同时携带多个 semantic facts；
+- 用户现在仍然应该显式传入本地 policy bundle，文档和 CLI 也都按这个现实来写。
 
-## Release ledger
+## 已完成的基础能力（summary-only）
 
-| Release | 范围 | 当前状态 | 当前结论 |
-| --- | --- | --- | --- |
-| R5 | Core Workflow Complete | ✅ Completed | `init -> build -> diff -> check -> query` baseline 已闭环 |
-| R6 | Single-Machine Registry Baseline | ✅ Completed | 本地 publish / registry baseline 已完成 |
-| R7 | Provider Matrix Coverage | ✅ Completed | provider evidence matrix 已冻结为 baseline 证据 |
-| R8 | 历史 trust/verifier baseline | ✅ Completed | 已完成，但不再继续作为当前产品方向 |
-| R9 | 历史 remote/security baseline | ✅ Completed | 已完成，但不再继续作为当前产品方向 |
-| R10 | Local Server Capability & Shared Framework Extraction | ✅ Completed | 本地 server capability 与共享框架抽取已完成 |
-| R11 | Local-Only Storage + SBOM Foundation | ✅ Completed | 共享本地 store、SBOM foundation 与 bundle integration 已完成 |
-| R12 | Provider Semantic Depth + CIQ Schema Richness | ✅ Completed | provider semantic depth、consumer readiness 与 handoff 已完成 |
-| R13 | OPA Diff Enrichment | ✅ Completed | semantic diff、component diff、OPA input shaping 与 SARIF enrichment 已闭环 |
+- R11：共享本地存储与 SBOM foundation 已完成；
+- R12：Go / Rust / Terraform / OpenAPI richer declaration facts 已完成；
+- R13：`semanticDiff` / `componentDiff` 与最小 SARIF runtime 已完成，接下来由 A002 继续把 semantic match contract 统一化。
 
-## 当前产品范围（active scope）
+## 下一步（summary-only）
 
-- #strong[单机优先]：只面向本机上的 CLI / Local Registry / local query runtime；
-- #strong[共享本地存储]：本地 bundle cache 是唯一 authoritative storage；
-- #strong[继续推进语义和 policy]：当前继续围绕 richer declaration facts、SBOM 和 semantic diff 演进；
-- #strong[不支持 hosted / distributed]：不再把 remote registry、多节点 HA、hosted deployment 写入 active scope；
-- #strong[不支持 trust verifier 主线]：不再把 trust verifier、trust root、KMS 作为当前产品主线。
+- 在 built-in rule catalog 稳定后，再继续推进 richer OPA input；
+- richer input ready 后，再继续推进 Terraform / OpenAPI deeper breaking-change rules。
 
-## 当前最值得用户关心的完成项
+## 当前不适合做什么？
 
-### R11 · Local-Only Storage + SBOM Foundation
+- hosted registry
+- distributed sync
+- multi-node HA
+- trust verifier / KMS
 
-- `.codeiq/cache/registry/*` 已成为共享本地 store；
-- `src/lib/sbom/*` 已提供 component model、采集与导出能力；
-- bundle/query/diff 已开始消费 `software-components.ndjson`、`sbom.cdx.json`、`sbom.spdx.json`。
+## 如果你需要更详细的内部进展
 
-### R12 · Provider Semantic Depth + CIQ Schema Richness
-
-- richer `shape` / `relations` / `language_specific` 已成为当前稳定 contract 的一部分；
-- query、diff、bundle reader 已能稳定透传这些 richer payload；
-- Go、Rust、Terraform、OpenAPI 的 richer facts 已形成当前可验证基线。
-
-### R13 · OPA Diff Enrichment
-
-- diff 已能输出 `semanticCategory`、`semanticDiff`、`componentDiff`；
-- check 已能把 diff 整形成 OPA-friendly 输入；
-- SARIF 输出已带上更丰富的 semantic / location 信息。
-
-## Proposal → implementation reconciliation（摘要）
-
-`spec/proposal.typ` 仍保留项目申报和问题定义价值，但它已经不再等同于当前 repo 的 active contract。
-
-当前文档和实现都遵循这个规则：#strong[以 schema + implementation + tests + docs 的已验证现实为准]。
-
-对用户来说，这个对账最重要的含义是：
-
-- `shape` 已经不是“未来再设计”，而是当前稳定 declaration contract 的一部分；
-- `CIQ Diff` 已经不只是浅层 add/remove/change marker，而是 richer semantic surface；
-- `SARIF` 当前应理解为本地 minimal output，不应被误解成 hosted ingestion promise；
-- `MCP` 当前应理解为 local query runtime，而不是 broader hosted MCP ecosystem promise；
-- Local Registry 当前应理解为 local private registry / local cache，而不是 hosted product。
-
-## 当前文档状态
-
-- 文档站已按用户视角完成一轮完整重构：导航现分为 #strong[Start Here]、#strong[Common Tasks]、#strong[Core Concepts]、#strong[Reference & Status]；
-- 首页与 docs layout 已改为任务优先入口，不再把内部模块结构直接暴露为主要导航心智；
-- 当前 docs 主要页面已覆盖：第一次跑通、发版前兼容性检查、AI / Agent 查询、本机 bundle 共享、产物模型、本地 runtime 边界、CLI reference、MCP / Registry reference 与产品状态；
-- 这轮重构的目标不是增加新功能，而是让当前 local-only reality 更容易被最终用户理解和采用。
-
-## 当前明确非目标
-
-下面这些内容现在都不应被理解成当前产品承诺：
-
-- trust verifier / trust root / key rotation / KMS
-- remote registry / hosted registry
-- distributed replication / multi-node HA
-- 把 Local Registry 做成云产品
-- 把 build / diff / check / publish 迁移成查询运行时职责
-
-## 这页应该什么时候读？
-
-如果你想知道“现在能不能正式评估接入、文档里哪些说法才代表当前事实”，就应该读这页。
-
-## 相关页面
-
-- 如果你想从用户任务进入，请回到 [CodeIQ 能帮我解决什么问题？](/docs/introduction)。
-- 如果你想查具体命令，请读 [CLI Reference](/docs/cli)。
-- 如果你想理解本地边界，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。
+请改看贡献者文档：[/contrib/progress](/contrib/progress)
