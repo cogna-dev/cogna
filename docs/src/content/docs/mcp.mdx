@@ -1,94 +1,34 @@
 ---
-title: 让 AI / Agent 查询依赖与 API
-description: 理解什么时候用 CLI query，什么时候用 local query runtime，以及为什么推荐 outlines → symbol 的查询顺序。
+title: AI 查询
+description: 如何用 CLI query 或 MCP 查询依赖与 API，并推荐从 outlines 到 symbol 的顺序使用。
 order: 4
 ---
 
-# 让 AI / Agent 查询依赖与 API
+# AI 查询
 
-如果你的目标是“让 AI 在一个第三方库、Terraform Module 或 OpenAPI 规格里更可靠地找到答案”，那么你应该把 CodeIQ 理解成 #strong[先构建上下文，再消费上下文] 的工具，而不是一个随时替代所有 CLI 操作的万能入口。
+这一页属于 #strong[How-to]：当你要让 AI / Agent 查询接口时，直接照这里做。
 
-## 先记住一个原则
+## 两种方式
 
-CodeIQ 里的 AI / Agent 查询分成两种使用方式：
-
-| 场景 | 更适合什么入口 |
+| 场景 | 入口 |
 | --- | --- |
-| 一次性查询、脚本、CI | `codeiq query` |
-| 交互式、多轮查询、AI Agent 会不断追问 | `codeiq mcp start` |
+| 一次性查询 | `codeiq query` |
+| 多轮交互式查询 | `codeiq mcp start` |
 
-也就是说：
+它们的边界很明确：
 
-- 如果你只想查一个符号，CLI query 往往更简单；
-- 如果你希望 AI 连续追问多个接口，local query runtime 更合适。
+- `query` 适合脚本、单次调试、CI 里的离线读取；
+- `mcp start` / `mcp serve` 适合本地 AI / Agent 多轮查询；
+- `build`、`diff`、`check`、`publish` 仍然应该通过 CLI 完成，而不是通过 MCP 触发。
 
-## 典型路径
+## 推荐顺序
 
-```bash
-codeiq build ./sdk
-codeiq mcp start
-```
+1. `codeiq.query.outlines`
+2. `codeiq.query.symbol`
 
-这条路径适合下面这些情况：
+这样更容易先缩小范围，再看细节。
 
-- 你已经把 bundle 构建好了；
-- 你想让 AI 基于本地产物做多轮查询；
-- 你不想让 AI 只依赖 README、注释片段或仓库全文搜索。
-
-## 为什么推荐 `outlines → symbol`？
-
-这是当前最适合 AI 的查询顺序。
-
-### 第一步：`codeiq.query.outlines`
-
-它的作用不是直接给你最终答案，而是给 AI 一个“公开接口大纲”。
-
-它适合回答：
-
-- 这个包大概有哪些公开模块、类型、函数或路径？
-- 当前任务最可能相关的入口有哪些？
-- 下一步应该精查哪个 symbol？
-
-### 第二步：`codeiq.query.symbol`
-
-当你已经有目标 path 或 selector 之后，再用它来拿精确信息。
-
-它更适合回答：
-
-- 这个具体函数/类型/契约的签名是什么？
-- 它在什么位置？
-- 它有哪些关系、注释、结构化字段？
-- 对 Terraform / OpenAPI 来说，它的契约摘要是什么？
-
-这种两段式查询的好处是：AI 先缩小范围，再拿精确事实，通常会比“直接盲猜某个 symbol 名称”更稳定。
-
-## CLI query 和 MCP 的边界是什么？
-
-这是用户最容易混淆的地方。
-
-| 能力 | 应该走哪个入口 |
-| --- | --- |
-| 构建 bundle | CLI |
-| 生成 diff | CLI |
-| 执行 check / OPA / SARIF | CLI |
-| 发布到 Local Registry | CLI |
-| 一次性查询 | CLI query |
-| 多轮交互式查询 | local query runtime |
-
-换句话说：#strong[MCP 在这里是本地查询入口，不是构建和治理入口]。
-
-## local query runtime 当前是怎么工作的？
-
-在当前实现里，它是一个 #strong[single-machine local HTTP JSON-RPC runtime]。
-
-这意味着：
-
-- 它只负责查询；
-- 它和 CLI / Local Registry 共享本地 bundle cache；
-- 如果当前工作目录没有现成的 `dist/` bundle，它也可以按 PURL 从共享本地 store 物化一份 bundle 再继续查询；
-- 它不承诺 hosted agent、远端发现、跨节点 tool registry。
-
-## 常用命令
+## MCP 常用命令
 
 ```bash
 codeiq mcp start
@@ -97,22 +37,28 @@ codeiq mcp stop
 codeiq mcp serve
 ```
 
-- `start`：启动本地查询服务；
-- `status`：检查是否可用；
-- `stop`：关闭本地服务；
-- `serve`：以前台方式运行，适合调试和本地集成。
+当前 MCP runtime 会优先读取当前工作目录下的 `dist/manifest.json`；如果你传入的 PURL 不在当前目录，它会尝试从本地 registry / cache materialize 对应 bundle，而不是走远端 hosted query。
 
-## 什么时候你应该优先接入这页的能力？
+## MCP tools
 
-如果你满足下面任一情况，优先做 AI / Agent 查询接入通常很有价值：
+- `codeiq.query.outlines`
+- `codeiq.query.symbol`
+- `codeiq.runtime.context`
 
-- 你经常让 AI 帮你理解第三方库；
-- 你希望 AI 基于当前版本的真实接口，而不是历史文档；
-- 你需要在一个较大的包里逐步缩小范围，而不是一次性把整个仓库塞进上下文；
-- 你想让 CLI 和 AI 共用同一份本地 bundle 来源。
+推荐的调用顺序是：
+
+1. 先用 `codeiq.query.outlines` 浏览某个 PURL 的公开接口大纲；
+2. 再用 `codeiq.query.symbol` 精确读取某个 path / selector 的签名、位置、docs、shape、relations 和 `language_specific`；
+3. 需要调试 runtime 状态时，再看 `codeiq.runtime.context`。
+
+## 一个最小的调用心智
+
+- 先用 `outlines` 找候选路径
+- 再用 `symbol` 查具体签名、位置和说明
+
+这套心智同样适用于 Terraform / OpenAPI：先缩小 contract 范围，再精确读取 declaration facts。
 
 ## 下一步
 
-- 如果你想把同一份 bundle 交给同机多个工具复用，请读 [在本机共享 bundle：publish / registry / materialize](/docs/bundle-sharing)。
-- 如果你想理解 bundle、diff、result 和 SARIF 分别是什么，请读 [理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF](/docs/indexing)。
-- 如果你需要精确参数和接口，请读 [MCP / Registry Reference](/docs/runtime-reference)。
+- 命令与接口：[/docs/runtime-reference](/docs/runtime-reference)
+- 共享 Bundle：[/docs/bundle-sharing](/docs/bundle-sharing)

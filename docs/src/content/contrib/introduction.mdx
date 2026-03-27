@@ -1,0 +1,70 @@
+---
+title: 贡献指南
+description: 面向贡献者的最短入口：如何理解仓库、运行检查、维护用户文档，以及继续阅读内部参考。
+order: 1
+---
+
+# 贡献指南
+
+这组文档面向贡献者、维护者和需要理解内部边界的人，而不是普通使用者。
+
+如果你要做的是：
+
+- 开发新功能；
+- 调整文档结构；
+- 对齐 spec、实现和 dashboard；
+- 理解当前 local-only 边界与内部约束；
+
+请从这里开始。
+
+## 先看哪里？
+
+- 用户使用方式：`/docs/*`
+- 当前内部边界：[/contrib/architecture](/contrib/architecture)
+- 当前 release ledger：[/contrib/progress](/contrib/progress)
+
+## 与用户文档的关系
+
+用户文档现在按 Divio 四象限组织：
+
+- Tutorials：帮助用户第一次跑通
+- How-to：帮助用户完成具体任务
+- Reference：提供精确命令、格式和接口
+- Explanation：解释产品定位、工作方式和边界
+
+贡献者文档不替代这些页面，而是补充：
+
+- proposal 与实现的对账
+- 计划与 release ledger
+- 架构边界与维护规则
+
+## 本地开发常用命令
+
+### 主仓库
+
+```bash
+moon check
+moon test
+```
+
+### 文档站
+
+```bash
+cd docs
+pnpm dev
+pnpm build
+```
+
+## 仓库里最重要的文档入口
+
+- `README.md`：对外入口，保持简洁，只讲用户价值和入口链接；
+- `CONTRIBUTING.md`：仓库级贡献说明；
+- `docs/src/content/docs/*`：用户文档；
+- `docs/src/content/contrib/*`：贡献者文档；
+- `spec/plan.typ`、`spec/proposal.typ`：计划与 proposal 背景。
+
+## 对文档的要求
+
+- 用户文档只讲使用，不暴露内部实现路径和设计争论；
+- 贡献者文档负责记录架构边界、计划、proposal 对账和维护约束；
+- 每轮文档开发后，记得同步用户文档、贡献者文档和 README。

@@ -1,97 +1,92 @@
 ---
-title: 发版前兼容性检查
-description: 从 bundle 到 diff 到 check，理解如何在发布前得到结构化的兼容性结论和 SARIF 输出。
+title: 发版检查
+description: 如何在发布前生成 diff、执行 policy check，并读懂 SARIF 结果。
 order: 3
 ---
 
-# 发版前兼容性检查
+# 发版检查
 
-如果你是 SDK、库、Terraform Module 或 OpenAPI 的维护者，这通常会是你最关心的一页。
+这一页属于 #strong[How-to]：当你要发布时，按这里的步骤做。
 
-CodeIQ 在这个场景里解决的核心问题不是“找所有改动”，而是：#strong[在发布前，把公开接口和契约变化整理成一份可检查、可解释、可进入审查流程的结果]。
+## 目标
 
-## 最短路径
+在发布前回答三个问题：
+
+1. 这次变了什么？
+2. 哪些变化值得警惕？
+3. 是否违反了本地 policy？
+
+## 步骤
 
 ```bash
 codeiq build ./sdk
-codeiq diff ./sdk
-codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+codeiq diff ./sdk --since <last-release-commit> --test-changes true
+codeiq check ./sdk/dist/diff.json --policy ./policy/dist/bundle.ciq.tgz
 ```
 
-这三步分别回答三个不同的问题：
+这里的关键点有两个：
 
-- `build`：当前版本到底公开了什么？
-- `diff`：和基线相比，到底变了什么？
-- `check`：这些变化是否违反了本地 policy？
+- 当前 `check` 仍然要求显式传入一个本地 policy bundle；
+- 如果 policy repo 使用 `profile: policy-bundle` 构建，实际可传入的产物通常是 `dist/bundle.ciq.tgz`。
 
-## 为什么不能只看源码 diff？
+## 先看哪些结果？
 
-源码 diff 更适合看“实现上改了哪些行”，但发布前兼容性检查更关心的是：
+### `dist/diff.json`
 
-- 某个公开函数是不是被删了；
-- 某个 method 是否变成了更危险的版本；
-- 某个 OpenAPI parameter 是否从 optional 变成了 required；
-- 某个软件成分是不是发生了版本升级；
-- 这些变化里哪些只是 note，哪些已经值得 warning 或 error。
+优先看：
 
-CodeIQ 的 `CIQ Diff` 就是在回答这个问题。
+- `summary`
+- `changes[*].kind`
+- `changes[*].level`
+- `changes[*].semanticCategory`
+- `changes[*].semanticDiff`
+- `changes[*].beforeRecord` / `changes[*].afterRecord`
+- `componentChanges`
 
-## `CIQ Diff` 里最值得先看的字段
+当前 repo 已经为很多 change 做了 richer semantic shaping。例如：
 
-对于用户来说，不需要先看完所有 JSON 细节。优先关注这些内容：
+- Go：receiver、pointer receiver、method set、signature 变化
+- Rust：`unsafe`、extern ABI、where clause、signature 变化
+- Terraform：provider ref、lifecycle、meta-argument 变化
+- OpenAPI：HTTP method、requiredness、status code、media type 变化
 
-### `changes[*].kind`
+### `dist/check.sarif.json`
 
-告诉你这是新增、删除、修改还是弃用。
+优先看：
 
-### `changes[*].level`
+- `level = error`：通常意味着高风险
+- `level = warning`：值得重点确认
+- `level = note`：补充信息
 
-告诉你这是更偏向 breaking、warning 还是 note。
+当前最小 SARIF 会把 policy decision 映射成：
 
-### `changes[*].semanticCategory`
+- `ruleId`
+- `level`
+- `message.text`
+- `locations[].physicalLocation.artifactLocation.uri`
+- `tool.driver.rules[].helpUri`
 
-这是当前更有价值的字段：它不是只告诉你“改了”，而是告诉你“改成了什么类型的变化”。
+因此，在看 SARIF 时，优先确认：
 
-### `changes[*].beforeRecord` / `afterRecord`
+- 是哪条 policy rule 触发了结果；
+- 结果落在哪个源文件 / 契约文件；
+- `helpUri` 是否指向了你团队约定的 policy 文档。
 
-如果你要追查具体证据，这里能帮助你看到变化前后的声明记录，而不是只看一条抽象描述。
+## 适合谁？
 
-### `componentChanges`
+- SDK / Library 维护者
+- OpenAPI / Terraform 维护者
+- 要做发布前门禁的团队
 
-如果你关心的是软件成分变化、版本升级或依赖结构变化，这部分是重点。
+## 相关输入长什么样？
 
-## `check` 做了什么？
+- 代码 / 规格 repo 先生成 `CIQ Bundle`
+- policy repo 生成 `CIQ OPA Bundle`
+- `check` 消费的是 `CIQ Diff + local policy bundle`
 
-`check` 不会重新分析仓库。它做的是：
-
-1. 读取 `CIQ Diff`；
-2. 把 diff 整形成 OPA-friendly 输入；
-3. 调用本地 `opa eval --bundle ...`；
-4. 把决策结果合并为一份本地 `SARIF` 输出。
-
-因此，`check` 的价值在于把“结构化变更事实”转换成“可审查、可门禁”的结果层。
-
-## 如何读 `SARIF`？
-
-第一次使用时，你可以把它简单理解成三层信号：
-
-- `error`：高风险，通常表示需要阻断或人工明确审批；
-- `warning`：值得重点检查，但未必必须阻断；
-- `note`：信息性结果，帮助你理解变化背景。
-
-当前 CodeIQ 的文档口径应理解为：#strong[本地 minimal SARIF v2.1.0 output]。它足够支持当前本机工作流，但不应被误解为“已经承诺所有 hosted 平台都能零调整直接消费”。
-
-## 什么时候这条路径最值得接入？
-
-你很适合优先接入这条路径，如果你满足以下任一情况：
-
-- 你经常发版 SDK / Library；
-- 你维护的 OpenAPI 变化需要被团队审查；
-- 你希望把 Terraform / OpenAPI / 代码接口治理统一到一套工作流；
-- 你不想只靠人肉 review 来判断这次改动是否破坏兼容性。
+如果你想精确查 bundle、diff、policy-bundle 和 SARIF 的文件结构，请看：[/docs/indexing](/docs/indexing)
 
 ## 下一步
 
-- 如果你想让 AI 查询构建结果，请读 [让 AI / Agent 查询依赖与 API](/docs/mcp)。
-- 如果你想把 bundle 交给同机多个工具复用，请读 [在本机共享 bundle：publish / registry / materialize](/docs/bundle-sharing)。
-- 如果你想理解 `Diff / SARIF / Bundle` 分别是什么，请读 [理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF](/docs/indexing)。
+- AI 查询：[/docs/mcp](/docs/mcp)
+- MCP / Registry 参考：[/docs/runtime-reference](/docs/runtime-reference)

@@ -1,0 +1,84 @@
+---
+title: 配置与 PURL
+description: 了解 codeiq.yaml 的关键字段、支持的 profile，以及如何为仓库选择 PURL。
+order: 7
+---
+
+# 配置与 PURL
+
+这一页属于 #strong[Reference]：它用来精确查阅 `codeiq.yaml` 和 PURL，而不是做教程。
+
+## `codeiq.yaml` 最小示例
+
+```yaml
+schemaVersion: ciq-config/v1
+profile: openapi-spec
+purl: pkg:openapi/acme/payment-api@2026.03.01
+source:
+  repo: https://github.com/acme/payment-api
+  ref: main
+inputs:
+  include:
+    - openapi/**/*.yaml
+checks:
+  format: sarif
+  policy: default-compat
+```
+
+## `policy-bundle` 示例
+
+当仓库本身是 policy repo 时，当前最小配置通常类似：
+
+```yaml
+schemaVersion: ciq-config/v1
+profile: policy-bundle
+purl: pkg:generic/acme/compat-policy@2026.03.27
+source:
+  repo: https://github.com/acme/compat-policy
+  ref: main
+inputs:
+  include:
+    - "**/*.rego"
+checks:
+  format: sarif
+  policy: default-compat
+```
+
+## 关键字段
+
+| 字段 | 作用 |
+| --- | --- |
+| `schemaVersion` | 配置 schema 版本，当前为 `ciq-config/v1` |
+| `profile` | 仓库类型 |
+| `purl` | 当前仓库或产物的唯一标识 |
+| `source.repo` / `source.ref` | 仓库来源 |
+| `inputs.include` | 要参与构建的代码或规格文件 |
+| `checks.format` | 当前固定为 `sarif` |
+| `checks.policy` | 策略名称或约定字符串；当前 CLI 运行时仍建议显式传 `--policy <bundle-path>` |
+
+## 当前支持的 profile
+
+- `go-module`
+- `rust-crate`
+- `terraform-module`
+- `openapi-spec`
+- `policy-bundle`
+
+## PURL 示例
+
+```text
+pkg:golang/github.com/gin-gonic/gin@1.10.0
+pkg:cargo/tokio@1.43.0
+pkg:terraform/hashicorp/terraform-aws-vpc@5.18.1
+pkg:openapi/acme/payment-api@2026.03.01
+```
+
+CodeIQ 当前把 PURL 作为 canonical identifier。对于 `pkg:terraform` 和 `pkg:openapi`，如果你要和不认识这些 type 的外部工具互通，可能需要准备 `pkg:generic` fallback；但在当前 repo 文档与示例里，这些 type 仍然是主表达方式。
+
+## 什么时候看这页？
+
+- 你在写 `codeiq.yaml`
+- 你在决定 profile
+- 你在准备 query、registry download 或 publish 时需要准确的 PURL
+
+如果你想看设计边界和 proposal 背景，请读：[/contrib/architecture](/contrib/architecture)

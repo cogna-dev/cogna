@@ -1,24 +1,46 @@
 ---
-import { getCollection } from "astro:content"
-
-const docs = await getCollection("docs")
-  .then((entries) =>
-    entries.sort((a, b) => {
-      const orderDiff = (a.data.order ?? 999) - (b.data.order ?? 999)
-      if (orderDiff !== 0) {
-        return orderDiff
-      }
-      return a.id.localeCompare(b.id)
-    }),
-  )
-
-const first = docs[0]
-
-if (!first) {
-  return Astro.redirect("/")
-}
-
-return Astro.redirect(
-  `/docs/${first.id.replace(/^docs\//, "").replace(/\.mdx?$/, "")}`,
-)
+import Layout from "@/layouts/doc.astro"
 ---
+
+<Layout title="用户文档" description="CodeIQ 用户文档，按四象限组织。" headings={[]}>
+	<h1>用户文档</h1>
+	<p>
+		本节按 Divio 的四象限组织：<strong>Tutorials</strong>、<strong>How-to</strong>、<strong>Reference</strong>、<strong>Explanation</strong>。
+	</p>
+	<p>
+		如果你是第一次接触 CodeIQ，请先走 Tutorials；如果你已经知道要完成什么任务，请直接打开 How-to；如果你需要查命令、
+		Bundle、Diff、SARIF、Registry 或 MCP 的准确字段与接口，请看 Reference；如果你想理解 local-only 边界、支持范围和工作方式，请看 Explanation。
+	</p>
+
+	<h2>Tutorials</h2>
+	<p>从零跑通一次初始化、构建、对比、检查与查询，先得到一条完整成功路径。</p>
+	<ul>
+		<li><a href="/docs/quickstart">快速开始</a></li>
+	</ul>
+
+	<h2>How-to</h2>
+	<p>围绕明确目标给出步骤：发版检查、AI 查询、共享 Bundle。</p>
+	<ul>
+		<li><a href="/docs/release-check">发版检查</a></li>
+		<li><a href="/docs/mcp">AI 查询</a></li>
+		<li><a href="/docs/bundle-sharing">共享 Bundle</a></li>
+	</ul>
+
+	<h2>Reference</h2>
+	<p>精确查阅命令、配置、Bundle 结构、结果文件、MCP / Registry 接口和支持 profile。</p>
+	<ul>
+		<li><a href="/docs/cli">CLI</a></li>
+		<li><a href="/docs/config">配置与 PURL</a></li>
+		<li><a href="/docs/indexing">Bundle 与结果</a></li>
+		<li><a href="/docs/runtime-reference">MCP / Registry</a></li>
+	</ul>
+
+	<h2>Explanation</h2>
+	<p>解释产品定位、单机工作方式、当前边界与成熟度，帮助你判断何时该使用 CodeIQ。</p>
+	<ul>
+		<li><a href="/docs/introduction">概览</a></li>
+		<li><a href="/docs/runtime-model">工作方式</a></li>
+		<li><a href="/docs/providers">支持范围</a></li>
+		<li><a href="/docs/progress">当前状态</a></li>
+	</ul>
+</Layout>

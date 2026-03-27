@@ -3,7 +3,7 @@ import Base from "@/layouts/base.astro"
 import { Header } from "@/components/primitive/header"
 import { DocsLayout } from "@/components/doc/doc-layout"
 import { Footer } from "@/components/primitive/footer"
-import { footerMenus, topNavigation, userSidebar } from "@/lib/navigation"
+import { contributorSidebar, footerMenus, topNavigation } from "@/lib/navigation"
 
 interface Props {
   title?: string
@@ -18,7 +18,7 @@ const currentPath = Astro.url.pathname
 <Base title={title} description={description}>
 	<Header client:load header={{
 		title: "CodeIQ",
-		description: "面向声明与变更治理的本地工作流",
+		description: "贡献者文档与内部参考",
 		menus: topNavigation,
 		homeHref: "/",
 	}} />
@@ -27,14 +27,14 @@ const currentPath = Astro.url.pathname
 		title={title || ""}
 		description={description}
 		headings={headings}
-		sidebar={userSidebar}
+		sidebar={contributorSidebar}
 		currentPath={currentPath}
 	>
 		<slot />
 	</DocsLayout>
 	<Footer client:load footer={{
 		title: "CodeIQ",
-		description: "Tutorials / How-to / Reference / Explanation",
+		description: "贡献者文档与内部参考",
 		menus: footerMenus,
 		copyright: "CodeIQ",
 	}} socials={{}} />

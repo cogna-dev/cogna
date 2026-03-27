@@ -1,105 +1,53 @@
 ---
-title: 支持范围与当前限制
-description: 从用户视角理解当前支持哪些 profile、哪些语义已经稳定、哪些能力明确不在当前范围内。
-order: 8
+title: 支持范围
+description: 解释当前支持哪些仓库类型、适合哪些使用方式，以及当前明确不做什么。
+order: 11
 ---
 
-# 支持范围与当前限制
+# 支持范围
 
-如果你在评估是否要把 CodeIQ 接入自己的仓库，这一页最重要。
+这一页属于 #strong[Explanation]：它解释当前适用边界，而不是逐条列参数。
 
-它回答的不是“内部 extractor 是怎么实现的”，而是：#strong[今天你到底能依赖什么，哪些事情现在还不应该指望它去做]。
+## 当前支持
 
-## 当前支持哪些 profile？
+- Go module
+- Rust crate
+- Terraform Module
+- OpenAPI specification
+- OPA policy bundle
 
-当前文档和实现口径里，主要支持以下 profile：
+## 各 profile 当前关注什么？
 
-| Profile | 适合什么仓库 | 当前你可以期待什么 |
-| --- | --- | --- |
-| `go-module` | Go 模块 / SDK | 公开函数、类型、方法、关系和更丰富的声明事实 |
-| `rust-crate` | Rust crate | trait / impl / associated item / generics 等 richer facts |
-| `terraform-module` | Terraform Module | variable / output / resource / provider / lifecycle 等契约事实 |
-| `openapi-spec` | OpenAPI 规格仓库 | path / operation / schema / parameter / response 等 API 契约事实 |
-| `policy-bundle` | OPA policy 仓库 | 供 `check` 使用的本地 policy bundle |
+| Profile | 当前关注的公开事实 |
+| --- | --- |
+| `go-module` | 导出函数、类型、常量、接口、方法集等声明变化 |
+| `rust-crate` | public item、trait / impl、unsafe / extern、where clause 等声明变化 |
+| `terraform-module` | variable、output、module、provider、lifecycle 与 meta-argument 契约 |
+| `openapi-spec` | path、operation、parameter、request / response、schema 等 API contract |
+| `policy-bundle` | Rego policy、OPA bundle entrypoint、policy catalog |
 
-## 当前哪些事实已经足够稳定？
+## 当前适合的使用方式
 
-从用户角度看，你现在可以把下面这些产物视为当前稳定基线的一部分：
+- 本机 build / diff / check / query
+- 本机共享 bundle
+- 本机 AI / Agent 查询
 
-- 公开声明事实（declaration facts）
-- richer `shape` / `relations` / `language_specific`
-- software component facts
-- CycloneDX / SPDX SBOM 导出
-- semantic diff / component diff
-- local minimal SARIF v2.1.0 output
+## 当前支持到什么程度？
 
-也就是说，CodeIQ 当前已经不只是“列个符号表”，而是能把声明、依赖成分和检查结果组织成一条完整链路。
+- 代码 / 规格 repo 可以稳定 build 成 `CIQ Bundle`
+- `diff` 已经能为多种生态输出 richer semantic categories
+- `check` 已经能把 diff + policy 结果转成最小 SARIF
+- built-in compatibility policy baseline 正在继续扩展，但当前用户流程仍然是显式传入本地 policy bundle
 
-## 从用户角度，当前最值得相信的能力是什么？
-
-### 1. 你可以把仓库构建成可复用 bundle
-
-无论你是要做查询、做 diff、做 check，还是做本机共享，当前 bundle 主线已经是稳定基线。
-
-### 2. 你可以在发布前看结构化变化，而不只看源码 patch
-
-当前 diff 已经不仅有 `added / removed / changed`，还包含更丰富的 `semanticCategory`、`semanticDiff` 和 `componentDiff`。
-
-### 3. 你可以把结果给 AI 查询，也可以给审查流程消费
-
-也就是：
-
-- 给 AI：`query` / local query runtime
-- 给审查流程：`check` -> `SARIF`
-
-## 当前最重要的边界是什么？
-
-### local-only
-
-CodeIQ 当前不是 hosted platform，而是 single-machine / local-only 工作流。
-
-### query runtime 只负责查询
-
-不要把 `MCP` 或 local query runtime 理解成“所有命令的统一入口”。构建、diff、check、publish 仍然属于 CLI。
-
-### Registry 是本地 façade，不是 hosted 产品
-
-当前应该把它理解为共享本地 store 的命令 / HTTP façade，而不是云端服务。
-
-### SARIF 口径是本地最小输出
-
-当前更准确的说法是：#strong[local minimal SARIF v2.1.0 output]。这足够支撑当前本地工作流，但不应被理解成所有 hosted 平台无条件零配置兼容。
-
-## 当前明确不在范围内的内容
-
-下面这些内容现在都不应被当成当前产品承诺：
+## 当前不在范围内
 
 - hosted registry
 - distributed replication
 - multi-node HA
-- trust verifier / trust root / KMS
-- 远端签名验证和 hosted policy distribution
+- trust verifier / KMS
 
-## 如果你在做落地评估，应该怎么判断？
+## 什么时候看这页？
 
-可以用下面这个简单规则：
-
-### 适合现在就接入
-
-- 你的主要目标是本机 build / diff / check / query；
-- 你想先把 SDK、OpenAPI 或 Terraform 的结构化变化管理起来；
-- 你希望让 AI 查询当前版本的真实公开接口；
-- 你可以接受 local-only 产品边界。
-
-### 暂时不适合直接依赖
-
-- 你现在最需要的是 hosted 多租户 registry；
-- 你必须依赖远端分布式同步或多节点 HA；
-- 你必须把 trust verifier / KMS / hosted signing 当成当前主路径；
-- 你需要的是完整实现级静态分析平台，而不是接口和契约治理工作流。
-
-## 下一步
-
-- 如果你要看当前成熟度与 release ledger，请读 [Progress / Product Status](/docs/progress)。
-- 如果你要精确查命令，请读 [CLI Reference](/docs/cli)。
-- 如果你要理解本地边界和 runtime 关系，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。
+- 你在判断项目能不能接入 CodeIQ
+- 你在确认当前边界
+- 你需要区分用户能力和未来方向

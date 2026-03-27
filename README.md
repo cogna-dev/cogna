@@ -17,29 +17,32 @@
 </div>
 
 CodeIQ is a declaration-focused CLI for API and third-party dependency governance.
-It extracts interface contracts, computes diffs, and prepares structured artifacts for policy checks and downstream automation.
+It helps you build package snapshots, compare versions, run policy checks, and query APIs from one machine.
 
-Current product scope is single-machine only: CLI, Local Registry, and MCP share one local bundle store, and bundles now include declaration facts plus SBOM artifacts.
+Current scope is local-only: CLI, Local Registry, and MCP share one local bundle store.
 
-## Project Scope
+## What you can do with CodeIQ
 
-- Focus on public declarations and contracts rather than implementation-level linting.
-- Provide a unified workflow for `init`, `build`, `diff`, `check`, `query`, and `publish`.
-- Keep CLI entry thin and route command logic to cohesive modules under `src/`.
+- Build a reusable bundle for a repo or spec
+- Compare versions before release
+- Run policy checks and export SARIF
+- Query APIs and dependencies from CLI or MCP
 
-## Current Highlights
+## Typical flow
 
-- **Init command available**: `init` generates baseline CIQ config metadata.
-- **Modular layout**: command modules are organized by directory for cohesion.
-- **In-process testability**: command entry functions are callable from e2e tests.
-- **Shared CLI framework**: `src/cli` now provides common result, logging, and error handling.
-- **Shared config module**: `src/config` now provides typed config defaults, loading, and validation.
-- **Shared utilities**: `src/utils` now provides archive-like payload helpers and checksum helpers.
+```text
+init -> build -> diff -> check -> query -> publish
+```
 
-## Workflow Overview
+## Links
 
-Typical flow: `init -> build -> diff -> check -> query/publish`.
+- User docs: https://codeiq.xaclabs.dev/docs
+- User docs: https://codeiq.xaclabs.dev/docs/introduction
+- Quickstart: https://codeiq.xaclabs.dev/docs/quickstart
+- Contributor docs: https://codeiq.xaclabs.dev/contrib/introduction
+- Progress: https://codeiq.xaclabs.dev/contrib/progress
+- Repo contributing guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 
-For full product documentation and roadmap details, visit:
+For the full docs site, visit:
 
 👉 https://codeiq.xaclabs.dev

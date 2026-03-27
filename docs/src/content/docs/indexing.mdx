@@ -1,49 +1,18 @@
 ---
-title: 理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF
-description: 用“谁生成、谁消费、什么时候该关心”来理解 CodeIQ 的核心产物，而不是把它们当成一组抽象名词。
-order: 6
+title: Bundle 与结果
+description: 精确查阅 Bundle、Diff、SARIF、Query Result 等主要产物分别是什么，以及它们包含什么信息。
+order: 8
 ---
 
-# 理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF
+# Bundle 与结果
 
-很多用户第一次接触 CodeIQ 时，真正困惑的不是命令本身，而是：为什么会有这么多产物？
+这一页属于 #strong[Reference]：当你需要精确确认产物、文件或结果结构时，查这里。
 
-理解它们最好的方式不是背字段，而是问三个问题：
+## `CIQ Bundle`
 
-1. #strong[谁生成它？]
-2. #strong[谁消费它？]
-3. #strong[我在什么场景下需要关心它？]
+构建代码仓库后，当前 bundle 通常包含：
 
-## 总览：一张表先看全
-
-| 产物 | 谁生成 | 谁消费 | 什么时候你需要关心它 |
-| --- | --- | --- | --- |
-| `CIQ Config` | `init` | `build` 等 CLI 流程 | 第一次接入仓库时 |
-| `CIQ Bundle` | `build` | `query`、MCP、publish、diff | 你想查询或复用仓库事实时 |
-| `CIQ OPA Bundle` | `build`（policy-bundle） | `check` | 你想做 policy check 时 |
-| `CIQ Diff` | `diff` | `check`、人工 review | 你想知道这次改了什么时 |
-| `CIQ Result` | `query` / MCP | 人、脚本、AI | 你想查具体接口时 |
-| `SARIF` | `check` | CI、审查流程、人 | 你想把检查结果接进流程时 |
-
-## `CIQ Config`：告诉 CodeIQ 这个仓库是什么
-
-这是工作流的起点。
-
-你可以把它理解为：
-
-- 当前仓库属于哪个 profile；
-- 当前仓库的 PURL 是什么；
-- 从哪些文件构建；
-- 默认检查策略应该怎么接。
-
-对普通用户来说，第一次接入时关心它就够了。后续大多数时候，你只是在消费它带来的行为，而不是频繁手改所有字段。
-
-## `CIQ Bundle`：一份可查询、可比较、可复用的仓库快照
-
-这是 CodeIQ 最核心的产物。
-
-一个 bundle 不只是“索引文件”，而是一份把仓库公开事实整理后的结构化快照。当前代码 bundle 通常包含：
-
+- `manifest.json`
 - `declarations.ndjson`
 - `symbols.ndjson`
 - `software-components.ndjson`
@@ -51,30 +20,38 @@ order: 6
 - `sbom.spdx.json`
 - `metadata.json`
 - `checksums.txt`
+- `bundle.ciq.tgz`
 
-你应该在这些场景关心 bundle：
+其中，`bundle.ciq.tgz` 是完整归档；其他文件则是构建完成后落在 `dist/` 中、方便本地直接消费的物化内容。
 
-- 你想查询某个接口；
-- 你想把同一份事实复用给 CLI / MCP / 自动化；
-- 你想把当前版本和另一个版本做结构化比较。
+## `CIQ OPA Bundle`
 
-## `CIQ OPA Bundle`：给 `check` 用的 policy 载荷
+构建 `policy-bundle` 时，当前产物会以策略 bundle 的形式供 `check` 使用。当前 `dist/` 下通常会看到：
 
-这不是给 AI 查询的 bundle，而是给发布前检查使用的本地 policy bundle。
+- `manifest.json`
+- `opa-bundle.tar.gz`
+- `policy.rules.json`
+- `metadata.json`
+- `checksums.txt`
+- `bundle.ciq.tgz`
 
-在当前实现里，它的活跃路径应该理解为：
+其中最关键的两个文件是：
 
-- 本地准备 policy bundle；
-- `check` 调用本机 `opa eval --bundle ...`；
-- 再把结果转成当前的本地 `SARIF` 输出。
+- `opa-bundle.tar.gz`：OPA 原生 bundle 载荷
+- `policy.rules.json`：规则目录和帮助信息的 machine-readable catalog
 
-因此，它的价值不是“存放更多代码事实”，而是“给变更事实附加组织自己的规则”。
+当前 `manifest.json` 会写成 `ciq-opa-bundle/v1`，并把入口固定为 `codeiq/compat/deny`。
 
-## `CIQ Diff`：不是源码 patch，而是结构化变更结果
+## `CIQ Diff`
 
-源码 diff 告诉你“改了哪些行”；`CIQ Diff` 告诉你“改了哪些公开接口、契约和软件成分”。
+当前 `diff` 重点提供：
 
-在当前基线里，用户更值得关心的是：
+- `summary`
+- `changes`
+- `componentChanges`
+- 可选 `testChanges`
+
+在 change entry 中，常见字段包括：
 
 - `kind`
 - `level`
@@ -83,41 +60,56 @@ order: 6
 - `beforeRecord` / `afterRecord`
 - `componentDiff`
 
-如果你想做发布前判断，这会比单纯看源码 patch 更接近真正的问题。
+当前 repo 已经为多种生态输出 richer semantic categories，例如：
 
-## `CIQ Result`：把查询结果结构化返回
+- Go：receiver、pointer receiver、method set、signature 变化
+- Rust：`unsafe`、extern ABI、where clause、signature 变化
+- Terraform：provider ref、lifecycle、meta-argument 变化
+- OpenAPI：HTTP method、requiredness、status code、media type 变化
 
-无论你是通过一次性 `query`，还是通过 local query runtime 去查，最后都需要一个稳定的结果载体。
+## `SARIF`
 
-`CIQ Result` 的意义在于：
+`check` 输出 `check.sarif.json`，当前用于把 diff + policy 结果交给审查或 CI 消费。
 
-- 给脚本消费时足够结构化；
-- 给人看时足够可追溯；
-- 给 AI 用时不会丢掉 path、signature、location 等关键信息。
+当前最小 SARIF 会稳定映射：
 
-## `SARIF`：把检查结果带进审查流程
+- `ruleId`
+- `level`
+- `message.text`
+- `locations[].physicalLocation.artifactLocation.uri`
+- `tool.driver.rules[].helpUri`
 
-`SARIF` 是 `check` 的最终输出层。
-
-对用户来说，你可以简单把它理解成：CodeIQ 把 diff + policy 的结果整理成一份更容易进入现有工作流的报告格式。
-
-当前口径应理解为：#strong[local minimal SARIF v2.1.0 output]。
-
-这句话的重点在于：
-
-- 它已经足够支持当前本地工作流；
-- 但它不意味着“任何 hosted 平台都零调整自动兼容”。
-
-## 一条更容易理解的心智模型
-
-如果你只想记一句话，可以这样记：
+默认输出位置通常是 diff 文件所在目录，例如：
 
 ```text
-Config 告诉 CodeIQ 怎么开始，Bundle 记录当前事实，Diff 记录变化，Check + SARIF 记录结论，Result 负责查询返回。
+./dist/check.sarif.json
+```
+
+## `CIQ Query` / `CIQ Result`
+
+`query` 输入 `CIQ Query`，输出 `CIQ Result`。
+
+一个最小 query 例如：
+
+```json
+{
+  "schemaVersion": "ciq-query/v1",
+  "purl": "pkg:cargo/tokio@1.43.0",
+  "selector": {
+    "path": "tokio::sync::Mutex::lock",
+    "kind": "function"
+  },
+  "intent": "upgrade"
+}
+```
+
+当前默认结果文件为：
+
+```text
+./query.result.json
 ```
 
 ## 下一步
 
-- 如果你想理解本地共享和 PURL/Registry/runtime 的关系，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。
-- 如果你想直接查命令，请读 [CLI Reference](/docs/cli)。
-- 如果你最关心能力边界，请读 [支持范围与当前限制](/docs/providers)。
+- 配置与 PURL：[/docs/config](/docs/config)
+- CLI：[/docs/cli](/docs/cli)

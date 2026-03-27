@@ -1,27 +1,29 @@
 ---
-title: 第一次跑通：10 分钟完成 build → diff → check → query
-description: 给第一次接触 CodeIQ 的用户一条最短成功路径：先跑通，再决定是否继续接入团队工作流。
+title: 快速开始
+description: 用一次完整的本地流程体验 CodeIQ：初始化、构建、对比、检查、查询。
 order: 2
 ---
 
-# 第一次跑通：10 分钟完成 build → diff → check → query
+# 快速开始
 
-如果你第一次接触 CodeIQ，最好的起点不是先把所有概念读完，而是先在一个熟悉的仓库上跑通一条最短路径。
+这一页属于 #strong[Tutorials]：跟着步骤做，先跑通一遍，再读其他文档。
 
-这条路径的目标不是“学会所有功能”，而是确认三件事：
+## 你会完成什么？
 
-1. 你的仓库能否稳定产出 bundle；
-2. 你能否看懂结构化 diff 和检查结果；
-3. 你能否从 bundle 拿到一次真实查询结果。
+完成这页后，你会拿到：
+
+- 一个 `codeiq.yaml`
+- 一个构建好的 bundle
+- 一个 diff 文件
+- 一个 SARIF 检查结果
+- 一次真实查询结果
 
 ## 前置条件
 
-开始之前，建议你准备：
-
-- 一个熟悉的代码仓库或规格仓库；
-- 本地可用的 `codeiq` CLI；
-- 如果要执行 `check`，本机还需要可用的 `opa` CLI；
-- 一个本地 policy bundle（如果你暂时没有，也可以先只跑到 `diff` 和 `query`）。
+- 已安装 `codeiq`
+- 有一个本地仓库可供测试
+- 如果要执行 `check`，本机还需要 `opa`
+- 如果你还没有 policy bundle，准备一个单独的 policy repo，或使用已经构建好的本地 policy bundle
 
 ## 第 1 步：初始化
 
@@ -29,9 +31,13 @@ order: 2
 codeiq init
 ```
 
-初始化的目标是生成后续工作流所需的基础配置，例如 `codeiq.yaml`、本地 cache 目录和默认的检查配置。
+这一步会生成 `codeiq.yaml`。
 
-你现在不需要理解所有字段，只需要知道：这一步在告诉 CodeIQ “这个仓库是什么、该如何构建、后续检查默认应该怎么接”。
+第一次使用时，先确认这三个字段：
+
+- `profile`：例如 `go-module`、`rust-crate`、`terraform-module`、`openapi-spec`
+- `purl`：当前仓库的唯一标识
+- `checks.policy`：当前只是字符串配置；真正执行 `check` 时，仍建议显式传 `--policy <bundle-path>`
 
 ## 第 2 步：构建 bundle
 
@@ -39,53 +45,76 @@ codeiq init
 codeiq build ./sdk
 ```
 
-如果这是代码仓库，你会得到一个 `CIQ Bundle`；如果这是策略仓库，你会得到一个 `CIQ OPA Bundle`。
+构建完成后，`dist/` 下通常会看到：
 
-在当前实现里，代码 bundle 通常会带上这些关键产物：
-
+- `manifest.json`
 - `declarations.ndjson`
 - `symbols.ndjson`
 - `software-components.ndjson`
 - `sbom.cdx.json`
 - `sbom.spdx.json`
+- `metadata.json`
+- `checksums.txt`
+- `bundle.ciq.tgz`
 
-第一次体验里，你只需要确认 `dist/` 下已经出现了这些结果中的主要部分。
+这里的 `bundle.ciq.tgz` 是整包产物；其余文件则是已物化的 bundle 内容。
 
 ## 第 3 步：生成 diff
 
 ```bash
-codeiq diff ./sdk
-codeiq diff ./sdk --since 2026-03-01T00:00:00Z --test-changes true
+codeiq diff ./sdk --since <last-release-commit> --test-changes true
 ```
 
-`diff` 生成的不是源码 patch，而是一份面向声明和软件成分的结构化变更结果。
+你会得到 `dist/diff.json`。当前 `CIQ Diff` 除了 `summary` 之外，还会在很多 change 上输出：
 
-第一次体验时，优先看下面几类字段：
-
-- `added / removed / changed / deprecated`
 - `semanticCategory`
 - `semanticDiff`
-- 如果启用了 `--test-changes true`，再看 `testSummary` 和 `testChanges`
+- `beforeRecord` / `afterRecord`
+- `componentDiff`
 
-## 第 4 步：执行 check（可选但强烈推荐）
+## 第 4 步：准备 policy bundle
 
-```bash
-codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+`check` 需要一个本地 policy bundle。最常见的方式有两种：
+
+### 方式 A：使用已有 policy bundle
+
+如果团队已经有一个构建好的 policy bundle，直接记住它的路径，例如：
+
+```text
+./policy/dist/bundle.ciq.tgz
 ```
 
-如果你本机有可用的 policy bundle，这一步最能体现 CodeIQ 的价值：
+### 方式 B：自己构建一个 policy repo
 
-- 它会把 `CIQ Diff` 整形成 OPA-friendly 输入；
-- 再通过本地 `opa eval --bundle ...` 执行策略判断；
-- 最终输出一份本地 `SARIF`，给审查和 CI 消费。
+为单独的 policy 仓库准备 `codeiq.yaml`，把 `profile` 设为 `policy-bundle`，然后执行：
 
-你现在不需要先读懂全部 `SARIF` 字段。第一次体验只需要知道：CodeIQ 已经把“这次变更需不需要关注”整理成 `error / warning / note` 这样的结果层级。
+```bash
+codeiq build ./policy
+```
 
-## 第 5 步：做一次查询
+当前 `build` 会在这个 policy repo 的 `dist/` 目录下生成：
 
-### 方式 A：一次性 CLI 查询
+- `manifest.json`
+- `opa-bundle.tar.gz`
+- `policy.rules.json`
+- `checksums.txt`
+- `bundle.ciq.tgz`
 
-准备一个简单的 `query.json`：
+在当前 repo reality 下，传给 `check --policy` 的通常是这个 policy repo 的 `dist/bundle.ciq.tgz`。
+
+## 第 5 步：执行检查
+
+```bash
+codeiq check ./sdk/dist/diff.json --policy ./policy/dist/bundle.ciq.tgz
+```
+
+你会得到 `check.sarif.json`。当前实现会把它写到 diff 文件所在目录，例如这里通常是：
+
+```text
+./sdk/dist/check.sarif.json
+```
+
+## 第 6 步：执行查询
 
 ```json
 {
@@ -99,43 +128,36 @@ codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
 }
 ```
 
-然后执行：
+保存为 `query.json` 后运行：
 
 ```bash
-codeiq query ./query.json
+cd ./sdk
+codeiq query ../query.json
 ```
 
-### 方式 B：交互式查询
+当前默认输出文件是：
 
-```bash
-codeiq mcp start
+```text
+./query.result.json
 ```
 
-如果你是给 AI 或 Agent 使用，推荐顺序是：
+## 你现在应该看到什么？
 
-1. 先调用 `codeiq.query.outlines`；
-2. 再对感兴趣的 path 调用 `codeiq.query.symbol`。
+- `codeiq.yaml`
+- `dist/manifest.json`
+- `dist/diff.json`
+- `dist/check.sarif.json`
+- `dist/bundle.ciq.tgz`
+- `query.result.json`
 
-## 什么叫“跑通了”？
+如果你同时构建了一个 policy repo，你还会看到：
 
-你完成第一次成功路径后，至少应该看到下面这些结果中的大部分：
+- `policy/dist/opa-bundle.tar.gz`
+- `policy/dist/policy.rules.json`
+- `policy/dist/bundle.ciq.tgz`
 
-- 已生成 `codeiq.yaml`；
-- `dist/` 下已经出现 bundle 相关产物；
-- 已生成一份 `CIQ Diff`；
-- 如果执行了 `check`，已生成一份本地 `SARIF`；
-- 你已经能通过 `query` 或 `mcp` 拿到一次真实查询结果。
+## 接下来
 
-## 第 6 步：如果需要，再做本地共享
-
-```bash
-codeiq publish ./dist/tokio@1.43.0.ciq.tgz
-```
-
-这不是第一次体验的必选项，但如果你希望同机上的多个命令、脚本或 AI 工作流复用同一份 bundle，就应该把它写入本地共享 store。
-
-## 接下来怎么读？
-
-- 如果你最关心发布前门禁，请读 [发版前兼容性检查](/docs/release-check)。
-- 如果你最关心 AI 查询，请读 [让 AI / Agent 查询依赖与 API](/docs/mcp)。
-- 如果你想理解每种产物分别是什么，请读 [理解 CodeIQ 产物：Config / Bundle / OPA Bundle / Diff / Result / SARIF](/docs/indexing)。
+- 发布前门禁：[/docs/release-check](/docs/release-check)
+- AI 查询：[/docs/mcp](/docs/mcp)
+- CLI 参考：[/docs/cli](/docs/cli)

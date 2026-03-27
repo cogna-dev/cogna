@@ -1,14 +1,14 @@
 ---
-title: MCP / Registry Reference
-description: 精确查阅本地查询运行时和 Local Registry 的命令、工具面、HTTP 接口和当前行为边界。
-order: 10
+title: MCP / Registry
+description: 精确查阅本地 MCP、Registry 命令和最小接口。
+order: 9
 ---
 
-# MCP / Registry Reference
+# MCP / Registry
 
-这一页不是讲“为什么”，而是讲“现在具体有什么可以用”。
+这一页属于 #strong[Reference]：它提供精确命令和接口。
 
-## MCP runtime 命令
+## MCP 命令
 
 ```bash
 codeiq mcp start
@@ -17,36 +17,9 @@ codeiq mcp status
 codeiq mcp stop
 ```
 
-| 命令 | 当前作用 |
-| --- | --- |
-| `start` | 启动本地查询服务 |
-| `serve` | 以前台方式运行本地 HTTP JSON-RPC runtime |
-| `status` | 查看当前服务状态 |
-| `stop` | 停止本地服务 |
+当前 `mcp start` 是本地常驻入口，`mcp serve` 是前台运行入口；它们都服务于本地查询，而不是远端托管。
 
-## MCP tools
-
-当前公开的本地工具面包括：
-
-| Tool | 用途 |
-| --- | --- |
-| `codeiq.query.outlines` | 返回指定 bundle 的公开接口大纲 |
-| `codeiq.query.symbol` | 查询具体 symbol 的结构化详情 |
-| `codeiq.runtime.context` | 返回当前本地运行时请求上下文快照 |
-
-## 推荐查询顺序
-
-```text
-codeiq.query.outlines -> codeiq.query.symbol
-```
-
-适合的原因：
-
-- 先缩小范围；
-- 再获取精确信息；
-- 更适合 AI / Agent 多轮交互。
-
-## Local Registry 相关命令
+## Registry 命令
 
 ```bash
 codeiq publish <bundle-file>
@@ -56,17 +29,15 @@ codeiq registry download <purl> --output <dir>
 codeiq registry serve [--port <port>]
 ```
 
-| 命令 | 作用 |
-| --- | --- |
-| `publish` | 把 bundle 写入共享本地 registry store |
-| `registry upload-local` | 直接写入本地 registry 请求 |
-| `registry download-local` | 按 PURL 解析本地下载响应与元数据 |
-| `registry download` | 按 PURL 物化 bundle 到输出目录 |
-| `registry serve` | 以前台方式运行本地 Registry HTTP server |
+当前 `publish` 也会复用同一套本地 registry contract，只是它面向的是完整 bundle 文件，而不是直接调用这些子命令。
 
-## Registry HTTP 最小接口
+## MCP tools
 
-当前公开的最小 HTTP 接口包括：
+- `codeiq.query.outlines`
+- `codeiq.query.symbol`
+- `codeiq.runtime.context`
+
+## 最小 HTTP 接口
 
 - `GET /health`
 - `POST /api/v1/bundles`
@@ -75,16 +46,8 @@ codeiq registry serve [--port <port>]
 - `GET /api/v1/bundles/{bundleId}`
 - `GET /api/v1/bundles/{bundleId}/download`
 
-## 当前边界说明
+## 什么时候需要这页？
 
-为了避免误用，这一页也要明确边界：
-
-- 这些接口和命令都以 local-only runtime 为前提；
-- 当前不是 hosted registry API 承诺；
-- 当前不是远端 MCP 网络生态兼容声明；
-- 当前的核心目标是让本机上的 CLI、Registry 和查询运行时共享同一份 bundle 事实来源。
-
-## 关联页面
-
-- 如果你想先理解为什么这样设计，请读 [理解 Local Registry、PURL 与 local query runtime](/docs/runtime-model)。
-- 如果你想先看用户任务，请读 [在本机共享 bundle：publish / registry / materialize](/docs/bundle-sharing)。
+- 你要精确写脚本调用 `registry serve` 的本地接口
+- 你要核对 MCP 当前暴露了哪些 tools
+- 你要确认 Local Registry 和 MCP 在本地工作流中的边界

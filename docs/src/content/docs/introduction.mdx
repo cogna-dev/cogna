@@ -1,92 +1,90 @@
 ---
-title: CodeIQ 能帮我解决什么问题？
-description: 从用户任务出发，理解 CodeIQ 的价值、适用场景、核心工作流和当前边界。
+title: 概览
+description: 从用户视角理解 CodeIQ 的目标、适用场景、核心能力和当前边界。
 order: 1
 ---
 
-# CodeIQ 能帮我解决什么问题？
+# 概览
 
-CodeIQ 解决的不是“怎么读懂所有实现细节”，而是另一个更常见的问题：当你要发版、升级依赖、审查 OpenAPI 或让 AI 查询第三方库时，怎样才能先拿到一份 #strong[稳定、可追溯、可比较] 的事实基础。
+这一页属于 #strong[Explanation]：它回答的是“CodeIQ 是什么、适合解决什么问题”，而不是“命令怎么写”。
 
-它把仓库里的公开接口、配置契约和 API 合约整理成标准化产物，让你可以在本机完成这几类高价值动作：
+## CodeIQ 解决什么问题？
 
-- 发布前先看清这次到底改了什么；
-- 把变更结果交给 policy 检查，而不是只看文本 diff；
-- 让 AI / Agent 按稳定入口查询依赖和 API，而不是盲搜全仓；
-- 把同一份 bundle 复用给 CLI、MCP 和自动化脚本。
+CodeIQ 不是新的 linter，也不是 IDE / LSP 的替代品。
 
-## 它最适合哪些场景？
+它关注的是：#strong[公开接口、契约和版本差异]。
 
-### 1. SDK / Library 发版前检查
+当你要回答下面这些问题时，CodeIQ 会比单纯翻 README、看 diff 文本或做实现级静态分析更直接：
 
-你要确认的不只是“代码过没过测试”，还包括：
+- 这个库或 API 当前对外承诺了什么？
+- 两个版本之间哪些公开声明真的变了？
+- 这些变化是否可能破坏兼容性？
+- 我能否把检查结果接到本地 CI / 审查流程里？
 
-- 是否删掉了公开 API；
-- 是否把某个接口变成了更危险或不兼容的版本；
-- 这些变化是否违反组织自己的兼容性 policy。
+当你面对下面这些场景时，CodeIQ 会特别有用：
 
-### 2. Terraform / OpenAPI 变更治理
+- SDK / Library 发版前要确认有没有破坏兼容性
+- Terraform Module 或 OpenAPI 规格更新后要看清楚变更
+- 想让 AI / Agent 查询当前版本的真实接口，而不是只搜 README
+- 想把变更检查结果输出成 SARIF，接到现有审查流程里
 
-如果你的仓库不是传统代码，而是 Terraform Module 或 OpenAPI 规格，CodeIQ 仍然能把这些契约变化整理成结构化产物，而不是让你手工对 YAML / HCL 做逐行比较。
+## 当前提供哪些核心能力？
 
-### 3. 让 AI 查询第三方依赖与 API
-
-如果你已经在用 AI 写代码，你会很快遇到一个问题：AI 很容易找到“看起来像答案的文本”，但不一定能稳定找到“当前这个版本真正公开了什么”。
-
-CodeIQ 的做法是：
-
-- 先给 AI 一个 #strong[outlines] 级别的大纲入口；
-- 再让它对具体 symbol 做精确查询；
-- 最后把路径、签名、位置、契约摘要都绑定到 bundle 里，而不是漂浮在文档片段里。
-
-## 它和 README、grep、LSP、lint 有什么不同？
-
-| 方式 | 更擅长什么 | 局限是什么 |
-| --- | --- | --- |
-| README / 外部文档 | 快速理解产品背景 | 文档可能过时，和当前实现不一致 |
-| grep / 全仓搜索 | 找文本、找关键词 | 很难稳定回答“这次发布到底改了哪些公开契约” |
-| LSP / IDE 导航 | 交互式跳转和定位 | 不会自动给你可发布、可比较、可审查的产物 |
-| lint / 静态分析 | 实现级质量问题 | 不以公开接口变化作为主要输出 |
-| #strong[CodeIQ] | 公开接口、结构化契约、变更检查、AI 查询复用 | 当前只覆盖单机 local-only 工作流 |
-
-## CodeIQ 给你的直接产物是什么？
-
-| 产物 / 能力 | 你会直接得到什么 |
+| 能力 | 当前结果 |
 | --- | --- |
-| `CIQ Bundle` | 一份可发布、可查询、可比较的仓库快照 |
-| `CIQ Diff` | 一份面向声明和软件成分的结构化变更结果 |
-| `SARIF` | 一份可被审查流程或 CI 消费的检查输出 |
-| Local Registry | 一套共享本地 bundle store 和 façade |
-| local query runtime | 一个面向 AI / Agent 的交互式查询入口 |
+| 构建仓库快照 | `build` 生成 `CIQ Bundle`，其中包含声明、符号、software components、SBOM、metadata、checksums 和 `bundle.ciq.tgz` |
+| 构建策略快照 | `profile: policy-bundle` 时，`build` 生成 `CIQ OPA Bundle`，其中包含 `opa-bundle.tar.gz`、`policy.rules.json` 和 `bundle.ciq.tgz` |
+| 比较版本 | `diff` 生成 `CIQ Diff`，当前会输出 `summary`、`changes`、`componentChanges`，并为很多 change 补上 `semanticCategory`、`semanticDiff`、`componentDiff` |
+| 发布前检查 | `check` 在本机执行 `opa eval --bundle ... data.codeiq.compat.deny`，并生成本地最小 `SARIF v2.1.0` |
+| 查询上下文 | `query` 输出 `CIQ Result`；`mcp` 提供本地查询 runtime，支持 AI / Agent 重复查询 |
+| 共享产物 | `publish`、`registry download-local`、`registry download`、`registry serve` 让 bundle 在单机工作流里复用 |
 
-## 典型工作流是什么？
+## 当前有哪些核心对象？
 
-你不需要一开始就理解所有概念。只要先记住这条主线：
+- #strong[`CIQ Config`]：定义 profile、PURL、输入路径和 checks policy；
+- #strong[`CIQ Bundle`]：面向代码 / 规格仓库的声明与 component 快照；
+- #strong[`CIQ OPA Bundle`]：面向 policy 的策略快照，供 `check` 装载；
+- #strong[`CIQ Diff`]：描述版本之间 declaration 与 component 的变化；
+- #strong[`SARIF`]：`check` 的对外结果格式；
+- #strong[`Local Registry`]：单机上的 bundle publish / resolve / download façade；
+- #strong[`MCP runtime`]：本地查询工具层，不替代 `build / diff / check / publish`。
+
+## 当前支持哪些仓库？
+
+- Go module
+- Rust crate
+- Terraform Module
+- OpenAPI specification
+- OPA policy bundle
+
+这些 profile 统一使用 PURL 作为 canonical identifier，并围绕一套本地工作流组织：配置、构建、比较、检查、查询和本地共享。
+
+## 当前工作流
 
 ```text
-init -> build -> diff -> check -> query / mcp -> publish（可选）
+init -> build -> diff -> check -> query -> publish
 ```
 
-- `init`：准备配置；
-- `build`：把仓库整理成 bundle；
-- `diff`：看当前版本与基线版本之间的结构化变化；
-- `check`：把 diff 交给本地 policy bundle 做检查，并输出 SARIF；
-- `query / mcp`：消费 bundle，给脚本或 AI 查询；
-- `publish`：把 bundle 放进本机共享 store，供后续复用。
+## CodeIQ 不做什么？
 
-## 当前边界是什么？
+- 不做 hosted registry
+- 不做 distributed replication 或 multi-node HA
+- 不把 trust verifier / KMS 作为当前 active scope
+- 不把 MCP 变成 build / diff / check / publish 的替代入口
 
-这点非常重要：CodeIQ 当前是 #strong[single-machine / local-only] 产品边界。
+## 当前边界
 
-这意味着：
+CodeIQ 当前是 #strong[local-only] 工作流：
 
-- 面向本机上的 CLI、Local Registry 和 local query runtime；
-- 不承诺 hosted registry、distributed sync、多节点 HA；
-- 不承诺 trust verifier、KMS、远端签名验证链路；
-- `MCP` 在这里是本地查询入口，不是构建、发版或门禁执行入口。
+- CLI 在本机运行
+- bundle 在本机共享和下载
+- query / MCP 在本机消费这些 bundle
 
-## 你下一步应该读哪一页？
+这意味着：当前文档、命令和示例都优先描述 repo 已实现的本地路径，而不是更宽的 hosted / remote 叙事。
 
-- 如果你想先判断自己能不能跑通，请读 [第一次跑通：10 分钟完成 build → diff → check → query](/docs/quickstart)。
-- 如果你最关心发布前门禁，请读 [发版前兼容性检查](/docs/release-check)。
-- 如果你最关心 AI 查询，请读 [让 AI / Agent 查询依赖与 API](/docs/mcp)。
+## 接下来读什么？
+
+- 第一次使用：[/docs/quickstart](/docs/quickstart)
+- 明确任务：[/docs](/docs)
+- 命令查阅：[/docs/cli](/docs/cli)
+- 支持范围：[/docs/providers](/docs/providers)

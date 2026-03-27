@@ -2,6 +2,7 @@
 import Base from "@/layouts/base.astro"
 import { Header } from "@/components/primitive/header"
 import { Footer } from "@/components/primitive/footer"
+import { footerMenus, topNavigation } from "@/lib/navigation"
 
 interface Props {
   title?: string
@@ -14,13 +15,8 @@ const { title, description } = Astro.props
 <Base title={title} description={description}>
 	<Header client:load header={{
 		title: "CodeIQ",
-		description: "把仓库变成可检查、可查询、可复用的本地上下文资产",
-		menus: [
-			{ title: "了解 CodeIQ", href: "/docs/introduction" },
-			{ title: "快速开始", href: "/docs/quickstart" },
-			{ title: "兼容性检查", href: "/docs/release-check" },
-			{ title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
-		],
+		description: "面向声明与变更治理的本地工作流",
+		menus: topNavigation,
 		homeHref: "/",
 	}} />
 	<main>
@@ -28,26 +24,8 @@ const { title, description } = Astro.props
 	</main>
 	<Footer client:load footer={{
 		title: "CodeIQ",
-		description: "单机、local-only 的代码接口治理与 AI 查询工作流。",
-		menus: [
-			{
-				title: "Start Here",
-				children: [
-					{ title: "CodeIQ 能帮我解决什么问题？", href: "/docs/introduction" },
-					{ title: "第一次跑通", href: "/docs/quickstart" },
-					{ title: "发版前兼容性检查", href: "/docs/release-check" },
-				],
-			},
-			{
-				title: "Reference & Status",
-				children: [
-					{ title: "CLI Reference", href: "/docs/cli" },
-					{ title: "MCP / Registry Reference", href: "/docs/runtime-reference" },
-					{ title: "Progress / Product Status", href: "/docs/progress" },
-					{ title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
-				],
-			},
-		],
+		description: "Tutorials / How-to / Reference / Explanation",
+		menus: footerMenus,
 		copyright: "CodeIQ",
 	}} socials={{}} />
 </Base>

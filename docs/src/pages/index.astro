@@ -5,18 +5,18 @@ import { HomeFeature } from "@/components/home/home-feature"
 import { HomeHero } from "@/components/home/home-hero"
 
 const homeHero = {
-  title: "CodeIQ：把仓库变成可检查、可查询、可复用的本地上下文资产",
+  title: "CodeIQ",
   description:
-    "围绕 build、diff、check、query 与本地共享，把公开接口、软件成分和策略检查组织成一条可落地的单机工作流。",
+    "从代码与规格文件提取公开声明，生成 Bundle，比较版本，执行本地 policy check，并把结果交给 CLI、Local Registry 和 MCP 复用。",
   actions: [
     {
-      title: "了解 CodeIQ",
-      href: "/docs/introduction",
+      title: "快速开始",
+      href: "/docs/quickstart",
       variant: "default" as const,
     },
     {
-      title: "10 分钟跑通",
-      href: "/docs/quickstart",
+      title: "用户文档",
+      href: "/docs",
       variant: "outline" as const,
     },
   ],
@@ -25,46 +25,71 @@ const homeHero = {
 const homeFeature = {
   variant: "default" as const,
   layout: "bento" as const,
-  title: "从用户任务出发，而不是从内部模块出发",
-  description: "先跑通，再检查，再查询，再复用。",
+  title: "Feature 列表",
+  description:
+    "当前主页同时给出核心能力和文档入口：既能快速理解产品能做什么，也能直接进入 Tutorials / How-to / Reference / Explanation。",
   items: [
     {
-      title: "先完成第一次成功路径",
+      title: "构建 CIQ Bundle",
       description:
-        "先用一个真实仓库完成 build、diff、check 与 query，快速判断 CodeIQ 是否适合你的工作流。",
+        "对 Go、Rust、Terraform、OpenAPI 仓库生成声明、符号、software components 与 SBOM 产物，并打包成 `bundle.ciq.tgz`。",
       cover: "/images/feature-accessible.svg",
       action: { title: "查看快速开始", href: "/docs/quickstart" },
       span: 1 as const,
     },
     {
-      title: "发版前做兼容性检查",
+      title: "比较与检查",
       description:
-        "把声明变化与软件成分变化整理成 CIQ Diff，再结合本地 policy bundle 输出 SARIF。",
+        "`diff` 当前会输出 `semanticCategory`、`semanticDiff`、`componentDiff`；`check` 会在本机执行 OPA 并生成最小 SARIF。",
       cover: "/images/feature-themeable.svg",
-      action: { title: "查看检查流程", href: "/docs/release-check" },
+      action: { title: "查看发版检查", href: "/docs/release-check" },
       span: 1 as const,
     },
     {
-      title: "让 AI / Agent 查询依赖与 API",
+      title: "本地策略 Bundle",
       description:
-        "当你需要交互式查询时，推荐按 outlines → symbol 的顺序逐步缩小范围。",
+        "`policy-bundle` profile 已能产出 `ciq-opa-bundle/v1`、`opa-bundle.tar.gz` 与 `policy.rules.json`，供 `check --policy` 使用。",
       cover: "/images/feature-composable.svg",
-      action: { title: "查看 AI 查询工作流", href: "/docs/mcp" },
+      action: { title: "查看 Bundle 参考", href: "/docs/indexing" },
       span: 1 as const,
+    },
+    {
+      title: "Local Registry",
+      description:
+        "`publish`、`registry download-local`、`registry download`、`registry serve` 让 CLI、脚本和 MCP 在同一台机器上复用同一份 bundle store。",
+      cover: "/images/feature-accessible.svg",
+      action: { title: "查看共享 Bundle", href: "/docs/bundle-sharing" },
+      span: 1 as const,
+    },
+    {
+      title: "AI / MCP 查询",
+      description:
+        "本地 MCP runtime 当前暴露 `codeiq.query.outlines`、`codeiq.query.symbol` 和 `codeiq.runtime.context`，面向本机 bundle 查询，而不是远端 hosted service。",
+      cover: "/images/feature-themeable.svg",
+      action: { title: "查看 AI 查询", href: "/docs/mcp" },
+      span: 1 as const,
+    },
+    {
+      title: "支持范围与文档四象限",
+      description:
+        "当前支持 Go / Rust / Terraform / OpenAPI / policy-bundle；用户文档按 Tutorials、How-to、Reference、Explanation 组织，贡献者文档承接架构边界和开发进度。",
+      cover: "/images/feature-composable.svg",
+      action: { title: "查看用户文档", href: "/docs" },
+      span: 2 as const,
     },
   ],
 }
 
 const homeCta = {
-  title: "从一个真实仓库开始",
+  title: "继续深入",
   description:
-    "如果你已经认可整体方向，下一步就按用户任务阅读：第一次跑通、发版前检查、AI 查询与本地共享。",
+    "如果你要参与仓库维护、继续推进 A002 内置 OPA 兼容性策略库，或核对 proposal 与实现的差异，请继续阅读贡献者文档和开发进度。",
   variant: "primary" as const,
-  action: { title: "进入文档", href: "/docs/introduction" },
+  action: { title: "贡献者文档", href: "/contrib/introduction" },
 }
 ---
 
-<Layout title="CodeIQ" description="单机、local-only 的代码接口治理与 AI 查询工作流">
+<Layout title="CodeIQ" description="面向声明与变更治理的本地工作流">
 	<HomeHero client:load hero={homeHero} />
 	<HomeFeature client:load feature={homeFeature} />
 	<HomeCta client:load cta={homeCta} />

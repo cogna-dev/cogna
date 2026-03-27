@@ -10,6 +10,15 @@ const docs = defineCollection({
   }),
 })
 
+const contrib = defineCollection({
+  loader: glob({ pattern: "contrib/**/*.{md,mdx}", base: "./src/content" }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    order: z.number().default(999),
+  }),
+})
+
 const articles = defineCollection({
   loader: glob({ pattern: "articles/**/*.{md,mdx}", base: "./src/content" }),
   schema: z.object({
@@ -29,4 +38,4 @@ const articles = defineCollection({
   }),
 })
 
-export const collections = { docs, articles }
+export const collections = { docs, contrib, articles }

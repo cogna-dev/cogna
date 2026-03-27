@@ -14,17 +14,14 @@ pnpm dev
 pnpm build
 ```
 
-## 主要内容位置
+## 文档分工
 
-- 页面内容：`src/content/docs/`
-- 静态资源：`public/`
+- 用户文档：`src/content/docs/`
+- 贡献者文档：`src/content/contrib/`
+- 仓库级贡献说明：`../CONTRIBUTING.md`
 
-## 当前文档主题
+## 当前信息架构
 
-文档内容围绕以下主题组织：
-
-- CodeIQ 的产品定位与适用场景
-- `CIQ Bundle`、`CIQ Diff`、`SARIF` 等核心产物
-- CLI 工作流：`init / build / diff / check / query / publish`
-- MCP 查询工作流：`codeiq.query.outlines` → `codeiq.query.symbol`
-- 功能成熟度与路线图
+- 顶部导航：快速开始 / 用户文档 / 贡献者文档 / 开发进度 / GitHub
+- 用户文档采用 Divio 四象限：Tutorials / How-to / Reference / Explanation
+- 主页 feature 区用于展示四象限和当前核心能力

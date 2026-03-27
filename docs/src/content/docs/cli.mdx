@@ -1,216 +1,80 @@
 ---
-title: CLI Reference
-description: 精确查阅当前 CLI 命令、常见调用方式、输入输出产物，以及它们在用户工作流中的位置。
-order: 9
+title: CLI
+description: 精确查阅当前 CLI 命令、常见组合，以及它们各自处理什么输入和输出。
+order: 6
 ---
 
-# CLI Reference
+# CLI
 
-CodeIQ 的 CLI 围绕一条单机工作流展开：先初始化配置，再构建 bundle，随后根据需要执行差异比较、策略检查、查询与发布。当前 `R11` 已把产品范围收敛为 #strong[单机 CLI + Local Registry + MCP]：三者共享同一套本地 bundle cache，并在 bundle 中统一承载 declaration facts 与 SBOM facts。
+这一页属于 #strong[Reference]：当你需要查命令时，直接看这里。
 
-| 命令 | 输入 | 输出 | 作用 |
-| --- | --- | --- | --- |
-| `codeiq init` | 无 | `CIQ Config` | 初始化本地配置与缓存 |
-| `codeiq build <repo>` | 代码仓库或策略仓库 | `CIQ Bundle` 或 `CIQ OPA Bundle` | 构建声明快照或策略 bundle |
-| `codeiq diff <repo> [--since <ref>] [--test-changes <bool>]` | 代码仓库 | `CIQ Diff` | 生成声明层差异（可附带测试变化区段） |
-| `codeiq check <diff-file> --policy <policy-bundle>` | `CIQ Diff` + 本地 `CIQ OPA Bundle` | `SARIF` | 检查此次变更是否符合 policy |
-| `codeiq query <query-file>` | 本地 `CIQ Bundle` + `CIQ Query` | `CIQ Result` | 执行一次性本地查询 |
-| `codeiq publish <bundle-file>` | 本地 bundle 文件 | publish result | 上传 bundle 到 Registry |
-| `codeiq registry upload-local <upload-request-file>` | `codeiq-registry-upload/v1` 请求文件 | `codeiq-publish-receipt/v1` | 将 bundle 写入本地 registry index/bundles |
-| `codeiq registry download-local <purl>` | PURL | `codeiq-registry-download/v1` | 解析本地 registry 元数据（含 ETag/304 语义） |
-| `codeiq registry download <purl> --output <dir>` | PURL + 输出目录 | 物化后的 bundle 文件集 | 通过共享本地 bundle store 下载并展开 bundle |
-| `codeiq registry serve [--port <port>]` | 端口 | 本地 Registry HTTP 服务 | 以前台方式提供 `/health`、publish、resolve、versions、bundle detail、download |
-| `codeiq mcp <start\|serve\|stop\|status>` | 无 | 本地 MCP 服务状态 | 管理本地查询代理 |
+## 命令总览
 
-## 什么时候你应该优先看这页？
+| 命令 | 输入 | 当前输出 |
+| --- | --- | --- |
+| `codeiq init` | 无 | 生成 `codeiq.yaml` |
+| `codeiq build <repo>` | 代码 repo 或 policy repo | 物化 `dist/*`，并生成 `dist/bundle.ciq.tgz` |
+| `codeiq diff <repo> [--since <ref>] [--test-changes <bool>]` | 已配置 repo | 生成 `dist/diff.json` |
+| `codeiq check <diff-file> --policy <policy-bundle>` | `CIQ Diff` + 本地 policy bundle | 生成 `check.sarif.json` |
+| `codeiq query <query-file>` | `CIQ Query` | 生成 `query.result.json` |
+| `codeiq publish <bundle-file>` | `bundle.ciq.tgz` | 生成 publish receipt |
+| `codeiq registry ...` | PURL / bundle / upload request | 本地 registry metadata 或物化后的 bundle |
+| `codeiq mcp ...` | 本地 bundle context | 本地 MCP runtime |
 
-当你已经理解了整体工作流，只是需要：
+## 子命令参考
 
-- 精确查命令格式；
-- 回忆某个命令输入什么、输出什么；
-- 快速复制一条常见命令组合；
+### `registry`
 
-这页最合适。
+- `codeiq registry upload-local <upload-request-file>`
+- `codeiq registry download-local <purl>`
+- `codeiq registry download <purl> --output <dir>`
+- `codeiq registry serve --port <port>`
 
-## `codeiq init`
+### `mcp`
 
-```bash
-codeiq init
-```
+- `codeiq mcp start --port <port> --stdio <true|false>`
+- `codeiq mcp serve --port <port>`
+- `codeiq mcp status`
+- `codeiq mcp stop`
 
-用于准备本地运行所需的基础状态，例如配置文件、缓存目录，以及后续 CLI 工作流的初始环境。
+## 常见组合
 
-## `codeiq build <repo>`
-
-```bash
-codeiq build ./sdk
-codeiq build ./policy
-```
-
-`build` 是 CodeIQ 的起点。它把代码仓库或策略仓库构建成标准化产物：
-
-- 代码仓库 -> `CIQ Bundle`
-- 策略仓库 -> `CIQ OPA Bundle`
-
-这一步输出的是可发布、可比较、可查询的 bundle，而不是单纯的“索引文件”。当前代码 bundle 默认会同时产出：
-
-- `declarations.ndjson`
-- `symbols.ndjson`
-- `software-components.ndjson`
-- `sbom.cdx.json`
-- `sbom.spdx.json`
-
-## `codeiq diff <repo>`
-
-```bash
-codeiq diff ./sdk
-codeiq diff ./sdk --since 2026-03-01T00:00:00Z --test-changes true
-```
-
-`diff` 用来比较当前仓库与基线版本，输出 `CIQ Diff`。它关注的是声明层的变化，例如新增、删除、变更、弃用，以及对应的兼容性影响。
-
-当前已支持两类增强参数：
-
-- `--since <ref>`：把比较起点写入 diff 输出中的 `since` 字段。
-- `--test-changes true`：在 diff 输出中附加 `includeTestChanges`、`testSummary`、`testChanges` 区段。
-
-## `codeiq check <diff-file> --policy <policy-bundle>`
-
-```bash
-codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
-```
-
-`check` 的输入是 `CIQ Diff` 与本地 `CIQ OPA Bundle`，目标是确认这次变更是否符合组织 policy。当前实现会调用本机 `opa eval --bundle --input --format json` 获取 policy decision，并把 decision 合并映射到 `SARIF`（包含 rules/results），便于接入 CI、代码审查与质量平台。
-
-## `codeiq query <query-file>`
-
-```bash
-codeiq query ./query.json
-```
-
-如果你只需要做一次性查询，那么直接使用 CLI 即可。查询文件中会包含 PURL 和 selector，CodeIQ 会从本地 bundle 中返回对应的 `CIQ Result`。
-
-## `codeiq publish <bundle-file>`
-
-```bash
-codeiq publish ./dist/tokio@1.43.0.ciq.tgz
-```
-
-`publish` 会把本地构建好的 bundle 写入共享本地 registry store：`.codeiq/cache/registry`。当检测到同一 PURL 且 `If-None-Match` 命中时，会返回 `304` 语义并产出 `status = "already-exists"` 的 receipt；否则正常写入并返回 `published`。返回结果是 `codeiq-publish-receipt/v1`，其中 `provenance.source` 固定为 `local-registry`。
-
-当前 active contract 已明确：
-
-- Local Registry 只作为共享本地 bundle store 的命令 / HTTP façade；
-- CLI、Local Registry 与 MCP 复用同一套 `.codeiq/cache/registry/{index,bundles}`；
-- trust verifier、remote registry 与 hosted/distributed transport 已退出当前产品主线。
-
-## `codeiq registry upload-local <upload-request-file>`
-
-```bash
-codeiq registry upload-local ./dist/upload.json
-```
-
-用于把 `codeiq-registry-upload/v1` 请求写入共享本地 registry store。写入成功后返回 `codeiq-publish-receipt/v1`，并把 bundle/索引落在 `.codeiq/cache/registry/bundles` 与 `.codeiq/cache/registry/index`。
-
-## `codeiq registry download-local <purl>`
-
-```bash
-codeiq registry download-local "pkg:openapi/acme/payment-api@2026.03.01"
-```
-
-按 PURL 从共享本地 registry 解析下载响应（`codeiq-registry-download/v1`）。该响应包含 `status`、`etag`、`downloadUrl`、`notModified` 与 `signature` 字段，可用于单机 304/缓存语义验证，以及本地 receipt / metadata 透传。
-
-## `codeiq registry download <purl> --output <dir>`
-
-```bash
-codeiq registry download "pkg:openapi/acme/payment-api@2026.03.01" --output ./out
-```
-
-在解析到本地 bundle 后，将其物化到输出目录，得到 `manifest.json`、`declarations.ndjson`、`symbols.ndjson`、`software-components.ndjson`、`sbom.cdx.json`、`sbom.spdx.json`、`metadata.json`、`checksums.txt`。
-
-## `codeiq registry serve [--port <port>]`
-
-```bash
-codeiq registry serve
-codeiq registry serve --port 8787
-```
-
-以当前仓库工作目录为根，启动一个真实的本地 Registry HTTP server。当前最小公开接口为：
-
-- `GET /health`
-- `POST /api/v1/bundles`
-- `GET /api/v1/bundles/resolve?purl=...`
-- `GET /api/v1/packages/{purl-encoded}/versions`
-- `GET /api/v1/bundles/{bundleId}`
-- `GET /api/v1/bundles/{bundleId}/download`
-
-它会复用 `.codeiq/cache/registry/index` 与 `.codeiq/cache/registry/bundles` 作为本地存储，因此既可以作为 loopback 开发 server，也可以作为 `publish` / `registry download` 的真实 HTTP 证据路径。
-
-## `codeiq mcp <start|serve|stop|status>`
-
-```bash
-codeiq mcp start
-codeiq mcp serve
-codeiq mcp status
-codeiq mcp stop
-```
-
-MCP 是本地常驻查询代理，只负责高频、内存中的查询能力，也是当前主业务流程里的 review consumption 入口：
-
-- `start`：启动本地 MCP 服务
-- `serve`：以前台 HTTP JSON-RPC 方式运行 MCP server，公开 `/health` 与 `/rpc`
-- `status`：检查当前服务状态与 health
-- `stop`：停止本地 MCP 服务
-
-`start / status / stop` 当前管理的也是同一套 HTTP runtime；`--stdio` 仅保留兼容参数，不再作为 detached stdio 终态。
-
-它不负责 `build`、`diff`、`check`、`publish`。这些操作仍应通过 CLI 完成。
-
-## MCP 查询工具
-
-MCP 当前保留两个工具：
-
-- `codeiq.query.outlines`：根据 PURL 获取包的公开接口大纲，适合先浏览有哪些公开内容可供查询。
-- `codeiq.query.symbol`：对某个具体 path 执行精确查询，返回声明、签名、注释、位置与契约摘要。
-
-推荐顺序是：先调用 `codeiq.query.outlines` 获取大纲，再调用 `codeiq.query.symbol` 获取精确信息。
-
-## 推荐组合
-
-### 本地验证
+### 第一次跑通
 
 ```bash
 codeiq init
 codeiq build ./sdk
+codeiq diff ./sdk
+```
+
+### 发布前检查
+
+```bash
+codeiq build ./sdk
+codeiq diff ./sdk --since <last-release-commit>
+codeiq check ./sdk/dist/diff.json --policy ./policy/dist/bundle.ciq.tgz
+```
+
+### AI 查询
+
+```bash
+codeiq build ./sdk
 codeiq mcp start
 ```
 
-### 发布前门禁
+### 本地共享
 
 ```bash
-codeiq build ./sdk
-codeiq diff ./sdk
-codeiq check ./dist/tokio.diff.json --policy ./dist/compat-policy.ciq.tgz
+codeiq publish ./dist/bundle.ciq.tgz
 ```
 
-### 团队共享
+## 当前需要注意什么？
 
-```bash
-codeiq build ./sdk
-codeiq publish ./dist/tokio@1.43.0.ciq.tgz
-```
+- `check` 当前不会自动把 `checks.policy: default-compat` 解析成一个可执行 bundle 路径；实际运行时仍建议显式传 `--policy <bundle-path>`；
+- `build` 对普通 repo 和 `policy-bundle` repo 都会产出 `dist/bundle.ciq.tgz`，但 policy repo 还会额外生成 `opa-bundle.tar.gz` 和 `policy.rules.json`；
+- `query` 和 `mcp` 是读本地 bundle 的入口，不负责重新 build。
 
-## 说明
+## 更多参考
 
-当前文档聚焦已经明确的命令与产物约定。后续实现推进时，这一页适合继续补充：
-
-- 参数细节
-- JSON 示例
-- 错误码
-- 自动化脚本示例
-
-## 相关页面
-
-- [第一次跑通：10 分钟完成 build → diff → check → query](/docs/quickstart)
-- [MCP / Registry Reference](/docs/runtime-reference)
-- [Progress / Product Status](/docs/progress)
+- MCP / Registry：[/docs/runtime-reference](/docs/runtime-reference)
+- 配置与 PURL：[/docs/config](/docs/config)
