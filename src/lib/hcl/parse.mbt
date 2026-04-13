@@ -1,4 +1,14 @@
 ///|
+priv enum HclLine {
+  BlockOpen(kind~ : String, name~ : String, signature~ : String, line_no~ : Int)
+  UnknownOpen
+  OneLine(kind~ : String, name~ : String, signature~ : String, line_no~ : Int)
+  Close
+  Attr(name~ : String, value~ : String, line_no~ : Int)
+  Ignored
+}
+
+///|
 fn trim_line(s : String) -> String {
   let mut start = 0
   while start < s.length() &&
@@ -27,88 +37,6 @@ fn trim_line(s : String) -> String {
 }
 
 ///|
-fn quoted_labels(line : String) -> Array[String] {
-  let result : Array[String] = []
-  let mut in_quote = false
-  let mut start = -1
-  for i in 0..<line.length() {
-    let ch = line.code_unit_at(i)
-    if ch == '"' {
-      if in_quote {
-        if start >= 0 {
-          result.push(line[start:i].to_string())
-        }
-        in_quote = false
-        start = -1
-      } else {
-        in_quote = true
-        start = i + 1
-      }
-    }
-  }
-  result
-}
-
-///|
-fn block_kind_name(line : String) -> (String, String) {
-  if line.has_prefix("resource ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 2 {
-      return ("resource", "\{parts[0]}.\{parts[1]}")
-    }
-  }
-  if line.has_prefix("data ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 2 {
-      return ("data", "\{parts[0]}.\{parts[1]}")
-    }
-  }
-  if line.has_prefix("variable ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 1 {
-      return ("variable", parts[0])
-    }
-  }
-  if line.has_prefix("output ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 1 {
-      return ("output", parts[0])
-    }
-  }
-  if line.has_prefix("module ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 1 {
-      return ("module", parts[0])
-    }
-  }
-  if line.has_prefix("provider ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 1 {
-      return ("provider", parts[0])
-    }
-  }
-  if line.has_prefix("locals") && line.has_suffix("{") {
-    return ("locals", "locals")
-  }
-  if line.has_prefix("dynamic ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 1 {
-      return ("dynamic", parts[0])
-    }
-  }
-  if line.has_prefix("check ") {
-    let parts = quoted_labels(line)
-    if parts.length() >= 1 {
-      return ("check", parts[0])
-    }
-  }
-  if line.has_prefix("terraform") && line.has_suffix("{") {
-    return ("terraform", "terraform")
-  }
-  ("", "")
-}
-
-///|
 fn find_eq(line : String) -> Int {
   let mut pos = -1
   for i in 0..<line.length() {
@@ -121,18 +49,180 @@ fn find_eq(line : String) -> Int {
 }
 
 ///|
-fn attr_name_value(line : String) -> (String, String) {
-  let eq_pos = find_eq(line)
-  if eq_pos < 0 {
+fn parse_identifier_text(
+  stream : @parsec.TokenStream,
+) -> @parsec.ParseResult[String] {
+  @parsec.map_result(stream, fn(s) {
+    @parsec.pred(s, "identifier", fn(token) {
+      match token.kind {
+        Identifier(_) | Keyword(_) => true
+        _ => false
+      }
+    })
+  }, @parsec.token_text)
+}
+
+///|
+fn parse_string_text(stream : @parsec.TokenStream) -> @parsec.ParseResult[String] {
+  @parsec.map_result(stream, fn(s) {
+    @parsec.pred(s, "string", fn(token) {
+      match token.kind {
+        StringLiteral(_) => true
+        _ => false
+      }
+    })
+  }, fn(token) {
+    let text = @parsec.token_text(token)
+    if text.length() >= 2 && text.code_unit_at(0) == '"' &&
+      text.code_unit_at(text.length() - 1) == '"' {
+      text[1:text.length() - 1].to_string()
+    } else {
+      text
+    }
+  })
+}
+
+///|
+fn parse_string_literals_before_open(tokens : Array[@parsec.Token]) -> Array[String] {
+  let labels : Array[String] = []
+  let mut stream = @parsec.new_stream(tokens)
+  while !stream.is_done() {
+    match @parsec.tag(stream, "{") {
+      Matched(..) => break
+      _ => ()
+    }
+    match parse_string_text(stream) {
+      Matched(value~, next~) => {
+        labels.push(value)
+        stream = next
+      }
+      _ => stream = stream.advance()
+    }
+  }
+  labels
+}
+
+///|
+fn parse_block_kind_name(tokens : Array[@parsec.Token]) -> (String, String) {
+  if tokens.is_empty() {
     return ("", "")
   }
-  let key = trim_line(line[0:eq_pos].to_string())
-  // Skip keys that contain spaces (they look like block declarations, not attrs)
-  if key.contains(" ") || key == "" {
-    return ("", "")
+  let stream = @parsec.new_stream(tokens)
+  match parse_identifier_text(stream) {
+    Matched(value=kind, next=after_kind) => {
+      match @parsec.cut(@parsec.tag(after_kind, "{")) {
+        Matched(..) => {
+          match kind {
+            "locals" | "terraform" => return (kind, kind)
+            _ => ()
+          }
+        }
+        _ => ()
+      }
+      let labels = parse_string_literals_before_open(tokens)
+      match kind {
+        "resource" | "data" if labels.length() >= 2 =>
+          (kind, "\{labels[0]}.\{labels[1]}")
+        "variable" | "output" | "module" | "provider" | "dynamic" |
+        "check" if labels.length() >= 1 =>
+          (kind, labels[0])
+        "locals" if tokens.length() >= 1 => ("locals", "locals")
+        "terraform" if tokens.length() >= 1 => ("terraform", "terraform")
+        _ => ("", "")
+      }
+    }
+    _ => ("", "")
   }
-  let val = trim_line(line[eq_pos + 1:line.length()].to_string())
-  (key, val)
+}
+
+///|
+fn classify_line(line : String, line_no : Int) -> HclLine {
+  let trimmed = trim_line(line)
+  if trimmed == "" {
+    return Ignored
+  }
+  let tokens = @parsec.tokenize_line(trimmed, line_no)
+  if trimmed.contains("{") && trimmed.contains("}") {
+    let (kind, name) = parse_block_kind_name(tokens)
+    if kind != "" {
+      return OneLine(kind~, name~, signature=trimmed, line_no~)
+    }
+    return Ignored
+  }
+  if trimmed.has_suffix("{") {
+    let (kind, name) = parse_block_kind_name(tokens)
+    if kind != "" {
+      return BlockOpen(kind~, name~, signature=trimmed, line_no~)
+    }
+    return UnknownOpen
+  }
+  if trimmed == "}" {
+    return Close
+  }
+  let eq_pos = find_eq(trimmed)
+  if eq_pos >= 0 {
+    let key = trim_line(trimmed[0:eq_pos].to_string())
+    if key != "" && !key.contains(" ") {
+      let value = trim_line(trimmed[eq_pos + 1:trimmed.length()].to_string())
+      return Attr(name=key, value~, line_no~)
+    }
+  }
+  Ignored
+}
+
+///|
+fn assemble_hcl_file(lines : Array[HclLine]) -> HclFile {
+  let blocks : Array[HclBlock] = []
+  let kind_stack : Array[String] = []
+  let name_stack : Array[String] = []
+  let sig_stack : Array[String] = []
+  let lineno_stack : Array[Int] = []
+  let attrs_stack : Array[Array[HclAttr]] = []
+
+  for line in lines {
+    match line {
+      OneLine(kind~, name~, signature~, line_no~) => {
+        blocks.push({ kind, name, signature, line_no, attrs: [] })
+      }
+      BlockOpen(kind~, name~, signature~, line_no~) => {
+        kind_stack.push(kind)
+        name_stack.push(name)
+        sig_stack.push(signature)
+        lineno_stack.push(line_no)
+        attrs_stack.push([])
+      }
+      UnknownOpen => {
+        kind_stack.push("")
+        name_stack.push("")
+        sig_stack.push("")
+        lineno_stack.push(0)
+        attrs_stack.push([])
+      }
+      Close => {
+        if !kind_stack.is_empty() {
+          let kind = kind_stack.pop().unwrap()
+          let name = name_stack.pop().unwrap()
+          let signature = sig_stack.pop().unwrap()
+          let line_no = lineno_stack.pop().unwrap()
+          let attrs = attrs_stack.pop().unwrap()
+          if kind != "" {
+            blocks.push({ kind, name, signature, line_no, attrs })
+          }
+        }
+      }
+      Attr(name~, value~, line_no~) => {
+        if !kind_stack.is_empty() && !attrs_stack.is_empty() {
+          let top_kind = kind_stack[kind_stack.length() - 1]
+          if top_kind != "" {
+            attrs_stack[attrs_stack.length() - 1].push({ name, value, line_no })
+          }
+        }
+      }
+      Ignored => ()
+    }
+  }
+
+  { blocks, }
 }
 
 ///|
@@ -140,56 +230,9 @@ fn attr_name_value(line : String) -> (String, String) {
 /// Returns an `HclFile` containing all recognised top-level and nested blocks
 /// together with their immediate attributes.
 pub fn parse_hcl_file(lines : Array[String]) -> HclFile {
-  let blocks : Array[HclBlock] = []
-  // Stack tracks (kind, name, signature, line_no, attrs) for open blocks
-  let kind_stack : Array[String] = []
-  let name_stack : Array[String] = []
-  let sig_stack : Array[String] = []
-  let lineno_stack : Array[Int] = []
-  let attrs_stack : Array[Array[HclAttr]] = []
-
+  let classified : Array[HclLine] = []
   for i in 0..<lines.length() {
-    let line_no = i + 1
-    let line = trim_line(lines[i].to_string())
-
-    if line.contains("{") && line.contains("}") {
-      let (kind, name) = block_kind_name(line)
-      if kind != "" {
-        blocks.push({ kind, name, signature: line, line_no, attrs: [] })
-        continue
-      }
-    }
-
-    if line.has_suffix("{") {
-      let (kind, name) = block_kind_name(line)
-      kind_stack.push(kind)
-      name_stack.push(name)
-      sig_stack.push(line)
-      lineno_stack.push(line_no)
-      attrs_stack.push([])
-    } else if line == "}" {
-      if !kind_stack.is_empty() {
-        let kind = kind_stack.pop().unwrap()
-        let name = name_stack.pop().unwrap()
-        let sig = sig_stack.pop().unwrap()
-        let lno = lineno_stack.pop().unwrap()
-        let attrs = attrs_stack.pop().unwrap()
-        if kind != "" {
-          blocks.push({ kind, name, signature: sig, line_no: lno, attrs })
-        }
-      }
-      // Attribute scanning — only inside a named block
-    } else if !attrs_stack.is_empty() && !kind_stack.is_empty() {
-      let top_kind = kind_stack[kind_stack.length() - 1]
-      if top_kind != "" {
-        let (k, v) = attr_name_value(line)
-        if k != "" {
-          let top_attrs = attrs_stack[attrs_stack.length() - 1]
-          top_attrs.push({ name: k, value: v, line_no })
-        }
-      }
-    }
+    classified.push(classify_line(lines[i].to_string(), i + 1))
   }
-
-  { blocks, }
+  assemble_hcl_file(classified)
 }
