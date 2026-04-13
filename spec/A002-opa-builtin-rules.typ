@@ -210,6 +210,7 @@ deny contains out if {
 - `policy.rules.json` 是 #strong[描述真相]；
 - `policy.rules.json` 必须由和 Rego 同一套规则源生成，而不是人工单独维护；
 - OPA #strong[不会执行 `policy.rules.json`]；它只执行 Rego；
+- `check` 运行时会读取 `policy.rules.json` 来补全 SARIF driver metadata，但不会把它当成 executable selector；
 - 评审与用户应通过 `policy.rules.json` 快速看到“有哪些规则、默认级别是什么、帮助链接在哪里”，而不必先读 Rego 源码。
 
 == `policy.rules.json` 是否还需要 `findingCodes`
@@ -220,6 +221,7 @@ deny contains out if {
 
 - `policy.rules.json` 会被 `build` 产出、写入 bundle、写入 manifest、写入 checksums，并在 tests 中校验其存在；
 - 但 `check` 运行时真正消费的是 #strong[OPA decision objects]，不是 `policy.rules.json`；
+- `check` 仍会读取 `policy.rules.json` 来补充 SARIF driver rules / helpUri 等报告元数据，但不会读取其中任何 selector 来参与匹配；
 - 当前代码里没有任何运行时逻辑会去读取 `policy.rules.json` 中的 `findingCodes` 来参与匹配。
 
 因此，如果 `findingCodes` 只是把同样的 selector 再从 Rego 抄写一遍放进 JSON，那么它在当前产品边界下 #strong[没有实际执行作用]，只会增加 drift 风险。
@@ -437,14 +439,12 @@ stage-1 规则匹配方式保持统一：
 
 = 当前 repo reality（非规范说明）
 
-当前代码还没有完全实现上面的 target design，主要差异有三点：
+当前 repo 已经基本实现上面的 target design；当前仍需继续推进的主要是 pre-release 收口，而不是规则能力缺口：
 
-- `src/cmd/diff/main.mbt` 仍会写 top-level `semanticCategory`，但这不再是 A002 的目标 contract；
-- `src/cmd/check/main.mbt` 的 `prepare_opa_input(diff)` 仍会透传 `semanticCategory`；
-- `src/cmd/build/main.mbt` 当前生成的 `policy.rules.json` 仍然是浅层 `kind/level/message` 目录。
-- 当前运行时不会读取 `policy.rules.json` 里的 selector 信息；真正参与执行的是 Rego 返回的 decision objects。
-
-这些都属于实现待跟进项，不影响 A002 对 target design 的收敛方向。
+- `policy.rules.json` 已按 generated catalog artifact 输出，只保留 `id/family/defaultLevel/summary/docs/entrypoint`；
+- 当前运行时不会读取 `policy.rules.json` 里的 selector 信息；真正参与执行的是 Rego 返回的 decision objects；
+- `policy.rules.json` 中的 entrypoint 继续使用 `data.codeiq.compat.deny` 形式，而 bundle manifest 使用 `codeiq/compat/deny` 形式；二者指向同一条 Rego entrypoint；
+- A002-5 的剩余工作集中在 docs / progress / acceptance wording 持续对齐。
 
 = 验证与落地阶段
 
@@ -454,11 +454,11 @@ stage-1 规则匹配方式保持统一：
   stroke: 0.4pt,
   [*Stage*], [*状态*], [*范围*], [*验收结果*],
 
-  [`A002-1`], [#strong[design freeze]], [contract + authoring + deliverables], [冻结 `semanticDiff.findings[]` canonical contract、`data.codeiq.compat.deny`、Rego vs catalog 角色分离、deliverables 与最小 `policy.rules.json`],
-  [`A002-2`], [pending], [core + Go / Rust built-ins], [实现 `compat.core.*`、`compat.go.*`、`compat.rust.*` stage-1 rules 与 catalog],
-  [`A002-3`], [pending], [OPA input enrichment], [把 `beforeRecord` / `afterRecord` 与 richer component evidence 加入 `prepare_opa_input`],
-  [`A002-4`], [pending], [Terraform / OpenAPI deeper rules], [实现 stage-2 Terraform / OpenAPI breaking rules 与 regression fixtures],
-  [`A002-5`], [pending], [catalog / docs / tests], [完成 generated catalog、docs、schema/tests 与 SARIF acceptance],
+  [`A002-1`], [#strong[completed]], [contract + authoring + deliverables], [冻结 `semanticDiff.findings[]` canonical contract、`data.codeiq.compat.deny`、Rego vs catalog 角色分离、deliverables 与最小 `policy.rules.json`],
+  [`A002-2`], [#strong[completed]], [core + Go / Rust built-ins], [`compat.core.*`、`compat.go.*`、`compat.rust.*` stage-1 rules 与 catalog 已完成],
+  [`A002-3`], [#strong[completed]], [OPA input enrichment], [`beforeRecord` / `afterRecord`、richer component evidence、catalog ↔ SARIF reconciliation 与 built-in acceptance 已完成],
+  [`A002-4`], [#strong[completed]], [Terraform / OpenAPI deeper rules], [stage-2 Terraform / OpenAPI breaking rules 与 regression fixtures 已完成],
+  [`A002-5`], [#strong[completed]], [catalog / docs / tests], [generated catalog、docs、schema/tests 与 SARIF acceptance 收口已完成],
 )
 
 = 非目标

@@ -40,7 +40,7 @@ init -> build -> diff -> check -> query -> publish
 - User docs: https://codeiq.xaclabs.dev/docs/introduction
 - Quickstart: https://codeiq.xaclabs.dev/docs/quickstart
 - Contributor docs: https://codeiq.xaclabs.dev/contrib/introduction
-- Progress: https://codeiq.xaclabs.dev/contrib/progress
+- Progress: https://codeiq.xaclabs.dev/docs/progress
 - Repo contributing guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 
 For the full docs site, visit:
