@@ -1,17 +1,17 @@
 ---
 title: 配置与 PURL
-description: 了解 codeiq.yaml 的关键字段、支持的 profile，以及如何为仓库选择 PURL。
+description: codeiq.yml 的 v2 字段说明、默认值，以及 registry / publish / SBOM 的配置优先级。
 order: 7
 ---
 
 # 配置与 PURL
 
-这一页属于 #strong[Reference]：它用来精确查阅 `codeiq.yaml` 和 PURL，而不是做教程。
+CodeIQ 默认读取仓库根目录的 `codeiq.yml`。如果只有旧文件名 `codeiq.yaml`，当前版本仍会兼容读取，但新的初始化、文档和示例都统一使用 `codeiq.yml`。
 
-## `codeiq.yaml` 最小示例
+## 一个完整的 v2 配置示例
 
 ```yaml
-schemaVersion: ciq-config/v1
+schemaVersion: ciq-config/v2
 profile: openapi-spec
 purl: pkg:openapi/acme/payment-api@2026.03.01
 source:
@@ -22,63 +22,89 @@ inputs:
     - openapi/**/*.yaml
 checks:
   format: sarif
-  policy: default-compat
+  policy: ./dist/policy.ciq.tgz
+diff:
+  includeTestChanges: false
+sbom:
+  format: spdx
+  dependencyBundles: true
+  requireLocalPackages: true
+publish:
+  includeDependencies: true
+registry:
+  port: 8787
+  storeDir: .codeiq/cache/registry
+mcp:
+  port: 3000
 ```
 
-## `policy-bundle` 示例
+## 字段说明
 
-当仓库本身是 policy repo 时，当前最小配置通常类似：
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `schemaVersion` | 是 | 当前写 `ciq-config/v2` |
+| `profile` | 是 | 仓库类型：Go / Rust / Terraform / OpenAPI / policy |
+| `purl` | 是 | 当前仓库或规格的唯一标识 |
+| `source.repo` | 是 | 源仓库地址 |
+| `source.ref` | 是 | 默认分支或基线引用 |
+| `inputs.include` | 是 | 要扫描的文件 glob |
+| `checks.format` | 否 | 目前固定为 `sarif` |
+| `checks.policy` | 否 | `codeiq check` 默认读取的 policy bundle 路径 |
+| `diff.includeTestChanges` | 否 | `diff` 是否包含测试变化 |
+| `sbom.format` | 否 | 当前仅支持 `spdx` |
+| `sbom.dependencyBundles` | 否 | 是否为可解析的本地依赖额外产出 dependency bundle |
+| `sbom.requireLocalPackages` | 否 | 本地依赖无法解析时是否直接失败 |
+| `publish.includeDependencies` | 否 | `codeiq publish` 是否同时发布 dependency bundles |
+| `registry.port` | 否 | `codeiq registry serve` 默认端口 |
+| `registry.storeDir` | 否 | 本地 registry 存储目录 |
+| `mcp.port` | 否 | `codeiq mcp serve` 默认端口 |
 
-```yaml
-schemaVersion: ciq-config/v1
-profile: policy-bundle
-purl: pkg:generic/acme/compat-policy@2026.03.27
-source:
-  repo: https://github.com/acme/compat-policy
-  ref: main
-inputs:
-  include:
-    - "**/*.rego"
-checks:
-  format: sarif
-  policy: default-compat
+## 配置优先级
+
+### Registry store 目录
+
+本地 registry 存储目录按下面顺序决定：
+
+1. 环境变量 `CODEIQ_REGISTRY_STORE_DIR`
+2. `codeiq.yml` 中的 `registry.storeDir`
+3. 默认值 `.codeiq/cache/registry`
+
+这意味着你可以在容器或 CI 里直接覆盖存储目录，而不必改仓库配置：
+
+```bash
+CODEIQ_REGISTRY_STORE_DIR=/data/registry codeiq registry serve --port 8787
 ```
 
-## 关键字段
+## 支持的 profile
 
-| 字段 | 作用 |
-| --- | --- |
-| `schemaVersion` | 配置 schema 版本，当前为 `ciq-config/v1` |
-| `profile` | 仓库类型 |
-| `purl` | 当前仓库或产物的唯一标识 |
-| `source.repo` / `source.ref` | 仓库来源 |
-| `inputs.include` | 要参与构建的代码或规格文件 |
-| `checks.format` | 当前固定为 `sarif` |
-| `checks.policy` | 策略名称或约定字符串；当前 CLI 运行时仍建议显式传 `--policy <bundle-path>` |
+| profile | 用途 |
+|---------|------|
+| `go-module` | Go module |
+| `rust-crate` | Rust crate |
+| `terraform-module` | Terraform module |
+| `openapi-spec` | OpenAPI 规格仓库 |
+| `policy-bundle` | OPA policy bundle |
 
-## 当前支持的 profile
+## 什么是 PURL？
 
-- `go-module`
-- `rust-crate`
-- `terraform-module`
-- `openapi-spec`
-- `policy-bundle`
+PURL（Package URL）是 CodeIQ 用来标识 bundle、diff 基线和 registry 记录的标准格式：
 
-## PURL 示例
+```text
+pkg:<type>/<namespace>/<name>@<version>
+```
+
+示例：
 
 ```text
 pkg:golang/github.com/gin-gonic/gin@1.10.0
 pkg:cargo/tokio@1.43.0
 pkg:terraform/hashicorp/terraform-aws-vpc@5.18.1
 pkg:openapi/acme/payment-api@2026.03.01
+pkg:generic/acme/compat-policy@2026.03.27
 ```
 
-CodeIQ 当前把 PURL 作为 canonical identifier。对于 `pkg:terraform` 和 `pkg:openapi`，如果你要和不认识这些 type 的外部工具互通，可能需要准备 `pkg:generic` fallback；但在当前 repo 文档与示例里，这些 type 仍然是主表达方式。
+## 下一步
 
-## 什么时候看这页？
-
-- 你在写 `codeiq.yaml`
-- 你在决定 profile
-- 你在准备 query、registry download 或 publish 时需要准确的 PURL
-
-如果你想看设计边界和 proposal 背景，请读：[/contrib/architecture](/contrib/architecture)
+- 初始化并生成配置文件：[快速开始](/docs/quickstart)
+- 查看命令面与当前 reality：[CLI 参考](/docs/cli)
+- 理解 bundle / registry / MCP 如何串起来：[工作方式](/docs/runtime-model)

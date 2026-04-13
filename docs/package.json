@@ -3,9 +3,12 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
+    "generate:policy-docs": "moon -C .. run src/scripts/gendoc/main",
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "predev": "pnpm run generate:policy-docs",
+    "prebuild": "pnpm run generate:policy-docs",
     "lint": "biome check src/components/primitive src/lib --linter-enabled=true --formatter-enabled=false --assist-enabled=false",
     "lint:fix": "biome check src/components/primitive src/lib --linter-enabled=true --formatter-enabled=false --assist-enabled=false --write",
     "format": "biome format --write ."
@@ -22,9 +25,11 @@
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.575.0",
     "motion": "^12.38.0",
+    "playwright": "^1.59.1",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "rehype-mermaid": "^3.0.0",
     "shiki": "^4.0.2",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.18"

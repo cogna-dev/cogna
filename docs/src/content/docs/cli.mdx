@@ -1,80 +1,201 @@
 ---
-title: CLI
-description: 精确查阅当前 CLI 命令、常见组合，以及它们各自处理什么输入和输出。
+title: CLI 参考
+description: 当前 CodeIQ CLI 的真实命令面、默认行为，以及各命令会读取或生成哪些文件。
 order: 6
 ---
 
-# CLI
+# CLI 参考
 
-这一页属于 #strong[Reference]：当你需要查命令时，直接看这里。
+当前版本的 CodeIQ CLI 以 `codeiq.yml` 为中心：`build`、`diff`、`check`、`publish`、`registry serve`、`mcp serve` 都优先读取当前工作目录对应仓库的配置，而不是要求你在命令行里重复传路径。
 
-## 命令总览
+---
 
-| 命令 | 输入 | 当前输出 |
-| --- | --- | --- |
-| `codeiq init` | 无 | 生成 `codeiq.yaml` |
-| `codeiq build <repo>` | 代码 repo 或 policy repo | 物化 `dist/*`，并生成 `dist/bundle.ciq.tgz` |
-| `codeiq diff <repo> [--since <ref>] [--test-changes <bool>]` | 已配置 repo | 生成 `dist/diff.json` |
-| `codeiq check <diff-file> --policy <policy-bundle>` | `CIQ Diff` + 本地 policy bundle | 生成 `check.sarif.json` |
-| `codeiq query <query-file>` | `CIQ Query` | 生成 `query.result.json` |
-| `codeiq publish <bundle-file>` | `bundle.ciq.tgz` | 生成 publish receipt |
-| `codeiq registry ...` | PURL / bundle / upload request | 本地 registry metadata 或物化后的 bundle |
-| `codeiq mcp ...` | 本地 bundle context | 本地 MCP runtime |
+## `codeiq init`
 
-## 子命令参考
-
-### `registry`
-
-- `codeiq registry upload-local <upload-request-file>`
-- `codeiq registry download-local <purl>`
-- `codeiq registry download <purl> --output <dir>`
-- `codeiq registry serve --port <port>`
-
-### `mcp`
-
-- `codeiq mcp start --port <port> --stdio <true|false>`
-- `codeiq mcp serve --port <port>`
-- `codeiq mcp status`
-- `codeiq mcp stop`
-
-## 常见组合
-
-### 第一次跑通
+生成一个新的 `codeiq.yml` 模板：
 
 ```bash
 codeiq init
-codeiq build ./sdk
-codeiq diff ./sdk
 ```
 
-### 发布前检查
+默认输出到当前目录的 `./codeiq.yml`。
+
+---
+
+## `codeiq build`
+
+读取当前仓库的 `codeiq.yml`，生成 `dist/` 下的 bundle 与索引产物：
 
 ```bash
-codeiq build ./sdk
-codeiq diff ./sdk --since <last-release-commit>
-codeiq check ./sdk/dist/diff.json --policy ./policy/dist/bundle.ciq.tgz
+codeiq build
 ```
 
-### AI 查询
+典型输出：
+
+```text
+dist/
+├── manifest.json
+├── declarations.ndjson
+├── symbols.ndjson
+├── software-components.ndjson
+├── sbom.spdx.json
+├── metadata.json
+├── checksums.txt
+├── bundle.ciq.tgz
+└── dependencies/              ← 仅在可解析本地依赖时出现
+```
+
+如果 `profile: policy-bundle`，还会额外生成：
+
+```text
+dist/
+├── opa-bundle.tar.gz
+└── policy.rules.json
+```
+
+---
+
+## `codeiq diff`
+
+根据当前仓库配置和 `dist/base` / `dist/target` 产物生成结构化 diff：
 
 ```bash
-codeiq build ./sdk
-codeiq mcp start
+codeiq diff
 ```
 
-### 本地共享
+输出文件：
+
+```text
+dist/diff.json
+```
+
+---
+
+## `codeiq check`
+
+读取 `codeiq.yml` 里的 `checks.policy` 并对 `dist/diff.json` 执行 policy 检查：
 
 ```bash
-codeiq publish ./dist/bundle.ciq.tgz
+codeiq check
 ```
 
-## 当前需要注意什么？
+输出文件：
 
-- `check` 当前不会自动把 `checks.policy: default-compat` 解析成一个可执行 bundle 路径；实际运行时仍建议显式传 `--policy <bundle-path>`；
-- `build` 对普通 repo 和 `policy-bundle` repo 都会产出 `dist/bundle.ciq.tgz`，但 policy repo 还会额外生成 `opa-bundle.tar.gz` 和 `policy.rules.json`；
-- `query` 和 `mcp` 是读本地 bundle 的入口，不负责重新 build。
+```text
+dist/check.sarif.json
+```
 
-## 更多参考
+> `check` 依赖本机可用的 `opa eval`。
 
-- MCP / Registry：[/docs/runtime-reference](/docs/runtime-reference)
-- 配置与 PURL：[/docs/config](/docs/config)
+---
+
+## `codeiq query`
+
+一次性查询某个 bundle 中的符号或 operation：
+
+```bash
+codeiq query <query-file>
+```
+
+示例查询文件：
+
+```json
+{
+  "schemaVersion": "ciq-query/v1",
+  "purl": "pkg:cargo/tokio@1.43.0",
+  "selector": {
+    "path": "tokio::sync::Mutex::lock"
+  },
+  "intent": "upgrade"
+}
+```
+
+`selector.kind` 当前是可选的；如果省略，CodeIQ 会在服务端做 ranked matching。
+
+---
+
+## `codeiq publish`
+
+发布当前仓库 `dist/bundle.ciq.tgz` 到本地或远端 registry：
+
+```bash
+codeiq publish
+```
+
+输出文件：
+
+```text
+dist/publish.json
+```
+
+如果 `publish.includeDependencies: true`，并且 `build` 阶段生成了 dependency bundles，publish receipt 还会聚合：
+
+- `dependencyCount`
+- `dependencyReceipts`
+
+---
+
+## `codeiq registry`
+
+### `registry serve`
+
+启动本地 HTTP registry server：
+
+```bash
+codeiq registry serve --port 8787
+```
+
+默认端口来自 `codeiq.yml -> registry.port`，命令行 `--port` 会覆盖它。
+
+本地存储目录优先级：
+
+1. `CODEIQ_REGISTRY_STORE_DIR`
+2. `codeiq.yml -> registry.storeDir`
+3. `.codeiq/cache/registry`
+
+### `registry status`
+
+查看 registry descriptor 和健康状态：
+
+```bash
+codeiq registry status
+```
+
+---
+
+## `codeiq mcp`
+
+### `mcp serve`
+
+在前台运行 MCP server：
+
+```bash
+codeiq mcp serve --port 3000
+```
+
+### `mcp status`
+
+查看 MCP server descriptor 和健康状态：
+
+```bash
+codeiq mcp status
+```
+
+---
+
+## 当前推荐工作流
+
+```bash
+codeiq init
+codeiq build
+codeiq diff
+codeiq check
+codeiq publish
+codeiq registry serve --port 8787
+```
+
+另一个终端里，如果要给 AI / Agent 使用：
+
+```bash
+codeiq mcp serve --port 3000
+```

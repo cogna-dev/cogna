@@ -1,55 +1,111 @@
 ---
 title: 工作方式
-description: 解释 Local Registry、PURL 和本地查询运行时分别在用户工作流里扮演什么角色。
+description: 解释 CodeIQ 现在的本地运行模型：bundle、registry、MCP、SPDX 与 dependency bundles 如何协同。
 order: 10
 ---
 
 # 工作方式
 
-这一页属于 #strong[Explanation]：它解释系统怎样配合工作，而不是逐条列命令。
+CodeIQ 当前仍然是**单机闭环**：你在本地仓库里构建 bundle，本地 registry 负责按 PURL 存储和分发，MCP 负责把这些 bundle 暴露给 AI / Agent。
 
-## 三个关键对象
+---
 
-- Local Registry：负责保存和共享 bundle
-- PURL：负责标识和定位 bundle
-- MCP：负责查询 bundle
+## 完整流程一览
 
-如果把完整工作流展开，当前实际上有五个相互配合的层次：
+```mermaid
+flowchart LR
+    subgraph BUILD["1. 构建"]
+        A["代码仓库或 API 规格"] -->|"codeiq init"| B["codeiq.yml 配置文件"]
+        B -->|"codeiq build"| C["dist/bundle.ciq.tgz"]
+        B -->|"codeiq build"| C2["dist/sbom.spdx.json"]
+        B -->|"codeiq build"| C3["dist/dependencies/*"]
+    end
 
-1. `init` / `build`：定义并产出 bundle
-2. `diff` / `check`：比较版本并执行本地 policy
-3. `publish` / `registry`：共享和物化 bundle
-4. `query`：一次性读取 bundle
-5. `mcp`：把 bundle 变成本地 AI / Agent 查询接口
+    subgraph GOVERN["2. 治理"]
+        C -->|"codeiq diff"| D["dist/diff.json"]
+        D -->|"codeiq check"| E["dist/check.sarif.json"]
+    end
 
-## 一句话理解
+    subgraph SHARE["3. 共享"]
+        C -->|"codeiq publish"| F["Local Registry"]
+        C3 -->|"publish.includeDependencies"| F
+    end
 
-```text
-Registry 负责存，PURL 负责找，MCP 负责查。
+    subgraph QUERY["4. 查询"]
+        F -->|"codeiq registry serve"| G["HTTP Registry API"]
+        C -->|"codeiq query"| H["CLI 单次查询"]
+        F -->|"codeiq mcp serve"| I["AI / Agent MCP 接口"]
+    end
 ```
 
-如果你把 `build` 和 `diff / check` 也算进去，那么更完整的版本是：
+---
 
-```text
-Build 负责产出，Diff / Check 负责治理，Registry 负责存，PURL 负责找，Query / MCP 负责查。
+## 现在的几个关键事实
+
+### 1. 配置文件默认是 `codeiq.yml`
+
+`codeiq init` 默认生成 `codeiq.yml`。旧文件名 `codeiq.yaml` 仍兼容读取，但新的命令说明、测试和示例都统一使用 `codeiq.yml`。
+
+### 2. SBOM 已收口为 SPDX-only
+
+构建后会产出：
+
+- `software-components.ndjson`
+- `sbom.spdx.json`
+
+不再生成 CycloneDX 文件。
+
+### 3. Registry 和 Publish 会复用同一套本地 store
+
+store 目录优先级：
+
+1. `CODEIQ_REGISTRY_STORE_DIR`
+2. `codeiq.yml -> registry.storeDir`
+3. `.codeiq/cache/registry`
+
+这让本地开发、CI、容器运行都能复用相同语义。
+
+### 4. MCP 命令面已经收口
+
+当前暴露给 CLI 的是：
+
+- `codeiq mcp serve`
+- `codeiq mcp status`
+
+不再把后台 start/stop 作为当前主文档推荐路径。
+
+---
+
+## Registry 与 Docker
+
+如果你要把 registry 作为容器运行，推荐方式是：
+
+```bash
+docker build -f Dockerfile.registry -t codeiq-registry:local .
+
+docker run --rm \
+  -p 8787:8787 \
+  -e CODEIQ_REGISTRY_STORE_DIR=/data/registry \
+  -v "$PWD/.codeiq-docker-registry:/data/registry" \
+  codeiq-registry:local
 ```
 
-## 为什么这对用户重要？
+这样容器里的 registry 数据会直接持久化到挂载目录。
 
-- 你会知道该在哪里找 bundle
-- 你会知道为什么 query / MCP 需要 PURL
-- 你会知道 publish、download 和查询分别属于哪一步
+---
 
-## 当前为什么强调 local-only？
+## 为什么现在仍然是 local-first
 
-因为当前 repo 的设计重点不是 hosted service，而是：
+因为 CodeIQ 现在最强调的是：
 
-- 让一台机器上的 CLI、Local Registry 和 MCP 共享同一份上下文资产；
-- 让 `CIQ Bundle`、`CIQ OPA Bundle`、`CIQ Diff`、`SARIF` 成为可以离线复用的标准化产物；
-- 让用户在不引入远端平台的前提下完成 build → diff → check → query → publish 的闭环。
+- 本地仓库即可完成 build → diff → check → publish → query
+- 不需要云端账号或托管控制面
+- AI 查询直接基于本机真实 bundle，而不是依赖源码猜测
 
-## 什么时候看这页？
+---
 
-- 你要共享 bundle
-- 你要按 PURL 下载
-- 你要接入 AI / Agent 查询
+## 下一步
+
+- 看命令面与默认值：[CLI 参考](/docs/cli)
+- 看 registry / MCP 接口细节：[MCP / Registry 参考](/docs/runtime-reference)
+- 看 bundle 产物结构：[Bundle 与结果文件参考](/docs/indexing)

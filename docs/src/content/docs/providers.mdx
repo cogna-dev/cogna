@@ -1,53 +1,120 @@
 ---
 title: 支持范围
-description: 解释当前支持哪些仓库类型、适合哪些使用方式，以及当前明确不做什么。
+description: CodeIQ 当前支持哪些仓库类型、能检测哪些变化类型，以及各 profile 的能力对比。
 order: 11
 ---
 
 # 支持范围
 
-这一页属于 #strong[Explanation]：它解释当前适用边界，而不是逐条列参数。
+CodeIQ 目前支持以下五种仓库/规格类型。在 `codeiq init` 时选择对应的 `profile`，CodeIQ 会按该类型提取契约信息。
 
-## 当前支持
+---
 
-- Go module
-- Rust crate
-- Terraform Module
-- OpenAPI specification
-- OPA policy bundle
+## 支持的类型
 
-## 各 profile 当前关注什么？
+| profile | 适用场景 |
+|---------|---------|
+| `go-module` | Go 语言的模块或库 |
+| `rust-crate` | Rust 的 crate |
+| `terraform-module` | Terraform 模块 |
+| `openapi-spec` | OpenAPI 2.x / 3.x 规格文件 |
+| `policy-bundle` | OPA policy 仓库（用于生成 check 使用的策略 bundle） |
 
-| Profile | 当前关注的公开事实 |
-| --- | --- |
-| `go-module` | 导出函数、类型、常量、接口、方法集等声明变化 |
-| `rust-crate` | public item、trait / impl、unsafe / extern、where clause 等声明变化 |
-| `terraform-module` | variable、output、module、provider、lifecycle 与 meta-argument 契约 |
-| `openapi-spec` | path、operation、parameter、request / response、schema 等 API contract |
-| `policy-bundle` | Rego policy、OPA bundle entrypoint、policy catalog |
+---
 
-## 当前适合的使用方式
+## 各 profile 能提取和检测什么
 
-- 本机 build / diff / check / query
-- 本机共享 bundle
-- 本机 AI / Agent 查询
+### `go-module`
 
-## 当前支持到什么程度？
+**提取内容：** 导出函数、类型、常量、接口、方法集
 
-- 代码 / 规格 repo 可以稳定 build 成 `CIQ Bundle`
-- `diff` 已经能为多种生态输出 richer semantic categories
-- `check` 已经能把 diff + policy 结果转成最小 SARIF
-- built-in compatibility policy baseline 正在继续扩展，但当前用户流程仍然是显式传入本地 policy bundle
+**能检测的变化：**
 
-## 当前不在范围内
+| 变化 | 说明 |
+|------|------|
+| 签名变化 | 函数参数或返回值变化 |
+| receiver 变化 | value receiver 变成 pointer receiver |
+| method set 变化 | 接口方法被删除或修改 |
+| unsafe 变化 | 函数变成 `unsafe` |
+| 声明删除 | 公开函数/类型被删除 |
 
-- hosted registry
-- distributed replication
-- multi-node HA
-- trust verifier / KMS
+### `rust-crate`
 
-## 什么时候看这页？
+**提取内容：** pub 函数、类型、trait、impl、where clause
 
-- 你在判断项目能不能接入 CodeIQ
-- 你在确认当前边界
-- 你需要区分用户能力和未来方向
+**能检测的变化：**
+
+| 变化 | 说明 |
+|------|------|
+| 签名变化 | pub 函数参数或返回值变化 |
+| extern ABI 变化 | `extern "C"` 函数签名变化 |
+| where clause 变化 | 泛型约束变更 |
+| unsafe 变化 | 函数从 safe 变成 `unsafe fn` |
+| public item 删除 | pub 声明被移除 |
+
+### `terraform-module`
+
+**提取内容：** variable、output、module、provider、lifecycle、meta-argument
+
+**能检测的变化：**
+
+| 变化 | 说明 |
+|------|------|
+| `input-became-required` | variable 的 default 被删除 |
+| `output-removed` | output 被删除 |
+| `provider-ref-changed` | provider 依赖变化 |
+| `lifecycle-changed` | lifecycle 配置变化 |
+| `meta-argument-changed` | meta-argument 配置变化 |
+| 类型变化 | variable/output 的类型声明变化 |
+
+### `openapi-spec`
+
+**提取内容：** paths、operations、parameters、requestBody、responses、schemas
+
+**能检测的变化：**
+
+| 变化 | 说明 |
+|------|------|
+| `parameter-became-required` | query/path/header 参数变必填 |
+| `response-status-removed` | HTTP 响应状态码被删除 |
+| `response-schema-narrowed` | response body 字段减少 |
+| `media-type-changed` | 请求/响应的 media type 变化 |
+| operation 删除 | 整个 HTTP 方法被删除 |
+| path 删除 | 整个 API 路径被删除 |
+
+### `policy-bundle`
+
+**用途：** 把你的 `.rego` 文件构建成 OPA bundle，供 `codeiq.yml -> checks.policy` 引用。
+
+不产生 diff 或 SARIF，只生成可用于 policy 检查的 bundle 产物。
+
+---
+
+## 软件组件（SBOM）
+
+所有 profile（除 `policy-bundle` 外）都会在构建时自动提取软件组件信息，生成：
+
+- `software-components.ndjson`
+- `sbom.spdx.json`（SPDX 格式）
+
+这些文件可以接入外部 SBOM 消费工具，也会参与 `diff` 时的 `componentChanges` 对比。
+
+---
+
+## 今天能做什么
+
+- ✅ 本机 build / diff / check / query / publish
+- ✅ 本机 AI / Agent 查询（MCP）
+- ✅ 本机共享 bundle（Local Registry）
+- ✅ 生成标准 SARIF，接入 CI 和代码扫描平台
+- ❌ 云端托管 registry（尚未支持）
+- ❌ 分布式同步和多节点（尚未支持）
+- ❌ IDE 原生插件（尚未支持，见 [IDE 集成](/docs/ide)）
+- ❌ Web 控制台（尚未支持，见 [Web 界面](/docs/web)）
+
+---
+
+## 下一步
+
+- 了解各语言的详细示例：[Go](/docs/go)、[Rust](/docs/rust)、[Terraform](/docs/terraform)、[OpenAPI](/docs/openapi)
+- 了解检查流程：[发版检查](/docs/release-check)

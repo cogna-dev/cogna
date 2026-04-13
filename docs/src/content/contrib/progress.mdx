@@ -1,75 +1,22 @@
 ---
 title: 计划进展
-description: 当前 release ledger、proposal 对账结论，以及文档和实现的内部状态记录。
+description: 兼容入口；真实进度请以 /docs/progress 为准。
 order: 3
 ---
 
 # 计划进展
 
-> 最后更新时间：2026-03-27（Asia/Shanghai）
+> 最后更新时间：2026-04-08（Asia/Shanghai）
 
-## Delivery ledger
+> 本页只保留兼容入口。唯一的 progress source of truth 在 [/docs/progress](/docs/progress)。
 
-| Item | 范围 | 当前状态 | 当前结论 |
-| --- | --- | --- | --- |
-| R11 | Local-Only Storage + SBOM Foundation | ✅ Completed | 共享本地 store、SBOM foundation 与 bundle integration 已完成 |
-| R12 | Provider Semantic Depth + CIQ Schema Richness | ✅ Completed | provider semantic depth、consumer readiness 与 handoff 已完成 |
-| R13 | OPA Diff Enrichment | ✅ Completed | semantic diff、component diff、OPA input shaping 与 SARIF enrichment 已闭环 |
-| A002 | Built-in OPA Rules | 🚧 Active | 下一阶段主线：built-in OPA rules、policy catalog、docs / dashboard 对齐 |
+## 统一入口
 
-## 当前 active stage：A002-2（detailed）
+- 真实进度、plan gap 与当前 active stage：[/docs/progress](/docs/progress)
+- 贡献者入口：[/contrib/introduction](/contrib/introduction)
 
-### 目标
+## 当前兼容策略
 
-把当前 `default_policy_rules()` 仍然输出的四条 shallow default rules，升级成真正的 built-in OPA rules baseline，并把 semantic match contract 统一收敛到 `semanticDiff.findings[]`。
-
-### 当前阶段必须保持的 repo reality
-
-- `check` 继续使用本地 `opa eval --bundle ... data.codeiq.compat.deny`；
-- `diff` 已输出 enriched evidence，新的 built-in 设计会以 `semanticDiff.findings[]` 作为 declaration selector，并把多余 selector 清理掉；
-- `policy-bundle` 已经是正式 profile，`build` 已能产出 `ciq-opa-bundle/v1`、`opa-bundle.tar.gz`、`policy.rules.json`；
-- 用户文档必须继续优先描述 local-only runtime，而不是 hosted / distributed capability。
-
-### 当前 active checklist
-
-- `spec/A002-opa-builtin-rules.typ` 已冻结 built-in policy taxonomy、`semanticDiff.findings[]` contract、Rego/OPA vs catalog 分工、各生态策略矩阵、交付物与用户输入输出；
-- `spec/plan.typ` 已重写，R11–R13 保持 summary-only，A002 成为唯一 active detailed item；
-- 用户文档正在补回 proposal 中对用户仍有价值的流程、命令、产物与边界信息；
-- progress dashboard 需要继续保持“只有当前 active stage 保留详细说明”的规则。
-
-## Completed summaries
-
-### R11
-
-- 共享本地 store、SBOM foundation 与 bundle integration 已完成；
-- trust verifier、remote registry、distributed / hosted wording 已退出 active scope。
-
-### R12
-
-- Go / Rust / Terraform / OpenAPI richer declaration facts 已稳定落到 `shape`、`relations` 与 `language_specific`；
-- bundle / query / diff consumer readiness 已完成。
-
-### R13
-
-- `semanticCategory` / `semanticDiff` / `componentDiff` 与 OPA input shaping 已完成；
-- `check` 已稳定产出 local minimal SARIF v2.1.0。
-
-## Future summaries
-
-- A002-3：OPA input enrichment（`beforeRecord` / `afterRecord` 与 richer component evidence）
-- A002-4：Terraform / OpenAPI deeper breaking-change rules
-- A002-5：exact-rule overrides、catalog/docs/tests/SARIF acceptance 收口
-
-## Proposal → implementation reconciliation
-
-- `spec/proposal.typ` 保留项目申报与问题定义价值；
-- 当前 active contract 以 schema + implementation + tests + docs 的已验证现实为准；
-- 文档和 README 已按“用户文档 / 贡献者文档”重新拆分，避免把 proposal 叙事直接暴露给最终用户；
-- `policy-bundle`、local OPA runtime、semantic diff 与最小 SARIF 都应以当前代码为准，而不是沿用 proposal 中更宽的叙事。
-
-## 当前文档状态
-
-- 用户文档已经重构为 Divio 四象限结构；
-- 贡献者文档负责承接架构边界与进展记录；
-- README 已收敛为项目入口，并链接到用户与贡献者文档；
-- 本轮继续同步 `/docs` 首页、主页 Feature 列表、用户 Reference / How-to / Explanation 页面，以及用户状态页，使其与 A002 active stage 一致。
+- README、导航与 contributor docs 现在都应直接链接 `/docs/progress`；
+- `/contrib/progress` 仅用于兼容旧链接，不再维护独立 ledger；
+- 如需更新进度，请只修改 `docs/src/content/docs/progress.mdx`。

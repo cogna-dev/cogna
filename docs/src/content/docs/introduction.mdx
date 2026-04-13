@@ -1,90 +1,72 @@
 ---
 title: 概览
-description: 从用户视角理解 CodeIQ 的目标、适用场景、核心能力和当前边界。
+description: 什么是 CodeIQ，它能帮你解决什么问题，典型用法是什么样的。
 order: 1
 ---
 
-# 概览
+# 什么是 CodeIQ？
 
-这一页属于 #strong[Explanation]：它回答的是“CodeIQ 是什么、适合解决什么问题”，而不是“命令怎么写”。
+CodeIQ 是一个本地命令行工具，帮你回答一个核心问题：
 
-## CodeIQ 解决什么问题？
+> **"这次版本发布，对外的公开接口到底变了什么？这些变化会不会造成兼容性问题？"**
 
-CodeIQ 不是新的 linter，也不是 IDE / LSP 的替代品。
+不管你在维护一个 Go 库、Rust crate、Terraform Module，还是 OpenAPI 规格，在发版前你都需要回答这个问题——而 CodeIQ 的目标就是让这件事变得可靠、可重复、可以接进 CI。
 
-它关注的是：#strong[公开接口、契约和版本差异]。
+## 它能帮你做什么？
 
-当你要回答下面这些问题时，CodeIQ 会比单纯翻 README、看 diff 文本或做实现级静态分析更直接：
+CodeIQ 围绕一个本地工作流展开：
 
-- 这个库或 API 当前对外承诺了什么？
-- 两个版本之间哪些公开声明真的变了？
-- 这些变化是否可能破坏兼容性？
-- 我能否把检查结果接到本地 CI / 审查流程里？
-
-当你面对下面这些场景时，CodeIQ 会特别有用：
-
-- SDK / Library 发版前要确认有没有破坏兼容性
-- Terraform Module 或 OpenAPI 规格更新后要看清楚变更
-- 想让 AI / Agent 查询当前版本的真实接口，而不是只搜 README
-- 想把变更检查结果输出成 SARIF，接到现有审查流程里
-
-## 当前提供哪些核心能力？
-
-| 能力 | 当前结果 |
-| --- | --- |
-| 构建仓库快照 | `build` 生成 `CIQ Bundle`，其中包含声明、符号、software components、SBOM、metadata、checksums 和 `bundle.ciq.tgz` |
-| 构建策略快照 | `profile: policy-bundle` 时，`build` 生成 `CIQ OPA Bundle`，其中包含 `opa-bundle.tar.gz`、`policy.rules.json` 和 `bundle.ciq.tgz` |
-| 比较版本 | `diff` 生成 `CIQ Diff`，当前会输出 `summary`、`changes`、`componentChanges`，并为很多 change 补上 `semanticCategory`、`semanticDiff`、`componentDiff` |
-| 发布前检查 | `check` 在本机执行 `opa eval --bundle ... data.codeiq.compat.deny`，并生成本地最小 `SARIF v2.1.0` |
-| 查询上下文 | `query` 输出 `CIQ Result`；`mcp` 提供本地查询 runtime，支持 AI / Agent 重复查询 |
-| 共享产物 | `publish`、`registry download-local`、`registry download`、`registry serve` 让 bundle 在单机工作流里复用 |
-
-## 当前有哪些核心对象？
-
-- #strong[`CIQ Config`]：定义 profile、PURL、输入路径和 checks policy；
-- #strong[`CIQ Bundle`]：面向代码 / 规格仓库的声明与 component 快照；
-- #strong[`CIQ OPA Bundle`]：面向 policy 的策略快照，供 `check` 装载；
-- #strong[`CIQ Diff`]：描述版本之间 declaration 与 component 的变化；
-- #strong[`SARIF`]：`check` 的对外结果格式；
-- #strong[`Local Registry`]：单机上的 bundle publish / resolve / download façade；
-- #strong[`MCP runtime`]：本地查询工具层，不替代 `build / diff / check / publish`。
-
-## 当前支持哪些仓库？
-
-- Go module
-- Rust crate
-- Terraform Module
-- OpenAPI specification
-- OPA policy bundle
-
-这些 profile 统一使用 PURL 作为 canonical identifier，并围绕一套本地工作流组织：配置、构建、比较、检查、查询和本地共享。
-
-## 当前工作流
-
-```text
-init -> build -> diff -> check -> query -> publish
+```mermaid
+flowchart LR
+    A["init\n初始化配置"] --> B["build\n构建快照"]
+    B --> C["diff\n比较版本"]
+    C --> D["check\n策略检查"]
+    D --> E["query / mcp\n查询接口"]
+    B --> F["publish\n共享 bundle"]
 ```
 
-## CodeIQ 不做什么？
+| 步骤 | 你得到什么 |
+|------|-----------|
+| `codeiq init` | 一份 `codeiq.yml` 配置文件 |
+| `codeiq build` | 一个包含公开声明快照的 bundle（`dist/bundle.ciq.tgz`） |
+| `codeiq diff` | 两个版本之间的结构化变更报告（`dist/diff.json`） |
+| `codeiq check` | 基于 OPA policy 的兼容性检查结果，SARIF 格式（`dist/check.sarif.json`） |
+| `codeiq query` / `codeiq mcp` | 精确查询某个符号、接口或契约的当前状态 |
+| `codeiq publish` | 把 bundle 发布到本地 registry，供其他工具复用 |
 
-- 不做 hosted registry
-- 不做 distributed replication 或 multi-node HA
-- 不把 trust verifier / KMS 作为当前 active scope
-- 不把 MCP 变成 build / diff / check / publish 的替代入口
+## 跟其他工具有什么区别？
 
-## 当前边界
+CodeIQ 不是 linter，也不是 LSP，更不是 IDE 插件。它关注的是**公开接口的契约级别变化**，而不是代码风格、实现细节或编辑器体验。
 
-CodeIQ 当前是 #strong[local-only] 工作流：
+举个例子：
 
-- CLI 在本机运行
-- bundle 在本机共享和下载
-- query / MCP 在本机消费这些 bundle
+- `git diff` 能告诉你文件里改了哪些行
+- CodeIQ 能告诉你：这个函数的参数类型变了，原来是 `*Context` 现在是 `Context`，而且这是个 breaking change
 
-这意味着：当前文档、命令和示例都优先描述 repo 已实现的本地路径，而不是更宽的 hosted / remote 叙事。
+## 支持哪些语言和规格？
 
-## 接下来读什么？
+| 类型 | profile 名称 |
+|------|---------|
+| Go module | `go-module` |
+| Rust crate | `rust-crate` |
+| Terraform Module | `terraform-module` |
+| OpenAPI 规格 | `openapi-spec` |
+| OPA Policy Bundle | `policy-bundle` |
 
-- 第一次使用：[/docs/quickstart](/docs/quickstart)
-- 明确任务：[/docs](/docs)
-- 命令查阅：[/docs/cli](/docs/cli)
-- 支持范围：[/docs/providers](/docs/providers)
+## 当前状态
+
+CodeIQ 目前是**完全本地的**：所有命令都在你自己的机器上运行，bundle 也存在本地。没有云端服务，没有网络依赖。
+
+当前 Go / Rust 抽取链路已经切到 **single canonical author path + optional LSP validation**：`validation=none` 与 `validation=lsp` 针对同一份代码必须产出相同的最终 bundle，LSP 只负责验证，不再 author 第二份 backend truth。
+
+这意味着你现在就可以：
+
+- 在本机运行完整的 build → diff → check → query 流程
+- 把 SARIF 结果接进已有 CI 或代码审查系统
+- 用 MCP 让本地 AI Agent 查询真实接口，而不是靠猜
+
+## 从哪里开始？
+
+- **第一次使用**：跟着[快速开始](/docs/quickstart)跑一遍完整流程
+- **想直接看命令**：查 [CLI 参考](/docs/cli)
+- **需要了解配置**：看[配置与 PURL](/docs/config)

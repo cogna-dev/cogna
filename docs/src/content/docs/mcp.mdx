@@ -1,64 +1,84 @@
 ---
-title: AI 查询
-description: 如何用 CLI query 或 MCP 查询依赖与 API，并推荐从 outlines 到 symbol 的顺序使用。
+title: AI 查询（MCP）
+description: 如何通过 `codeiq mcp serve` 把 bundle 暴露给 AI / Agent，并配合 registry 与 query 一起工作。
 order: 4
 ---
 
-# AI 查询
+# AI 查询（MCP）
 
-这一页属于 #strong[How-to]：当你要让 AI / Agent 查询接口时，直接照这里做。
+CodeIQ 通过本地 MCP server 把 bundle 内容暴露给 AI 工具。当前命令面已经收口为：
 
-## 两种方式
+- `codeiq mcp serve`
+- `codeiq mcp status`
 
-| 场景 | 入口 |
-| --- | --- |
-| 一次性查询 | `codeiq query` |
-| 多轮交互式查询 | `codeiq mcp start` |
+也就是说，MCP 现在是一个**前台服务进程**；是否由外部 supervisor、容器或 IDE 负责后台常驻，由你自己决定。
 
-它们的边界很明确：
+## 两种查询方式
 
-- `query` 适合脚本、单次调试、CI 里的离线读取；
-- `mcp start` / `mcp serve` 适合本地 AI / Agent 多轮查询；
-- `build`、`diff`、`check`、`publish` 仍然应该通过 CLI 完成，而不是通过 MCP 触发。
+| 使用场景 | 命令 |
+|----------|------|
+| 一次性查询（脚本 / CI） | `codeiq query <query-file>` |
+| AI / Agent 多轮查询 | `codeiq mcp serve --port 3000` |
 
-## 推荐顺序
+---
 
-1. `codeiq.query.outlines`
-2. `codeiq.query.symbol`
-
-这样更容易先缩小范围，再看细节。
-
-## MCP 常用命令
+## 快速开始
 
 ```bash
-codeiq mcp start
+# 1. 先构建 bundle
+codeiq build
+
+# 2. 在前台启动 MCP server
+codeiq mcp serve --port 3000
+
+# 3. 另一个终端里查看状态
 codeiq mcp status
-codeiq mcp stop
-codeiq mcp serve
 ```
 
-当前 MCP runtime 会优先读取当前工作目录下的 `dist/manifest.json`；如果你传入的 PURL 不在当前目录，它会尝试从本地 registry / cache materialize 对应 bundle，而不是走远端 hosted query。
+---
 
-## MCP tools
+## MCP 提供的工具
 
-- `codeiq.query.outlines`
-- `codeiq.query.symbol`
-- `codeiq.runtime.context`
+### `codeiq.query.outlines`
 
-推荐的调用顺序是：
+按 PURL 返回公开路径大纲，适合先缩小范围。
 
-1. 先用 `codeiq.query.outlines` 浏览某个 PURL 的公开接口大纲；
-2. 再用 `codeiq.query.symbol` 精确读取某个 path / selector 的签名、位置、docs、shape、relations 和 `language_specific`；
-3. 需要调试 runtime 状态时，再看 `codeiq.runtime.context`。
+### `codeiq.query.symbol`
 
-## 一个最小的调用心智
+按路径读取具体声明。`kind` 当前是可选的；如果不传，服务端会做 ranked matching。
 
-- 先用 `outlines` 找候选路径
-- 再用 `symbol` 查具体签名、位置和说明
+### `codeiq.runtime.context`
 
-这套心智同样适用于 Terraform / OpenAPI：先缩小 contract 范围，再精确读取 declaration facts。
+返回当前 runtime 看到的 bundle / registry 上下文，适合调试和确认加载状态。
+
+---
+
+## 推荐查询顺序
+
+```mermaid
+flowchart LR
+    A["启动 MCP\ncodeiq mcp serve --port 3000"] --> B["outlines\n浏览所有公开路径"]
+    B --> C["symbol\n精确读取签名和文档"]
+    C --> D["AI 生成准确回答"]
+```
+
+---
+
+## 与 Registry 的关系
+
+MCP 自己不负责构建 bundle。常见做法是：
+
+1. `codeiq build`
+2. `codeiq publish`
+3. `codeiq registry serve --port 8787`
+4. `codeiq mcp serve --port 3000`
+
+这样 CLI、registry、MCP 三者都围绕同一份本地 bundle / store 工作。
+
+---
 
 ## 下一步
 
-- 命令与接口：[/docs/runtime-reference](/docs/runtime-reference)
-- 共享 Bundle：[/docs/bundle-sharing](/docs/bundle-sharing)
+- 查询文件格式与 ranked matching：[CLI 参考](/docs/cli)
+- registry 与 HTTP API：[MCP / Registry 参考](/docs/runtime-reference)
+- 整体运行链路：[工作方式](/docs/runtime-model)

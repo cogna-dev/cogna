@@ -1,53 +1,88 @@
 ---
-title: MCP / Registry
-description: 精确查阅本地 MCP、Registry 命令和最小接口。
+title: MCP / Registry 参考
+description: 当前 MCP 与 Registry 命令面、HTTP API，以及 Docker / storeDir 运行方式的精确参考。
 order: 9
 ---
 
-# MCP / Registry
+# MCP / Registry 参考
 
-这一页属于 #strong[Reference]：它提供精确命令和接口。
+这里记录的是**当前 reality**：只有 `serve` / `status` 公开暴露给 CLI；上传、解析、下载 bundle 的行为通过 `publish` 和 registry HTTP API 完成。
+
+---
 
 ## MCP 命令
 
+| 命令 | 说明 |
+|------|------|
+| `codeiq mcp serve [--port <port>]` | 在前台运行 MCP server |
+| `codeiq mcp status` | 查看 MCP descriptor 和健康状态 |
+
+示例：
+
 ```bash
-codeiq mcp start
-codeiq mcp serve
-codeiq mcp status
-codeiq mcp stop
+codeiq build
+codeiq mcp serve --port 3000
 ```
 
-当前 `mcp start` 是本地常驻入口，`mcp serve` 是前台运行入口；它们都服务于本地查询，而不是远端托管。
+---
 
 ## Registry 命令
 
+| 命令 | 说明 |
+|------|------|
+| `codeiq publish` | 发布当前仓库 `dist/bundle.ciq.tgz` |
+| `codeiq registry serve [--port <port>]` | 启动本地 HTTP registry server |
+| `codeiq registry status` | 查看 registry descriptor 和健康状态 |
+
+### Registry store 目录优先级
+
+1. `CODEIQ_REGISTRY_STORE_DIR`
+2. `codeiq.yml -> registry.storeDir`
+3. `.codeiq/cache/registry`
+
+示例：
+
 ```bash
-codeiq publish <bundle-file>
-codeiq registry upload-local <upload-request-file>
-codeiq registry download-local <purl>
-codeiq registry download <purl> --output <dir>
-codeiq registry serve [--port <port>]
+CODEIQ_REGISTRY_STORE_DIR=/data/registry codeiq registry serve --port 8787
 ```
 
-当前 `publish` 也会复用同一套本地 registry contract，只是它面向的是完整 bundle 文件，而不是直接调用这些子命令。
+---
 
-## MCP tools
+## HTTP Registry 接口
 
-- `codeiq.query.outlines`
-- `codeiq.query.symbol`
-- `codeiq.runtime.context`
+运行 `codeiq registry serve` 后，可用的 API：
 
-## 最小 HTTP 接口
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/health` | 健康检查 |
+| `POST` | `/api/v1/bundles` | 上传 bundle |
+| `GET` | `/api/v1/bundles/resolve?purl=<purl>` | 按 PURL 查找 bundle |
+| `GET` | `/api/v1/packages/{purl}/versions` | 列出某个包的已发布版本 |
+| `GET` | `/api/v1/bundles/{bundleId}` | 获取 bundle 元数据 |
+| `GET` | `/api/v1/bundles/{bundleId}/download` | 下载 bundle 文件 |
 
-- `GET /health`
-- `POST /api/v1/bundles`
-- `GET /api/v1/bundles/resolve?purl=...`
-- `GET /api/v1/packages/{purl-encoded}/versions`
-- `GET /api/v1/bundles/{bundleId}`
-- `GET /api/v1/bundles/{bundleId}/download`
+---
 
-## 什么时候需要这页？
+## Docker 运行 Registry
 
-- 你要精确写脚本调用 `registry serve` 的本地接口
-- 你要核对 MCP 当前暴露了哪些 tools
-- 你要确认 Local Registry 和 MCP 在本地工作流中的边界
+P6 完成后，registry server 可以直接以容器方式交付：
+
+```bash
+docker build -f Dockerfile.registry -t codeiq-registry:local .
+
+docker run --rm \
+  -p 8787:8787 \
+  -e CODEIQ_REGISTRY_STORE_DIR=/data/registry \
+  -v "$PWD/.codeiq-docker-registry:/data/registry" \
+  codeiq-registry:local
+```
+
+容器里 `CODEIQ_REGISTRY_STORE_DIR` 必须指向可写目录，通常配合 volume 持久化。
+
+---
+
+## 下一步
+
+- 命令面总览：[CLI 参考](/docs/cli)
+- MCP 使用方式：[AI 查询（MCP）](/docs/mcp)
+- bundle / registry / MCP 如何连起来：[工作方式](/docs/runtime-model)

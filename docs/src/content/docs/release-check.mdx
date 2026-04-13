@@ -1,92 +1,125 @@
 ---
 title: 发版检查
-description: 如何在发布前生成 diff、执行 policy check，并读懂 SARIF 结果。
+description: 如何在发布前用 CodeIQ 生成变更 diff、执行 policy 检查，并读懂 diff.json 和 SARIF 结果，决定是否可以安全发版。
 order: 3
 ---
 
 # 发版检查
 
-这一页属于 #strong[How-to]：当你要发布时，按这里的步骤做。
+在发布 SDK、API 或 Terraform module 的新版本之前，你需要回答三个问题：
 
-## 目标
+1. **这次改了什么？** — 有哪些公开声明发生了变化
+2. **哪些变化可能有风险？** — 是否有 breaking change 会影响调用方
+3. **是否违反了团队的兼容性策略？** — policy 检查结果如何
 
-在发布前回答三个问题：
+CodeIQ 通过 `build → diff → check` 三步流程帮你系统地回答这三个问题。
 
-1. 这次变了什么？
-2. 哪些变化值得警惕？
-3. 是否违反了本地 policy？
+---
 
-## 步骤
+## 完整流程
 
 ```bash
-codeiq build ./sdk
-codeiq diff ./sdk --since <last-release-commit> --test-changes true
-codeiq check ./sdk/dist/diff.json --policy ./policy/dist/bundle.ciq.tgz
+# 1. 构建当前版本的 bundle
+cd ./sdk
+codeiq build
+
+# 2. 准备 dist/base 与 dist/target 两套产物后做对比
+codeiq diff
+
+# 3. 执行兼容性检查
+codeiq check
 ```
 
-这里的关键点有两个：
+### 目前的 diff 前提
 
-- 当前 `check` 仍然要求显式传入一个本地 policy bundle；
-- 如果 policy repo 使用 `profile: policy-bundle` 构建，实际可传入的产物通常是 `dist/bundle.ciq.tgz`。
+当前 `codeiq diff` 不从 CLI 接收 `--since` 或 `--test-changes`。你需要：
 
-## 先看哪些结果？
+- 先把基线版本产物放到 `dist/base/`
+- 再把当前版本产物放到 `dist/target/`
+- 如果要纳入测试变化，则在 `codeiq.yml -> diff.includeTestChanges` 中开启
 
-### `dist/diff.json`
+---
 
-优先看：
+## 读懂 diff.json
 
-- `summary`
-- `changes[*].kind`
-- `changes[*].level`
-- `changes[*].semanticCategory`
-- `changes[*].semanticDiff`
-- `changes[*].beforeRecord` / `changes[*].afterRecord`
-- `componentChanges`
+`diff.json` 是 `codeiq diff` 的核心输出，包含所有检测到的变化。
 
-当前 repo 已经为很多 change 做了 richer semantic shaping。例如：
+### 关键字段
 
-- Go：receiver、pointer receiver、method set、signature 变化
-- Rust：`unsafe`、extern ABI、where clause、signature 变化
-- Terraform：provider ref、lifecycle、meta-argument 变化
-- OpenAPI：HTTP method、requiredness、status code、media type 变化
+| 字段 | 含义 |
+|------|------|
+| `summary` | 变更摘要（添加/修改/删除的数量） |
+| `changes[*].kind` | 变化类型：`added` / `changed` / `removed` |
+| `changes[*].level` | 风险级别：`error` / `warning` / `note` |
+| `changes[*].path` | 变化的声明路径 |
+| `changes[*].semanticDiff.findings` | 具体的语义发现，包含 ruleId 和说明 |
+| `changes[*].beforeRecord` | 变化前的源文件位置 |
+| `changes[*].afterRecord` | 变化后的源文件位置 |
+| `componentChanges` | 软件组件（依赖）的变化 |
 
-### `dist/check.sarif.json`
+### 示例
 
-优先看：
+```json
+{
+  "summary": {
+    "added": 2,
+    "changed": 1,
+    "removed": 0
+  },
+  "changes": [
+    {
+      "kind": "changed",
+      "level": "error",
+      "path": "Client.Do",
+      "semanticDiff": {
+        "findings": [
+          {
+            "ruleId": "compat.go.signature-changed",
+            "level": "error",
+            "message": "function 'Client.Do' added parameter 'ctx context.Context'"
+          }
+        ]
+      },
+      "beforeRecord": { "uri": "client/client.go", "startLine": 87 },
+      "afterRecord": { "uri": "client/client.go", "startLine": 89 }
+    }
+  ]
+}
+```
 
-- `level = error`：通常意味着高风险
-- `level = warning`：值得重点确认
-- `level = note`：补充信息
+---
 
-当前最小 SARIF 会把 policy decision 映射成：
+## 读懂 check.sarif.json
 
-- `ruleId`
-- `level`
-- `message.text`
-- `locations[].physicalLocation.artifactLocation.uri`
-- `tool.driver.rules[].helpUri`
+`check.sarif.json` 是 policy 检查的输出，把 diff 中的 findings 映射为标准 SARIF 格式。
 
-因此，在看 SARIF 时，优先确认：
+### 优先看哪些字段
 
-- 是哪条 policy rule 触发了结果；
-- 结果落在哪个源文件 / 契约文件；
-- `helpUri` 是否指向了你团队约定的 policy 文档。
+| SARIF 字段 | 含义 |
+|------------|------|
+| `level: "error"` | 高风险，通常会阻止发版 |
+| `level: "warning"` | 需要人工确认 |
+| `level: "note"` | 提示信息 |
+| `ruleId` | 触发的 policy 规则 |
+| `message.text` | 对变化的具体说明 |
+| `artifactLocation.uri` + `startLine` | 变化在哪个文件哪一行 |
+| `tool.driver.rules[].helpUri` | 规则文档链接 |
 
-## 适合谁？
+---
 
-- SDK / Library 维护者
-- OpenAPI / Terraform 维护者
-- 要做发布前门禁的团队
+## 适合哪些发版场景
 
-## 相关输入长什么样？
+| 场景 | 建议 |
+|------|------|
+| SDK / 库的语义化版本发布 | 用 `diff --since` 确认 breaking change，决定是 major / minor / patch |
+| OpenAPI 新版本发布 | 检测 parameter requiredness、response status code 等高风险变化 |
+| Terraform module 新版本 | 检测 variable 必填性和 output 删除 |
+| PR 合并前的门禁检查 | 接入 CI，自动运行 diff + check |
 
-- 代码 / 规格 repo 先生成 `CIQ Bundle`
-- policy repo 生成 `CIQ OPA Bundle`
-- `check` 消费的是 `CIQ Diff + local policy bundle`
-
-如果你想精确查 bundle、diff、policy-bundle 和 SARIF 的文件结构，请看：[/docs/indexing](/docs/indexing)
+---
 
 ## 下一步
 
-- AI 查询：[/docs/mcp](/docs/mcp)
-- MCP / Registry 参考：[/docs/runtime-reference](/docs/runtime-reference)
+- 在 CI 中自动化运行：[持续集成](/docs/ci)
+- 了解 SARIF 接入：[启用 SARIF 集成](/docs/sarif)
+- 让 AI 查询变化详情：[AI 查询（MCP）](/docs/mcp)

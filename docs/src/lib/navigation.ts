@@ -14,42 +14,55 @@ export interface FooterGroup {
 }
 
 export const topNavigation: NavItem[] = [
-  { title: "快速开始", href: "/docs/quickstart" },
   { title: "用户文档", href: "/docs" },
   { title: "贡献者文档", href: "/contrib/introduction" },
-  { title: "开发进度", href: "/contrib/progress" },
   { title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
 ]
 
 export const userSidebar: NavGroup[] = [
   {
     title: "教程",
-    items: [{ title: "快速开始", href: "/docs/quickstart" }],
+    items: [
+      { title: "快速开始", href: "/docs/quickstart" },
+    ],
   },
   {
     title: "操作指南",
     items: [
-      { title: "发版检查", href: "/docs/release-check" },
-      { title: "AI 查询", href: "/docs/mcp" },
-      { title: "共享 Bundle", href: "/docs/bundle-sharing" },
+      { title: "构建索引", href: "/docs/build-indexes" },
+      { title: "检索函数签名", href: "/docs/query-signatures" },
+      { title: "分析变更", href: "/docs/analyze-changes" },
+      { title: "远程索引", href: "/docs/remote-indexing" },
     ],
   },
   {
-    title: "参考",
+    title: "集成",
     items: [
       { title: "CLI", href: "/docs/cli" },
-      { title: "配置与 PURL", href: "/docs/config" },
-      { title: "Bundle 与结果", href: "/docs/indexing" },
-      { title: "MCP / Registry", href: "/docs/runtime-reference" },
+      { title: "IDE", href: "/docs/ide" },
+      { title: "Web", href: "/docs/web" },
+      { title: "MCP", href: "/docs/mcp" },
+      { title: "持续集成", href: "/docs/ci" },
     ],
   },
   {
-    title: "解释",
+    title: "生态系统",
     items: [
-      { title: "概览", href: "/docs/introduction" },
-      { title: "工作方式", href: "/docs/runtime-model" },
-      { title: "支持范围", href: "/docs/providers" },
-      { title: "当前状态", href: "/docs/progress" },
+      { title: "核心配置", href: "/docs/config" },
+      { title: "Go", href: "/docs/go" },
+      { title: "Rust", href: "/docs/rust" },
+      { title: "Terraform", href: "/docs/terraform" },
+      { title: "OpenAPI", href: "/docs/openapi" },
+    ],
+  },
+  {
+    title: "高级主题",
+    items: [
+      { title: "软件成分分析", href: "/docs/sca-spdx" },
+      { title: "内置策略规则", href: "/docs/policies" },
+      { title: "自定义变更策略", href: "/docs/policy" },
+      { title: "SARIF", href: "/docs/sarif" },
+      { title: "平台工程", href: "/docs/platform-engineering" },
     ],
   },
 ]
@@ -57,13 +70,24 @@ export const userSidebar: NavGroup[] = [
 export const contributorSidebar: NavGroup[] = [
   {
     title: "开始",
-    items: [{ title: "贡献指南", href: "/contrib/introduction" }],
+    items: [
+      { title: "贡献指南", href: "/contrib/introduction" },
+      { title: "开发进度", href: "/docs/progress" },
+    ],
   },
   {
-    title: "内部参考",
+    title: "数据模型",
     items: [
-      { title: "架构边界", href: "/contrib/architecture" },
-      { title: "计划进展", href: "/contrib/progress" },
+      { title: "变更", href: "/contrib/changes" },
+      { title: "策略", href: "/contrib/policy" },
+    ],
+  },
+  {
+    title: "附录",
+    items: [
+      { title: "开源协议", href: "/contrib/license" },
+      { title: "行为准则", href: "/contrib/code-of-conduct" },
+      { title: "CLA", href: "/contrib/cla" },
     ],
   },
 ]
@@ -79,12 +103,11 @@ export const footerMenus: FooterGroup[] = [
     ],
   },
   {
-    title: "贡献者文档",
+    title: "附录",
     children: [
-      { title: "贡献指南", href: "/contrib/introduction" },
-      { title: "架构边界", href: "/contrib/architecture" },
-      { title: "开发进度", href: "/contrib/progress" },
-      { title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
+      { title: "开源协议", href: "/contrib/license" },
+      { title: "行为准则", href: "/contrib/code-of-conduct" },
+      { title: "CLA", href: "/contrib/cla" },
     ],
   },
 ]

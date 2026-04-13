@@ -1,95 +1,140 @@
 ---
-title: Bundle 与结果
-description: 精确查阅 Bundle、Diff、SARIF、Query Result 等主要产物分别是什么，以及它们包含什么信息。
+title: Bundle 与结果文件参考
+description: 精确查阅 CodeIQ 各类产物（Bundle、Diff、SARIF、Query Result）的文件结构和字段含义。
 order: 8
 ---
 
-# Bundle 与结果
+# Bundle 与结果文件参考
 
-这一页属于 #strong[Reference]：当你需要精确确认产物、文件或结果结构时，查这里。
+这里列出 CodeIQ 每个命令生成的具体文件，以及每个文件中包含的内容。当你不确定某个产物是什么、在哪里、有什么字段时，查这里。
 
-## `CIQ Bundle`
+---
 
-构建代码仓库后，当前 bundle 通常包含：
+## 普通仓库 Bundle（CIQ Bundle）
 
-- `manifest.json`
-- `declarations.ndjson`
-- `symbols.ndjson`
-- `software-components.ndjson`
-- `sbom.cdx.json`
-- `sbom.spdx.json`
-- `metadata.json`
-- `checksums.txt`
-- `bundle.ciq.tgz`
-
-其中，`bundle.ciq.tgz` 是完整归档；其他文件则是构建完成后落在 `dist/` 中、方便本地直接消费的物化内容。
-
-## `CIQ OPA Bundle`
-
-构建 `policy-bundle` 时，当前产物会以策略 bundle 的形式供 `check` 使用。当前 `dist/` 下通常会看到：
-
-- `manifest.json`
-- `opa-bundle.tar.gz`
-- `policy.rules.json`
-- `metadata.json`
-- `checksums.txt`
-- `bundle.ciq.tgz`
-
-其中最关键的两个文件是：
-
-- `opa-bundle.tar.gz`：OPA 原生 bundle 载荷
-- `policy.rules.json`：规则目录和帮助信息的 machine-readable catalog
-
-当前 `manifest.json` 会写成 `ciq-opa-bundle/v1`，并把入口固定为 `codeiq/compat/deny`。
-
-## `CIQ Diff`
-
-当前 `diff` 重点提供：
-
-- `summary`
-- `changes`
-- `componentChanges`
-- 可选 `testChanges`
-
-在 change entry 中，常见字段包括：
-
-- `kind`
-- `level`
-- `semanticCategory`
-- `semanticDiff`
-- `beforeRecord` / `afterRecord`
-- `componentDiff`
-
-当前 repo 已经为多种生态输出 richer semantic categories，例如：
-
-- Go：receiver、pointer receiver、method set、signature 变化
-- Rust：`unsafe`、extern ABI、where clause、signature 变化
-- Terraform：provider ref、lifecycle、meta-argument 变化
-- OpenAPI：HTTP method、requiredness、status code、media type 变化
-
-## `SARIF`
-
-`check` 输出 `check.sarif.json`，当前用于把 diff + policy 结果交给审查或 CI 消费。
-
-当前最小 SARIF 会稳定映射：
-
-- `ruleId`
-- `level`
-- `message.text`
-- `locations[].physicalLocation.artifactLocation.uri`
-- `tool.driver.rules[].helpUri`
-
-默认输出位置通常是 diff 文件所在目录，例如：
+在目标仓库目录执行 `codeiq build` 后，`dist/` 下会生成：
 
 ```text
-./dist/check.sarif.json
+dist/
+├── manifest.json           ← bundle 元数据：purl、profile、生成时间
+├── declarations.ndjson     ← 公开声明列表（函数、类型、接口等）
+├── symbols.ndjson          ← 符号信息（路径、签名、位置、文档）
+├── software-components.ndjson  ← 软件组件依赖列表
+├── sbom.spdx.json          ← SPDX 格式的 SBOM
+├── metadata.json           ← 补充元数据
+├── checksums.txt           ← 文件校验和
+└── bundle.ciq.tgz          ← 完整归档（上传 / 分发用）
 ```
 
-## `CIQ Query` / `CIQ Result`
+其中 `bundle.ciq.tgz` 是 `codeiq publish` 使用的主要文件；如果这是 policy 仓库，它也会作为 `checks.policy` 指向的 policy bundle。
 
-`query` 输入 `CIQ Query`，输出 `CIQ Result`。
+对 Go / Rust 仓库，`metadata.json` 中记录的是 canonical author path 的结果；当配置 `validation: lsp` 时，LSP 只做 parity validation，不会再写出第二份 backend-specific bundle 或第二套 snapshot truth。
 
-一个最小 query 例如：
+---
+
+## Policy Bundle（CIQ OPA Bundle）
+
+在 policy 仓库目录执行 `codeiq build`（`profile: policy-bundle`）后，`dist/` 下会生成：
+
+```text
+dist/
+├── manifest.json           ← bundle 元数据（manifest type: ciq-opa-bundle/v1）
+├── opa-bundle.tar.gz       ← OPA 原生 bundle 载荷（给 opa eval 用）
+├── policy.rules.json       ← 规则目录：ruleId、summary、level、helpUri
+├── metadata.json
+├── checksums.txt
+└── bundle.ciq.tgz          ← 给 `checks.policy` 引用的文件
+```
+
+**注意：** 当前 `codeiq check` 不再从 CLI 读取 `--policy` 参数，而是从 `codeiq.yml -> checks.policy` 读取 policy bundle。真正要引用的文件仍然是 `bundle.ciq.tgz`，不是 `opa-bundle.tar.gz`。
+
+---
+
+## Diff 文件（CIQ Diff）
+
+执行 `codeiq diff` 后，`./sdk/dist/diff.json` 的结构：
+
+```json
+{
+  "schemaVersion": "ciq-diff/v1",
+  "summary": {
+    "added": 2,
+    "changed": 1,
+    "removed": 0
+  },
+  "changes": [
+    {
+      "kind": "changed",
+      "level": "error",
+      "path": "Client.Do",
+      "semanticDiff": {
+        "findings": [
+          {
+            "ruleId": "compat.go.signature-changed",
+            "level": "error",
+            "message": "parameter 'ctx context.Context' was added"
+          }
+        ]
+      },
+      "beforeRecord": { "uri": "client/client.go", "startLine": 87 },
+      "afterRecord": { "uri": "client/client.go", "startLine": 89 }
+    }
+  ],
+  "componentChanges": [
+    {
+      "kind": "changed",
+      "beforePurl": "pkg:cargo/serde@1.0.195",
+      "afterPurl": "pkg:cargo/serde@1.0.197",
+      "beforeVersion": "1.0.195",
+      "afterVersion": "1.0.197"
+    }
+  ]
+}
+```
+
+---
+
+## SARIF 文件（check.sarif.json）
+
+执行 `codeiq check` 后，`./sdk/dist/check.sarif.json` 符合 SARIF 2.1.0 标准：
+
+```json
+{
+  "version": "2.1.0",
+  "runs": [{
+    "tool": {
+      "driver": {
+        "name": "CodeIQ",
+        "rules": [
+          {
+            "id": "compat.go.signature-changed",
+            "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/go/signature-changed"
+          }
+        ]
+      }
+    },
+    "results": [
+      {
+        "ruleId": "compat.go.signature-changed",
+        "level": "error",
+        "message": { "text": "function 'Client.Do' added parameter 'ctx'" },
+        "locations": [{
+          "physicalLocation": {
+            "artifactLocation": { "uri": "client/client.go" },
+            "region": { "startLine": 87 }
+          }
+        }]
+      }
+    ]
+  }]
+}
+```
+
+---
+
+## Query 文件（CIQ Query / CIQ Result）
+
+**查询文件格式（输入）：**
 
 ```json
 {
@@ -103,13 +148,11 @@ order: 8
 }
 ```
 
-当前默认结果文件为：
+执行 `codeiq query ./query.json` 后，结果保存在 `./query.result.json`。
 
-```text
-./query.result.json
-```
+---
 
 ## 下一步
 
-- 配置与 PURL：[/docs/config](/docs/config)
-- CLI：[/docs/cli](/docs/cli)
+- 配置 purl 和 profile：[配置参考](/docs/config)
+- CLI 命令完整参考：[CLI 参考](/docs/cli)

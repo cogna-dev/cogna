@@ -1,163 +1,220 @@
 ---
 title: 快速开始
-description: 用一次完整的本地流程体验 CodeIQ：初始化、构建、对比、检查、查询。
+description: 跟着这份教程，用 15 分钟跑完 init → build → diff → check → query 完整流程。
 order: 2
 ---
 
 # 快速开始
 
-这一页属于 #strong[Tutorials]：跟着步骤做，先跑通一遍，再读其他文档。
-
-## 你会完成什么？
-
-完成这页后，你会拿到：
-
-- 一个 `codeiq.yaml`
-- 一个构建好的 bundle
-- 一个 diff 文件
-- 一个 SARIF 检查结果
-- 一次真实查询结果
+这份教程会带你从零跑完一次完整的本地 CodeIQ 工作流。完成后你手里会有：一份配置文件、一个 bundle 快照、一份 diff 报告、一份 SARIF 检查结果。
 
 ## 前置条件
 
-- 已安装 `codeiq`
-- 有一个本地仓库可供测试
-- 如果要执行 `check`，本机还需要 `opa`
-- 如果你还没有 policy bundle，准备一个单独的 policy repo，或使用已经构建好的本地 policy bundle
+- 已安装 `codeiq` CLI
+- 有一个本地仓库（Go / Rust / Terraform / OpenAPI 都可以）
+- 如果要运行 `check`，需要额外安装 [`opa`](https://www.openpolicyagent.org/docs/latest/#running-opa)
 
-## 第 1 步：初始化
+---
+
+## 第 1 步：初始化配置
+
+在你的仓库根目录运行：
 
 ```bash
 codeiq init
 ```
 
-这一步会生成 `codeiq.yaml`。
+这会生成一个 `codeiq.yml`。打开它，先确认这几个字段：
 
-第一次使用时，先确认这三个字段：
+```yaml
+schemaVersion: ciq-config/v2
+profile: go-module          # 改成你仓库对应的类型
+purl: pkg:golang/github.com/your-org/your-lib@1.0.0   # 改成你的 PURL
+source:
+  repo: https://github.com/your-org/your-lib
+  ref: main
+inputs:
+  include:
+    - "**/*.go"
+registry:
+  storeDir: .codeiq/cache/registry
+```
 
-- `profile`：例如 `go-module`、`rust-crate`、`terraform-module`、`openapi-spec`
-- `purl`：当前仓库的唯一标识
-- `checks.policy`：当前只是字符串配置；真正执行 `check` 时，仍建议显式传 `--policy <bundle-path>`
+`profile` 决定 CodeIQ 如何理解你的代码。支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`、`policy-bundle`。
+
+---
 
 ## 第 2 步：构建 bundle
 
 ```bash
-codeiq build ./sdk
+cd ./your-lib
+codeiq build
 ```
 
-构建完成后，`dist/` 下通常会看到：
+构建完成后，`dist/` 目录会有这些文件：
 
-- `manifest.json`
-- `declarations.ndjson`
-- `symbols.ndjson`
-- `software-components.ndjson`
-- `sbom.cdx.json`
-- `sbom.spdx.json`
-- `metadata.json`
-- `checksums.txt`
-- `bundle.ciq.tgz`
+```text
+dist/
+├── manifest.json           ← bundle 的元数据描述
+├── declarations.ndjson     ← 公开声明（函数、类型、接口等）
+├── symbols.ndjson          ← 符号索引
+├── software-components.ndjson
+├── sbom.spdx.json          ← SPDX SBOM
+├── metadata.json
+├── checksums.txt
+└── bundle.ciq.tgz          ← 完整归档，后续步骤用的就是它
+```
 
-这里的 `bundle.ciq.tgz` 是整包产物；其余文件则是已物化的 bundle 内容。
+`bundle.ciq.tgz` 是你所有后续操作的基础——diff、check、query、publish 都会用到它。
+
+---
 
 ## 第 3 步：生成 diff
 
-```bash
-codeiq diff ./sdk --since <last-release-commit> --test-changes true
-```
-
-你会得到 `dist/diff.json`。当前 `CIQ Diff` 除了 `summary` 之外，还会在很多 change 上输出：
-
-- `semanticCategory`
-- `semanticDiff`
-- `beforeRecord` / `afterRecord`
-- `componentDiff`
-
-## 第 4 步：准备 policy bundle
-
-`check` 需要一个本地 policy bundle。最常见的方式有两种：
-
-### 方式 A：使用已有 policy bundle
-
-如果团队已经有一个构建好的 policy bundle，直接记住它的路径，例如：
-
-```text
-./policy/dist/bundle.ciq.tgz
-```
-
-### 方式 B：自己构建一个 policy repo
-
-为单独的 policy 仓库准备 `codeiq.yaml`，把 `profile` 设为 `policy-bundle`，然后执行：
+假设你已经准备好了基线版本和当前版本两套产物，想看它们之间改了什么：
 
 ```bash
-codeiq build ./policy
+cd ./your-lib
+# 先把旧版本产物放到 dist/base，把当前产物放到 dist/target
+codeiq diff
 ```
 
-当前 `build` 会在这个 policy repo 的 `dist/` 目录下生成：
-
-- `manifest.json`
-- `opa-bundle.tar.gz`
-- `policy.rules.json`
-- `checksums.txt`
-- `bundle.ciq.tgz`
-
-在当前 repo reality 下，传给 `check --policy` 的通常是这个 policy repo 的 `dist/bundle.ciq.tgz`。
-
-## 第 5 步：执行检查
-
-```bash
-codeiq check ./sdk/dist/diff.json --policy ./policy/dist/bundle.ciq.tgz
-```
-
-你会得到 `check.sarif.json`。当前实现会把它写到 diff 文件所在目录，例如这里通常是：
-
-```text
-./sdk/dist/check.sarif.json
-```
-
-## 第 6 步：执行查询
+这会生成 `dist/diff.json`。打开它，你会看到类似这样的结构：
 
 ```json
 {
+  "summary": {
+    "total": 3,
+    "added": 1,
+    "removed": 0,
+    "changed": 2
+  },
+  "changes": [
+    {
+      "id": "github.com/your-org/your-lib.Client.Do",
+      "kind": "changed",
+      "level": "warning",
+      "path": "pkg/client/client.go",
+      "semanticDiff": {
+        "findings": [
+          { "code": "go-signature-changed" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+`semanticDiff.findings` 是最重要的字段——它告诉你这次变化在语义上属于哪种类型（比如函数签名变了、方法集收缩了、参数变成必填了）。
+
+---
+
+## 第 4 步：准备 policy bundle（可选，用于 check）
+
+`check` 命令需要一个 policy bundle 来判断哪些变化是可接受的。最简单的方式是用内置规则：
+
+**新建一个 policy 仓库**，配置 `codeiq.yml`：
+
+```yaml
+schemaVersion: ciq-config/v2
+profile: policy-bundle
+purl: pkg:generic/your-org/compat-policy@1.0.0
+source:
+  repo: https://github.com/your-org/compat-policy
+  ref: main
+inputs:
+  include:
+    - "**/*.rego"
+registry:
+  storeDir: .codeiq/cache/registry
+```
+
+然后构建它：
+
+```bash
+cd ./compat-policy
+codeiq build
+```
+
+你会得到 `./compat-policy/dist/bundle.ciq.tgz`，这就是传给 `check` 的 policy bundle。
+
+---
+
+## 第 5 步：运行检查
+
+```bash
+cd ./your-lib
+codeiq check
+```
+
+这会生成 `./your-lib/dist/check.sarif.json`。SARIF 是行业标准格式，可以被 GitHub Code Scanning、Azure DevOps、各种代码审查平台直接消费。
+
+打开 `check.sarif.json`，最值得关注的是：
+
+```json
+{
+  "runs": [{
+    "results": [
+      {
+        "ruleId": "compat.go.signature-changed",
+        "level": "warning",
+        "message": { "text": "Go public signature changed." },
+        "locations": [{
+          "physicalLocation": {
+            "artifactLocation": { "uri": "pkg/client/client.go" },
+            "region": { "startLine": 42 }
+          }
+        }]
+      }
+    ]
+  }]
+}
+```
+
+`level` 有三档：`error`（可能破坏调用方）、`warning`（需要评估）、`note`（纯信息）。
+
+---
+
+## 第 6 步：查询具体接口
+
+如果你想精确查看某个函数现在的签名：
+
+```bash
+# 准备查询文件
+cat > query.json << 'EOF'
+{
   "schemaVersion": "ciq-query/v1",
-  "purl": "pkg:cargo/tokio@1.43.0",
+  "purl": "pkg:golang/github.com/your-org/your-lib@1.0.0",
   "selector": {
-    "path": "tokio::sync::Mutex::lock",
+    "path": "github.com/your-org/your-lib.Client.Do",
     "kind": "function"
   },
   "intent": "upgrade"
 }
-```
+EOF
 
-保存为 `query.json` 后运行：
-
-```bash
-cd ./sdk
+cd ./your-lib
 codeiq query ../query.json
 ```
 
-当前默认输出文件是：
+结果会写到 `./query.result.json`。
+
+---
+
+## 你现在有了什么？
 
 ```text
-./query.result.json
+your-lib/dist/
+├── bundle.ciq.tgz      ← 当前版本的公开接口快照
+├── diff.json           ← 与上个版本的结构化变更
+└── check.sarif.json    ← policy 检查结果（SARIF）
+
+your-lib/
+└── query.result.json   ← 单次查询结果
 ```
-
-## 你现在应该看到什么？
-
-- `codeiq.yaml`
-- `dist/manifest.json`
-- `dist/diff.json`
-- `dist/check.sarif.json`
-- `dist/bundle.ciq.tgz`
-- `query.result.json`
-
-如果你同时构建了一个 policy repo，你还会看到：
-
-- `policy/dist/opa-bundle.tar.gz`
-- `policy/dist/policy.rules.json`
-- `policy/dist/bundle.ciq.tgz`
 
 ## 接下来
 
-- 发布前门禁：[/docs/release-check](/docs/release-check)
-- AI 查询：[/docs/mcp](/docs/mcp)
-- CLI 参考：[/docs/cli](/docs/cli)
+- 想把检查接进 CI？看[持续集成](/docs/ci)
+- 想让 AI 查询接口？看 [AI 查询 / MCP](/docs/mcp)
+- 想深入了解每个命令的参数？看 [CLI 参考](/docs/cli)
