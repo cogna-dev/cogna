@@ -4,7 +4,20 @@ pub(all) struct RequestContext {
   request_key : String
   started_at_ms : UInt64
   deadline_ms : UInt64?
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for RequestContext with output(self, logger) {
+  logger.write_string("{request_id: ")
+  logger.write_object(self.request_id)
+  logger.write_string(", request_key: ")
+  logger.write_object(self.request_key)
+  logger.write_string(", started_at_ms: ")
+  logger.write_object(self.started_at_ms)
+  logger.write_string(", deadline_ms: ")
+  logger.write_object(self.deadline_ms)
+  logger.write_char('}')
+}
 
 ///|
 pub fn request_id_key(id : Json) -> String? {

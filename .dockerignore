@@ -1,0 +1,13 @@
+.git
+.github
+.claude
+.DS_Store
+.mooncakes
+_build
+dist
+docs/node_modules
+docs/dist
+node_modules
+trace.json
+repro
+examples

@@ -1,9 +1,12 @@
 import {
-  "yufeiminds/codeiq/cmd/bundle" @bundle,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/scripts/bundle" @bundle,
+  "yufeiminds/codeiq/cmd/registry/shell" @registry_shell,
   "yufeiminds/codeiq/lib/registry" @registry_lib,
-  "yufeiminds/codeiq/lib/server-runtime" @server_runtime,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/registry" @registry_impl,
+  "yufeiminds/codeiq/registry/runtime" @registry_runtime,
 }
 
 import {
@@ -17,8 +20,8 @@ import {
 
 options(
   targets: {
-    "download_bundle_test.mbt": [ "wasm" ],
-    "helpers_test.mbt": [ "wasm" ],
+    "download_bundle_test.mbt": [ "native", "wasm" ],
+    "helpers_test.mbt": [ "native", "wasm" ],
     "main_test.mbt": [ "wasm" ],
   },
 )

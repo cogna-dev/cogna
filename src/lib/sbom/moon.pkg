@@ -1,7 +1,0 @@
-import {
-  "moonbitlang/core/json" @json,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/x/fs" @fs,
-  "shu-kitamura/sha256" @sha256,
-  "yufeiminds/codeiq/config" @config,
-}

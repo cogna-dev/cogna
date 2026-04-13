@@ -2,30 +2,73 @@
 pub(all) struct McpStartParams {
   port : Int
   stdio : Bool
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for McpStartParams with output(self, logger) {
+  logger.write_string("{port: ")
+  logger.write_object(self.port)
+  logger.write_string(", stdio: ")
+  logger.write_object(self.stdio)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct McpStartResult {
   port : Int
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for McpStartResult with output(self, logger) {
+  logger.write_string("{port: ")
+  logger.write_object(self.port)
+  logger.write_string(", summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct McpStatusResult {
   status : String
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for McpStatusResult with output(self, logger) {
+  logger.write_string("{status: ")
+  logger.write_object(self.status)
+  logger.write_string(", summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct McpDescriptor {
   path : String
   info : Json
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for McpDescriptor with output(self, logger) {
+  logger.write_string("{path: ")
+  logger.write_object(self.path)
+  logger.write_string(", info: ")
+  logger.write_object(self.info)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct McpStopResult {
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for McpStopResult with output(self, logger) {
+  logger.write_string("{summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub impl @cli.Display for McpStartResult with display(self : McpStartResult) -> String {
@@ -149,29 +192,79 @@ fn mcp_server_info(port : Int, pid? : Int) -> Json {
 
 ///|
 fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
-  let out = @server_runtime.write_descriptor(path, info)
-  guard out is Ok(_) else { return Err(mcp_error(out.unwrap_err())) }
+  @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
+    err => return Err(mcp_error("cannot write descriptor \{path}: \{err.to_string()}"))
+  }
   Ok(())
 }
 
 ///|
 fn read_mcp_info(path : String) -> Result[McpDescriptor, @cli.CliError] {
-  let out = @server_runtime.read_descriptor(path)
-  guard out is Ok(descriptor) else { return Err(mcp_error(out.unwrap_err())) }
-  Ok({ path: descriptor.path, info: descriptor.info })
+  let text = @fs.read_file_to_string(path) catch {
+    err => return Err(mcp_error("cannot read descriptor \{path}: \{err.to_string()}"))
+  }
+  let parsed = try? @json.parse(text)
+  guard parsed is Ok(info) else {
+    return Err(mcp_error("descriptor is not valid json: \{path}"))
+  }
+  Ok({ path, info })
 }
 
 ///|
 fn descriptor_pid(info : Json) -> Int? {
-  @server_runtime.descriptor_pid(info)
+  guard info is Object(object) else { return None }
+  match object.get("pid") {
+    Some(Number(value, ..)) => Some(value.to_int())
+    _ => None
+  }
+}
+
+///|
+fn descriptor_port(info : Json) -> Int? {
+  guard info is Object(object) else { return None }
+  match object.get("port") {
+    Some(Number(value, ..)) => Some(value.to_int())
+    _ => None
+  }
+}
+
+///|
+fn descriptor_string(info : Json, field : String) -> String? {
+  guard info is Object(object) else { return None }
+  match object.get(field) {
+    Some(String(value)) if value != "" => Some(value)
+    _ => None
+  }
 }
 
 ///|
 fn descriptor_health_url(info : Json, port : Int) -> String {
-  match @server_runtime.descriptor_string(info, "healthUrl") {
+  match descriptor_string(info, "healthUrl") {
     Some(url) => url
     None => @mcp_core.health_url(port)
   }
+}
+
+///|
+fn wait_for_health(
+  url : String,
+  attempts? : Int = 20,
+  sleep_ms? : Int = 100,
+) -> Bool {
+  for _ in 0..<attempts {
+    let request_out = @mcp_runtime.http_request(
+      "GET",
+      url,
+      {},
+      @mcp_runtime.HttpBody::Empty,
+    )
+    match request_out {
+      Ok(result) => if result.status == 200 { return true }
+      Err(_) => ()
+    }
+    @mcp_shell.sleep_ms(sleep_ms)
+  }
+  false
 }
 
 ///|
@@ -186,10 +279,10 @@ fn write_runtime_state_with_pid(
 ///|
 fn wait_for_process_stop(pid : Int) -> Bool {
   for _ in 0..<20 {
-    if !@shell.is_alive(pid) {
+    if !@mcp_shell.is_alive(pid) {
       return true
     }
-    @shell.sleep_ms(100)
+    @mcp_shell.sleep_ms(100)
   }
   false
 }
@@ -197,7 +290,7 @@ fn wait_for_process_stop(pid : Int) -> Bool {
 ///|
 fn spawn_detached_server_process(port : Int) -> Result[Int, @cli.CliError] {
   let command = native_serve_command(port)
-  let spawn_out = @shell.spawn_detached(command)
+  let spawn_out = @mcp_shell.spawn_detached(command)
   guard spawn_out is Ok(pid) else {
     return Err(mcp_error(spawn_out.unwrap_err()))
   }
@@ -208,23 +301,23 @@ fn spawn_detached_server_process(port : Int) -> Result[Int, @cli.CliError] {
 fn wait_for_server_health(port : Int, pid : Int) -> Bool {
   let health_url = @mcp_core.health_url(port)
   for _ in 0..<200 {
-    if @server_runtime.wait_for_health(health_url, attempts=1, sleep_ms=0) {
+    if wait_for_health(health_url, attempts=1, sleep_ms=0) {
       return true
     }
-    if !@shell.is_alive(pid) {
+    if !@mcp_shell.is_alive(pid) {
       return false
     }
-    @shell.sleep_ms(100)
+    @mcp_shell.sleep_ms(100)
   }
   false
 }
 
 ///|
 fn stop_process_if_alive(pid : Int) -> Unit {
-  if @shell.is_alive(pid) {
-    ignore(@shell.terminate(pid))
+  if @mcp_shell.is_alive(pid) {
+    ignore(@mcp_shell.terminate(pid))
     if !wait_for_process_stop(pid) {
-      ignore(@shell.force_kill(pid))
+      ignore(@mcp_shell.force_kill(pid))
       ignore(wait_for_process_stop(pid))
     }
   }
@@ -267,16 +360,16 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
   if @fs.path_exists(info_path) {
     let info_out = read_mcp_info(info_path)
     guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }
-    let port = @server_runtime.descriptor_port(descriptor.info).unwrap_or(0)
+    let port = descriptor_port(descriptor.info).unwrap_or(0)
     let health_url = descriptor_health_url(descriptor.info, port)
-    let healthy = @server_runtime.wait_for_health(
+    let healthy = wait_for_health(
       health_url,
       attempts=1,
       sleep_ms=0,
     )
     match descriptor_pid(descriptor.info) {
       Some(pid) =>
-        if @shell.is_alive(pid) && healthy {
+        if @mcp_shell.is_alive(pid) && healthy {
           Ok({
             status: "running",
             summary: "MCP server healthy at \{health_url} with live pid \{pid}",

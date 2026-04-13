@@ -1,0 +1,17 @@
+import {
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
+  "shu-kitamura/sha256" @sha256,
+  "yufeiminds/codeiq/cmd/build" @build_cmd,
+  "yufeiminds/codeiq/cmd/init" @init_cmd,
+  "yufeiminds/codeiq/cmd/publish" @publish_cmd,
+  "yufeiminds/codeiq/cmd/registry" @registry_cmd,
+  "yufeiminds/codeiq/e2e/shell" @e2e_shell,
+  "yufeiminds/codeiq/registry/runtime" @registry_runtime,
+} for "test"
+
+supported_targets = "native"

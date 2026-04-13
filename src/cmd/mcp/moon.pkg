@@ -1,9 +1,10 @@
 import {
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/json" @json,
   "yufeiminds/codeiq/cmd/mcp/core" @mcp_core,
+  "yufeiminds/codeiq/cmd/mcp/runtime" @mcp_runtime,
+  "yufeiminds/codeiq/cmd/mcp/shell" @mcp_shell,
   "yufeiminds/codeiq/lib/mcp-sdk" @mcp_sdk,
-  "yufeiminds/codeiq/lib/server-runtime" @server_runtime,
-  "yufeiminds/codeiq/lib/shell" @shell,
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/cli" @cli,
 }

@@ -3,13 +3,33 @@ pub(all) struct DiffParams {
   repo : String
   since : String?
   include_test_changes : Bool
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for DiffParams with output(self, logger) {
+  logger.write_string("{repo: ")
+  logger.write_object(self.repo)
+  logger.write_string(", since: ")
+  logger.write_object(self.since)
+  logger.write_string(", include_test_changes: ")
+  logger.write_object(self.include_test_changes)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct DiffResult {
   repo : String
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for DiffResult with output(self, logger) {
+  logger.write_string("{repo: ")
+  logger.write_object(self.repo)
+  logger.write_string(", summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub impl @cli.Display for DiffResult with display(self : DiffResult) -> String {
@@ -403,7 +423,8 @@ fn has_shape_change(base : Json, target : Json) -> Bool {
   if base_object.get("shape") != target_object.get("shape") {
     return true
   }
-  if base_object.get("language_specific") != target_object.get("language_specific") {
+  if base_object.get("language_specific") !=
+    target_object.get("language_specific") {
     return true
   }
   let base_signature = record_string(base, "signature")
@@ -436,7 +457,8 @@ fn component_identity_name(record : Json) -> String {
         _ => record_string(record, "id").unwrap_or("unknown-component")
       }
       match candidate.find("@") {
-        Some(index) if candidate.has_prefix("pkg:") => candidate[:index].to_string()
+        Some(index) if candidate.has_prefix("pkg:") =>
+          candidate[:index].to_string()
         _ => candidate
       }
     }
@@ -465,7 +487,92 @@ fn json_object_get(obj : Json, key : String) -> Json? {
 }
 
 ///|
-fn semantic_diff(base : Json, target : Json) -> Json {
+fn push_unique_finding_code(codes : Array[String], code : String) -> Unit {
+  if code == "" {
+    return
+  }
+  for existing in codes {
+    if existing == code {
+      return
+    }
+  }
+  codes.push(code)
+}
+
+///|
+fn finding_level(code : String) -> String {
+  match code {
+    "removed-declaration" => "breaking"
+    "new-declaration" => "note"
+    "deprecated-declaration" => "warning"
+    "go-pointer-receiver-changed" => "breaking"
+    "go-receiver-changed" => "breaking"
+    "go-method-set-shrunk" => "breaking"
+    "go-method-set-expanded" => "warning"
+    "go-signature-changed" => "warning"
+    "rust-became-unsafe" => "breaking"
+    "rust-extern-abi-added" => "breaking"
+    "rust-extern-abi-changed" => "breaking"
+    "rust-where-clause-changed" => "warning"
+    "rust-signature-changed" => "warning"
+    "terraform-provider-ref-changed" => "breaking"
+    "terraform-prevent-destroy-added" => "warning"
+    "terraform-create-before-destroy-added" => "warning"
+    "terraform-ignore-changes-expanded" => "note"
+    "terraform-lifecycle-changed" => "warning"
+    "terraform-input-became-required" => "breaking"
+    "terraform-output-removed" => "breaking"
+    "openapi-http-method-changed" => "breaking"
+    "openapi-became-required" => "breaking"
+    "openapi-status-codes-added" => "warning"
+    "openapi-media-types-added" => "note"
+    "openapi-operation-changed" => "warning"
+    "openapi-response-status-removed" => "breaking"
+    "openapi-response-schema-narrowed" => "breaking"
+    _ => "warning"
+  }
+}
+
+///|
+fn level_rank(level : String) -> Int {
+  match level {
+    "breaking" => 3
+    "error" => 3
+    "warning" => 2
+    _ => 1
+  }
+}
+
+///|
+fn level_from_findings(codes : Array[String], default : String) -> String {
+  let mut selected = default
+  let mut selected_rank = level_rank(default)
+  for code in codes {
+    let candidate = finding_level(code)
+    let candidate_rank = level_rank(candidate)
+    if candidate_rank > selected_rank {
+      selected = candidate
+      selected_rank = candidate_rank
+    }
+  }
+  selected
+}
+
+///|
+fn findings_json(codes : Array[String]) -> Json {
+  let findings : Array[Json] = []
+  for code in codes {
+    findings.push({ "code": code })
+  }
+  Json::array(findings)
+}
+
+///|
+fn semantic_diff(
+  base : Json,
+  target : Json,
+  finding_codes : Array[String],
+) -> Json {
   let changed_fields : Array[Json] = []
 
   // signature change
@@ -503,7 +610,10 @@ fn semantic_diff(base : Json, target : Json) -> Json {
     changed_fields.push(Json::string("language_specific"))
   }
 
-  let result : Map[String, Json] = { "changedFields": Json::array(changed_fields) }
+  let result : Map[String, Json] = {
+    "changedFields": Json::array(changed_fields),
+    "findings": findings_json(finding_codes),
+  }
 
   // include shape before/after when changed
   if base_shape != target_shape {
@@ -626,6 +736,46 @@ fn json_array_len(obj : Json, key : String) -> Int {
 }
 
 ///|
+fn json_array_strings(obj : Json, key : String) -> Array[String] {
+  let values : Array[String] = []
+  guard obj is Object(m) else { return values }
+  match m.get(key) {
+    Some(Array(arr)) =>
+      for i in 0..<arr.length() {
+        match arr[i] {
+          String(value) if value != "" => values.push(value)
+          _ => ()
+        }
+      }
+    _ => ()
+  }
+  values
+}
+
+///|
+fn array_contains_string(values : Array[String], target : String) -> Bool {
+  for value in values {
+    if value == target {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn array_has_removed_string(
+  base_values : Array[String],
+  target_values : Array[String],
+) -> Bool {
+  for value in base_values {
+    if !array_contains_string(target_values, value) {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn get_lang_specific(record : Json, lang : String) -> Json {
   guard record is Object(m) else { return Json::null() }
   match m.get("language_specific") {
@@ -648,120 +798,163 @@ fn go_method_set_len(go_obj : Json) -> Int {
 }
 
 ///|
-fn classify_rust_change(base : Json, target : Json) -> (String, String) {
+fn rust_finding_codes(base : Json, target : Json) -> Array[String] {
+  let findings : Array[String] = []
   let base_rust = get_lang_specific(base, "rust")
   let target_rust = get_lang_specific(target, "rust")
   let base_unsafe = json_bool_val(base_rust, "unsafe")
   let target_unsafe = json_bool_val(target_rust, "unsafe")
   if !base_unsafe && target_unsafe {
-    return ("breaking", "rust-became-unsafe")
+    push_unique_finding_code(findings, "rust-became-unsafe")
   }
   let base_abi = record_string(base_rust, "externAbi")
   let target_abi = record_string(target_rust, "externAbi")
   if base_abi is None && target_abi is Some(_) {
-    return ("breaking", "rust-extern-abi-added")
+    push_unique_finding_code(findings, "rust-extern-abi-added")
   }
   if base_abi != target_abi && target_abi is Some(_) {
-    return ("breaking", "rust-extern-abi-changed")
+    push_unique_finding_code(findings, "rust-extern-abi-changed")
   }
   let base_where = record_string(base_rust, "whereClause")
   let target_where = record_string(target_rust, "whereClause")
   if base_where != target_where {
-    return ("warning", "rust-where-clause-changed")
+    push_unique_finding_code(findings, "rust-where-clause-changed")
   }
-  ("warning", "rust-signature-changed")
+  let base_shape = json_object_get(base, "shape")
+  let target_shape = json_object_get(target, "shape")
+  let base_sig = record_string(base, "signature")
+  let target_sig = record_string(target, "signature")
+  if base_shape != target_shape || base_sig != target_sig {
+    push_unique_finding_code(findings, "rust-signature-changed")
+  }
+  findings
 }
 
 ///|
-fn classify_go_change(base : Json, target : Json) -> (String, String) {
+fn go_finding_codes(base : Json, target : Json) -> Array[String] {
+  let findings : Array[String] = []
   let base_go = get_lang_specific(base, "go")
   let target_go = get_lang_specific(target, "go")
   let base_ptr = json_bool_val(base_go, "pointerReceiver")
   let target_ptr = json_bool_val(target_go, "pointerReceiver")
   if base_ptr != target_ptr {
-    return ("breaking", "go-pointer-receiver-changed")
+    push_unique_finding_code(findings, "go-pointer-receiver-changed")
   }
   let base_recv = record_string(base_go, "receiver")
   let target_recv = record_string(target_go, "receiver")
   if base_recv != target_recv {
-    return ("breaking", "go-receiver-changed")
+    push_unique_finding_code(findings, "go-receiver-changed")
   }
   let base_ms = go_method_set_len(base_go)
   let target_ms = go_method_set_len(target_go)
   if target_ms < base_ms {
-    return ("breaking", "go-method-set-shrunk")
+    push_unique_finding_code(findings, "go-method-set-shrunk")
   }
   if target_ms > base_ms {
-    return ("warning", "go-method-set-expanded")
+    push_unique_finding_code(findings, "go-method-set-expanded")
   }
-  ("warning", "go-signature-changed")
+  let base_shape = json_object_get(base, "shape")
+  let target_shape = json_object_get(target, "shape")
+  let base_sig = record_string(base, "signature")
+  let target_sig = record_string(target, "signature")
+  if base_shape != target_shape || base_sig != target_sig {
+    push_unique_finding_code(findings, "go-signature-changed")
+  }
+  if findings.is_empty() && base_go != target_go {
+    push_unique_finding_code(findings, "go-signature-changed")
+  }
+  findings
 }
 
 ///|
-fn classify_terraform_change(base : Json, target : Json) -> (String, String) {
+fn terraform_finding_codes(base : Json, target : Json) -> Array[String] {
+  let findings : Array[String] = []
   let base_tf = get_lang_specific(base, "terraform")
   let target_tf = get_lang_specific(target, "terraform")
+  let target_kind = record_string(target, "kind").unwrap_or("")
   let base_pref = record_string(base_tf, "providerRef")
   let target_pref = record_string(target_tf, "providerRef")
   if base_pref != target_pref {
-    return ("breaking", "terraform-provider-ref-changed")
+    push_unique_finding_code(findings, "terraform-provider-ref-changed")
   }
   let base_pd = json_bool_val(base_tf, "preventDestroy")
   let target_pd = json_bool_val(target_tf, "preventDestroy")
   if !base_pd && target_pd {
-    return ("warning", "terraform-prevent-destroy-added")
+    push_unique_finding_code(findings, "terraform-prevent-destroy-added")
   }
   let base_cbd = json_bool_val(base_tf, "createBeforeDestroy")
   let target_cbd = json_bool_val(target_tf, "createBeforeDestroy")
   if !base_cbd && target_cbd {
-    return ("warning", "terraform-create-before-destroy-added")
+    push_unique_finding_code(findings, "terraform-create-before-destroy-added")
   }
   let base_ic = json_array_len(base_tf, "ignoreChanges")
   let target_ic = json_array_len(target_tf, "ignoreChanges")
   if target_ic > base_ic {
-    return ("note", "terraform-ignore-changes-expanded")
+    push_unique_finding_code(findings, "terraform-ignore-changes-expanded")
   }
-  ("warning", "terraform-lifecycle-changed")
+  if target_kind == "variable" {
+    let base_required = json_bool_val(base_tf, "required")
+    let target_required = json_bool_val(target_tf, "required")
+    if !base_required && target_required {
+      push_unique_finding_code(findings, "terraform-input-became-required")
+    }
+  }
+  if findings.is_empty() && base_tf != target_tf {
+    push_unique_finding_code(findings, "terraform-lifecycle-changed")
+  }
+  findings
 }
 
 ///|
-fn classify_openapi_change(base : Json, target : Json) -> (String, String) {
+fn openapi_finding_codes(base : Json, target : Json) -> Array[String] {
+  let findings : Array[String] = []
   let base_oa = get_lang_specific(base, "openapi")
   let target_oa = get_lang_specific(target, "openapi")
+  let target_kind = record_string(target, "kind").unwrap_or("")
   let base_method = record_string(base_oa, "httpMethod")
   let target_method = record_string(target_oa, "httpMethod")
   if base_method != target_method && target_method is Some(_) {
-    return ("breaking", "openapi-http-method-changed")
+    push_unique_finding_code(findings, "openapi-http-method-changed")
   }
   let base_req = json_bool_val(base_oa, "required")
   let target_req = json_bool_val(target_oa, "required")
   if !base_req && target_req {
-    return ("breaking", "openapi-became-required")
+    push_unique_finding_code(findings, "openapi-became-required")
   }
   let base_sc = json_array_len(base_oa, "statusCodes")
   let target_sc = json_array_len(target_oa, "statusCodes")
   if target_sc > base_sc {
-    return ("warning", "openapi-status-codes-added")
+    push_unique_finding_code(findings, "openapi-status-codes-added")
+  }
+  if target_kind == "operation" {
+    let base_status_codes = json_array_strings(base_oa, "statusCodes")
+    let target_status_codes = json_array_strings(target_oa, "statusCodes")
+    if array_has_removed_string(base_status_codes, target_status_codes) {
+      push_unique_finding_code(findings, "openapi-response-status-removed")
+    }
   }
   let base_mt = json_array_len(base_oa, "mediaTypes")
   let target_mt = json_array_len(target_oa, "mediaTypes")
   if target_mt > base_mt {
-    return ("note", "openapi-media-types-added")
+    push_unique_finding_code(findings, "openapi-media-types-added")
   }
-  ("warning", "openapi-operation-changed")
+  if target_kind == "allOf" || target_kind == "anyOf" || target_kind == "oneOf" {
+    let base_member_refs = json_array_strings(base_oa, "memberRefs")
+    let target_member_refs = json_array_strings(target_oa, "memberRefs")
+    if array_has_removed_string(base_member_refs, target_member_refs) {
+      push_unique_finding_code(findings, "openapi-response-schema-narrowed")
+    }
+  }
+  if findings.is_empty() && base_oa != target_oa {
+    push_unique_finding_code(findings, "openapi-operation-changed")
+  }
+  findings
 }
 
 ///|
-// Classify the semantic level for a "changed" diff entry based on provider-specific rules.
-// Returns (level, semanticCategory) where level is "breaking"/"warning"/"note".
-fn classify_change_level(base : Json, target : Json) -> (String, String) {
+fn finding_codes_for_change(base : Json, target : Json) -> Array[String] {
   if is_component_record(target) {
-    let base_version = record_string(base, "version")
-    let target_version = record_string(target, "version")
-    if base_version != target_version {
-      return ("warning", "component-version-upgrade")
-    }
-    return ("warning", "component-metadata-changed")
+    return []
   }
   let profile = match json_object_get(target, "language_specific") {
     Some(Object(ls)) =>
@@ -772,12 +965,17 @@ fn classify_change_level(base : Json, target : Json) -> (String, String) {
     _ => ""
   }
   match profile {
-    "rust-crate" => classify_rust_change(base, target)
-    "go-module" => classify_go_change(base, target)
-    "terraform-module" => classify_terraform_change(base, target)
-    "openapi-spec" => classify_openapi_change(base, target)
-    _ => ("warning", "generic-change")
+    "rust-crate" => rust_finding_codes(base, target)
+    "go-module" => go_finding_codes(base, target)
+    "terraform-module" => terraform_finding_codes(base, target)
+    "openapi-spec" => openapi_finding_codes(base, target)
+    _ => []
   }
+}
+
+///|
+fn standalone_semantic_diff(finding_codes : Array[String]) -> Json {
+  { "findings": findings_json(finding_codes) }
 }
 
 ///|
@@ -795,18 +993,22 @@ fn declaration_changes(
       Some(base) => {
         let base_id = record_string(base, "id").unwrap_or(id)
         if has_shape_change(base, target) {
-          let (level, sem_cat) = classify_change_level(base, target)
+          let finding_codes = finding_codes_for_change(base, target)
+          let level = if is_component_record(target) {
+            "warning"
+          } else {
+            level_from_findings(finding_codes, "warning")
+          }
           let change_obj : Map[String, Json] = {
             "kind": "changed",
             "id": target_id,
             "path": record_path(target),
             "level": level,
-            "semanticCategory": sem_cat,
             "before": record_string(base, "signature").unwrap_or("unknown"),
             "after": record_string(target, "signature").unwrap_or("unknown"),
             "beforeRecord": change_record_payload(base),
             "afterRecord": change_record_payload(target),
-            "semanticDiff": semantic_diff(base, target),
+            "semanticDiff": semantic_diff(base, target, finding_codes),
           }
           if is_component_record(target) {
             change_obj["componentDiff"] = component_diff(base, target)
@@ -816,10 +1018,14 @@ fn declaration_changes(
         if record_bool(target, "deprecated") && !record_bool(base, "deprecated") {
           changes.push({
             "kind": "deprecated",
-            "id": if target_id != "" { target_id } else { base_id },
+            "id": if target_id != "" {
+              target_id
+            } else {
+              base_id
+            },
             "path": record_path(target),
             "level": "warning",
-            "semanticCategory": "deprecated-declaration",
+            "semanticDiff": standalone_semantic_diff(["deprecated-declaration"]),
             "afterRecord": change_record_payload(target),
           })
         }
@@ -830,7 +1036,7 @@ fn declaration_changes(
           "id": target_id,
           "path": record_path(target),
           "level": "note",
-          "semanticCategory": "new-declaration",
+          "semanticDiff": standalone_semantic_diff(["new-declaration"]),
           "afterRecord": change_record_payload(target),
         })
     }
@@ -839,12 +1045,27 @@ fn declaration_changes(
   for id, base in base_index {
     if !target_index.contains(id) {
       let base_id = record_string(base, "id").unwrap_or(id)
+      let base_kind = record_string(base, "kind").unwrap_or("")
+      let base_profile = match json_object_get(base, "language_specific") {
+        Some(Object(ls)) =>
+          match ls.get("profile") {
+            Some(String(p)) => p
+            _ => ""
+          }
+        _ => ""
+      }
+      let finding_codes = if base_profile == "terraform-module" &&
+        base_kind == "output" {
+        ["removed-declaration", "terraform-output-removed"]
+      } else {
+        ["removed-declaration"]
+      }
       changes.push({
         "kind": "removed",
         "id": base_id,
         "path": record_path(base),
         "level": "breaking",
-        "semanticCategory": "removed-declaration",
+        "semanticDiff": standalone_semantic_diff(finding_codes),
         "beforeRecord": change_record_payload(base),
       })
     }
@@ -892,9 +1113,39 @@ fn write_diff(path : String, diff : Json) -> Result[Unit, @cli.CliError] {
 
 ///|
 pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
-  let base_manifest_path = "\{params.repo}/dist/base/manifest.json"
-  let target_manifest_path = "\{params.repo}/dist/target/manifest.json"
-  let output_path = "\{params.repo}/dist/diff.json"
+  let repo = if params.repo == "" {
+    let resolved_out = @config.resolve(".")
+    guard resolved_out is Ok(resolved) else {
+      return Err(@cli.config_error(resolved_out.unwrap_err().to_string()))
+    }
+    resolved.root_dir
+  } else {
+    params.repo
+  }
+  let resolved_since = if params.repo == "" {
+    let resolved_out = @config.resolve(repo)
+    guard resolved_out is Ok(resolved) else {
+      return Err(@cli.config_error(resolved_out.unwrap_err().to_string()))
+    }
+    match params.since {
+      Some(value) => Some(value)
+      None => resolved.config.diff.since
+    }
+  } else {
+    params.since
+  }
+  let resolved_include_test_changes = if params.repo == "" {
+    let resolved_out = @config.resolve(repo)
+    guard resolved_out is Ok(resolved) else {
+      return Err(@cli.config_error(resolved_out.unwrap_err().to_string()))
+    }
+    resolved.config.diff.include_test_changes
+  } else {
+    params.include_test_changes
+  }
+  let base_manifest_path = "\{repo}/dist/base/manifest.json"
+  let target_manifest_path = "\{repo}/dist/target/manifest.json"
+  let output_path = "\{repo}/dist/diff.json"
 
   let base_manifest_out = read_manifest(base_manifest_path)
   guard base_manifest_out is Ok(base_manifest) else {
@@ -918,11 +1169,11 @@ pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
     return Err(target_schema_out.unwrap_err())
   }
 
-  let base_records_out = artifact_records("\{params.repo}/dist/base")
+  let base_records_out = artifact_records("\{repo}/dist/base")
   guard base_records_out is Ok(base_records) else {
     return Err(base_records_out.unwrap_err())
   }
-  let target_records_out = artifact_records("\{params.repo}/dist/target")
+  let target_records_out = artifact_records("\{repo}/dist/target")
   guard target_records_out is Ok(target_records) else {
     return Err(target_records_out.unwrap_err())
   }
@@ -943,10 +1194,10 @@ pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
   guard diff is Object(diff_object) else {
     return Err(diff_error("generated diff must be a JSON object"))
   }
-  if params.since is Some(since) {
+  if resolved_since is Some(since) {
     diff_object["since"] = Json::string(since)
   }
-  if params.include_test_changes {
+  if resolved_include_test_changes {
     let all_test_changes = test_changes(base_records, target_records)
     diff_object["includeTestChanges"] = true
     diff_object["testSummary"] = {
@@ -968,8 +1219,5 @@ pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
   let write_out = write_diff(output_path, diff)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 
-  Ok({
-    repo: params.repo,
-    summary: "Generated CIQ declaration diff at \{output_path}",
-  })
+  Ok({ repo, summary: "Generated CIQ declaration diff at \{output_path}" })
 }

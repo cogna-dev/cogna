@@ -1,12 +1,37 @@
 ///|
 fn remove_dir_if_exists(path : String) -> Unit {
-  @fs.remove_dir(path) catch {
-    _ => ()
+  if !@fs.path_exists(path) {
+    return
+  }
+  let is_dir_out = try? @fs.is_dir(path)
+  match is_dir_out {
+    Ok(true) => {
+      let entries = @fs.read_dir(path) catch {
+        _ => []
+      }
+      for entry in entries {
+        let child = "\{path}/\{entry}"
+        let child_is_dir_out = try? @fs.is_dir(child)
+        match child_is_dir_out {
+          Ok(true) => remove_dir_if_exists(child)
+          _ => @fs.remove_file(child) catch {
+            _ => ()
+          }
+        }
+      }
+      @fs.remove_dir(path) catch {
+        _ => ()
+      }
+    }
+    _ => @fs.remove_file(path) catch {
+      _ => ()
+    }
   }
 }
 
 ///|
 fn clear_registry_env_vars() -> Unit {
+  @sys.unset_env_var("CODEIQ_REGISTRY_STORE_DIR")
   @sys.unset_env_var("CODEIQ_REGISTRY_BASE_URL")
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
@@ -38,12 +63,23 @@ fn cleanup_registry() -> Unit {
   remove_dir_if_exists(".codeiq/cache/registry")
   remove_dir_if_exists(".codeiq/cache")
   remove_dir_if_exists(".codeiq")
+  remove_dir_if_exists(tmp_registry_store_root())
   clear_registry_env_vars()
 }
 
 ///|
 fn dbt_cleanup_registry() -> Unit {
   cleanup_registry()
+}
+
+///|
+fn tmp_registry_repo(name : String) -> String {
+  "/tmp/codeiq-registry-\{name}"
+}
+
+///|
+fn tmp_registry_store_root() -> String {
+  "/tmp/codeiq-registry-store"
 }
 
 ///|
@@ -221,4 +257,26 @@ fn tar_archive(entries : Array[(String, Bytes)]) -> Bytes {
     out.push(b'\x00')
   }
   Bytes::from_array(out)
+}
+
+///|
+test "registry helper imports stay live on native" {
+  let repo = tmp_registry_repo("helper-imports")
+  cleanup_registry()
+  remove_dir_if_exists(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+  let bundle_path = bundle_fixture(repo)
+  let request = upload_request_with_signature(bundle_path, "pkg:generic/acme/helper@0.0.1", {
+    "status": "verified",
+    "algorithm": "sha256",
+  })
+  guard request is Object(object) else {
+    cleanup_registry()
+    remove_dir_if_exists(repo)
+    fail("upload request should be object")
+  }
+  inspect(object.contains("signature"), content="true")
+  cleanup_registry()
+  remove_dir_if_exists(repo)
 }

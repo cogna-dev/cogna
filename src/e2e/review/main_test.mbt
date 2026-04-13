@@ -1,47 +1,30 @@
 ///|
+fn remove_dir_tree_if_exists(path : String) -> Unit {
+  if !@fs.path_exists(path) {
+    return
+  }
+  let is_dir_out = try? @fs.is_dir(path)
+  match is_dir_out {
+    Ok(true) => {
+      let entries = @fs.read_dir(path) catch {
+        _ => []
+      }
+      for entry in entries {
+        remove_dir_tree_if_exists("\{path}/\{entry}")
+      }
+      @fs.remove_dir(path) catch {
+        _ => ()
+      }
+    }
+    _ => @fs.remove_file(path) catch {
+      _ => ()
+    }
+  }
+}
+
+///|
 fn cleanup_lsp_e2e(path : String) -> Unit {
-  @fs.remove_file("\{path}/codeiq.yaml") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/main.go") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/lib.rs") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/main.tf") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/dist/manifest.json") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/dist/declarations.ndjson") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/dist/symbols.ndjson") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/dist/metadata.json") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/dist/checksums.txt") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/dist/bundle.ciq.tgz") catch {
-    _ => ()
-  }
-  @fs.remove_dir("\{path}/dist") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{path}/openapi/payment.yaml") catch {
-    _ => ()
-  }
-  @fs.remove_dir("\{path}/openapi") catch {
-    _ => ()
-  }
-  @fs.remove_dir(path) catch {
-    _ => ()
-  }
+  remove_dir_tree_if_exists(path)
 }
 
 ///|
@@ -104,6 +87,12 @@ fn cleanup_review_runtime_state() -> Unit {
     _ => ()
   }
   @fs.remove_file("./dist/mcp-tools-state.json") catch {
+    _ => ()
+  }
+  @fs.remove_file("./dist/opa-bundle.tar.gz") catch {
+    _ => ()
+  }
+  @fs.remove_file("./dist/policy.rules.json") catch {
     _ => ()
   }
 }
@@ -258,7 +247,7 @@ test "e2e review loop covers bundle diff check query and mcp consumption" {
       #|        {
       #|          "value": [
       #|            {
-      #|              "rule_id": "compat.removed-public-api",
+      #|              "rule_id": "compat.core.removed-declaration",
       #|              "level": "error",
       #|              "message": "Review requires compatibility approval",
       #|              "path": "manifest.purl"
@@ -285,7 +274,7 @@ test "e2e review loop covers bundle diff check query and mcp consumption" {
     _ => ""
   }
   assert_true(sarif.contains("\"version\": \"2.1.0\""))
-  assert_true(sarif.contains("compat.removed-public-api"))
+  assert_true(sarif.contains("compat.core.removed-declaration"))
 
   let query_path = write_review_query(path)
   let query_out = @query_cmd.run(@query_cmd.QueryParams::{

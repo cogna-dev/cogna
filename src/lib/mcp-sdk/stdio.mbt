@@ -1,4 +1,13 @@
 ///|
+fn decode_stdin_line(bytes : Bytes) -> String? {
+  if bytes.length() == 0 {
+    None
+  } else {
+    Some(@utf8.decode_lossy(bytes))
+  }
+}
+
+///|
 fn is_jsonrpc_notification_request(request : Json) -> Bool {
   guard request is Object(request_object) else { return false }
   if request_object.get("method") is Some(String(_)) {

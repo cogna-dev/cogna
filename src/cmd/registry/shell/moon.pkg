@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/async" @async,
+}
+
+options(
+  targets: {
+    "native.mbt": [ "native", "llvm" ],
+    "stub.mbt": [ "wasm", "wasm-gc", "js" ],
+  },
+)

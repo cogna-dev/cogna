@@ -219,6 +219,45 @@ test "mcp tools call returns structured content" {
 }
 
 ///|
+test "mcp tools call infers selector kind when omitted" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  let declarations =
+    #|{"id":"decl:payment:create","kind":"operation","path":"payment::create","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|{"id":"sym:payment:create","kind":"symbol","path":"payment::create","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
+    #|
+  @fs.write_string_to_file("./dist/declarations.ndjson", declarations) catch {
+    _ => fail("failed to write declaration fixture")
+  }
+
+  let request = parse_json_or_fail(
+    (
+      #|{
+      #|  "jsonrpc": "2.0",
+      #|  "id": 103,
+      #|  "method": "tools/call",
+      #|  "params": {
+      #|    "name": "codeiq.query.symbol",
+      #|    "arguments": {
+      #|      "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+      #|      "selector": "payment::create"
+      #|    }
+      #|  }
+      #|}
+    ),
+  )
+  let response = handle_request(request).stringify(indent=2)
+  assert_true(response.contains("\"isError\": false"))
+  assert_true(response.contains("operation createPayment"))
+  assert_true(response.contains("decl:payment:create"))
+
+  @fs.remove_file("./dist/declarations.ndjson") catch {
+    _ => ()
+  }
+}
+
+///|
 test "mcp tools call uses local query result when available" {
   @fs.create_dir("./dist") catch {
     _ => ()

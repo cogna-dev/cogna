@@ -1,11 +1,30 @@
 ///|
+fn remove_tree_if_exists(path : String) -> Unit {
+  if !@fs.path_exists(path) {
+    return
+  }
+  let is_dir_out = try? @fs.is_dir(path)
+  match is_dir_out {
+    Ok(true) => {
+      let entries = @fs.read_dir(path) catch {
+        _ => []
+      }
+      for entry in entries {
+        remove_tree_if_exists("\{path}/\{entry}")
+      }
+      @fs.remove_dir(path) catch {
+        _ => ()
+      }
+    }
+    _ => @fs.remove_file(path) catch {
+      _ => ()
+    }
+  }
+}
+
+///|
 fn cleanup_tmp_dir(dir : String) -> Unit {
-  @fs.remove_file("\{dir}/codeiq.yaml") catch {
-    _ => ()
-  }
-  @fs.remove_dir(dir) catch {
-    _ => ()
-  }
+  remove_tree_if_exists(dir)
 }
 
 ///|
@@ -14,23 +33,23 @@ test "e2e init writes config to tmp directory" {
   cleanup_tmp_dir(dir)
   @fs.create_dir(dir)
 
-  let output_path = "\{dir}/codeiq.yaml"
+  let output_path = "\{dir}/codeiq.yml"
   let result = @init_cmd.run(@init_cmd.InitParams::{ output_path, })
   guard result is Ok(ok) else { fail("init should succeed") }
   inspect(
     ok.display(),
-    content="Generated CIQ config at src/e2e/tmp_codeiq_e2e_init/codeiq.yaml",
+    content="Generated CIQ config at src/e2e/tmp_codeiq_e2e_init/codeiq.yml",
   )
 
   let content = @fs.read_file_to_string(output_path)
-  assert_true(content.has_prefix("schemaVersion: ciq-config/v1"))
+  assert_true(content.has_prefix("schemaVersion: ciq-config/v2"))
 
   cleanup_tmp_dir(dir)
 }
 
 ///|
 test "e2e banner contains codeiq ascii" {
-  let banner = @main_cmd.banner()
+  let banner = @cli.banner()
   assert_true(banner.contains("____"))
 }
 
@@ -40,7 +59,7 @@ test "e2e build creates dist skeleton from init config" {
   cleanup_tmp_dir(dir)
   @fs.create_dir(dir)
 
-  let output_path = "\{dir}/codeiq.yaml"
+  let output_path = "\{dir}/codeiq.yml"
   let init_out = @init_cmd.run(@init_cmd.InitParams::{ output_path, })
   guard init_out is Ok(_) else {
     cleanup_tmp_dir(dir)
@@ -96,7 +115,7 @@ test "e2e diff generates output from base and target manifests" {
   cleanup_tmp_dir(dir)
   @fs.create_dir(dir)
 
-  let output_path = "\{dir}/codeiq.yaml"
+  let output_path = "\{dir}/codeiq.yml"
   let init_out = @init_cmd.run(@init_cmd.InitParams::{ output_path, })
   guard init_out is Ok(_) else {
     cleanup_tmp_dir(dir)
@@ -366,6 +385,7 @@ test "e2e publish generates publish receipt from local bundle" {
   )
   assert_true(receipt.contains("\"publishId\":"))
   assert_true(receipt.contains("\"bundleType\": \"ciq-bundle\""))
+  assert_true(!receipt.contains("\"dependencyCount\""))
 
   @fs.remove_file("\{dir}/dist/bundle.ciq.tgz") catch {
     _ => ()

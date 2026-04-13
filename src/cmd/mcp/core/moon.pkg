@@ -1,9 +1,9 @@
 import {
-  "yufeiminds/codeiq/cmd/bundle" @bundle,
+  "yufeiminds/codeiq/scripts/bundle" @bundle,
+  "yufeiminds/codeiq/cmd/mcp/runtime" @mcp_runtime,
   "yufeiminds/codeiq/cmd/query" @query_cmd,
   "yufeiminds/codeiq/cmd/registry" @registry_cmd,
   "yufeiminds/codeiq/lib/mcp-sdk" @mcp_sdk,
-  "yufeiminds/codeiq/lib/server-runtime" @server_runtime,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,

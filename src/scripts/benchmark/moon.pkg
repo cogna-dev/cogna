@@ -1,0 +1,30 @@
+import {
+  "moonbitlang/core/argparse" @argparse,
+  "moonbitlang/core/env" @env,
+  "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
+  "yufeiminds/codeiq/scripts/benchmark/shell" @bench_shell,
+  "yufeiminds/codeiq/cli" @cli,
+  "yufeiminds/codeiq/cmd/build" @build,
+}
+
+import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
+  "yufeiminds/codeiq/scripts/benchmark/shell" @bench_shell,
+  "yufeiminds/codeiq/cli" @cli,
+  "yufeiminds/codeiq/cmd/build" @build,
+} for "wbtest"
+
+supported_targets = "native"
+
+options(
+  "is-main": true,
+  targets: {
+    "bench_config_wbtest.mbt": [ "native" ],
+    "bench_wbtest.mbt": [ "native" ],
+  },
+)

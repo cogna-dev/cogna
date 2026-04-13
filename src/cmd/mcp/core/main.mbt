@@ -6,7 +6,14 @@ fn mcp_error(message : String) -> @cli.CliError {
 ///|
 pub(all) struct McpServeParams {
   port : Int
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for McpServeParams with output(self, logger) {
+  logger.write_string("{port: ")
+  logger.write_object(self.port)
+  logger.write_char('}')
+}
 
 ///|
 fn validate_port(port : Int) -> Result[Unit, @cli.CliError] {
@@ -29,6 +36,58 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
         )
     }
     Ok(())
+  }
+}
+
+///|
+fn descriptor_path() -> String {
+  "./dist/mcp-server.json"
+}
+
+///|
+fn write_descriptor(path : String, info : Json) -> Result[Unit, @cli.CliError] {
+  @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
+    err => return Err(mcp_error("cannot write descriptor \{path}: \{err.to_string()}"))
+  }
+  Ok(())
+}
+
+///|
+fn join_url(base_url : String, path : String) -> String {
+  if path == "" || path == "/" {
+    return base_url
+  }
+  if base_url.has_suffix("/") && path.has_prefix("/") {
+    base_url[:base_url.length() - 1].to_string() + path
+  } else if !base_url.has_suffix("/") && !path.has_prefix("/") {
+    "\{base_url}/\{path}"
+  } else {
+    base_url + path
+  }
+}
+
+///|
+fn server_info(port : Int) -> Json {
+  {
+    "schemaVersion": "codeiq-mcp-descriptor/v1",
+    "name": "codeiq-mcp",
+    "protocolVersion": "2025-11-25",
+    "transport": "http",
+    "port": port,
+    "pid": Json::null(),
+    "baseUrl": base_url(port),
+    "rpcUrl": rpc_url(port),
+    "healthUrl": health_url(port),
+    "bundleResolved": @fs.path_exists("./dist/manifest.json"),
+    "initializeResult": initialize_result(),
+    "tools": tool_definitions(),
+  }
+}
+
+///|
+fn cleanup_descriptor(path : String) -> Unit {
+  @fs.remove_file(path) catch {
+    _ => ()
   }
 }
 
@@ -154,9 +213,9 @@ pub fn local_sarif() -> Json? {
 ///|
 fn purl_cache_key(purl : String) -> String {
   purl
-    .replace_all(old=":", new="_")
-    .replace_all(old="/", new="_")
-    .replace_all(old="@", new="_")
+  .replace_all(old=":", new="_")
+  .replace_all(old="/", new="_")
+  .replace_all(old="@", new="_")
 }
 
 ///|
@@ -166,7 +225,9 @@ fn ensure_dir(path : String) -> Result[Unit, @cli.CliError] {
   } else {
     @fs.create_dir(path) catch {
       err =>
-        return Err(mcp_error("cannot create directory \{path}: \{err.to_string()}"))
+        return Err(
+          mcp_error("cannot create directory \{path}: \{err.to_string()}"),
+        )
     }
     Ok(())
   }
@@ -312,8 +373,8 @@ fn run_symbol_tool_with_context(
   }
 
   let kind = match args.get("kind") {
-    Some(String(value)) => value
-    _ => "symbol"
+    Some(String(value)) if value != "" => Some(value)
+    _ => None
   }
   let intent = match args.get("intent") {
     Some(String(value)) => value
@@ -440,12 +501,12 @@ pub fn base_url(port : Int) -> String {
 
 ///|
 pub fn health_url(port : Int) -> String {
-  @server_runtime.join_url(base_url(port), health_path())
+  join_url(base_url(port), health_path())
 }
 
 ///|
 pub fn rpc_url(port : Int) -> String {
-  @server_runtime.join_url(base_url(port), rpc_path())
+  join_url(base_url(port), rpc_path())
 }
 
 ///|
@@ -466,27 +527,27 @@ pub fn handle_http_request(
   path : String,
   headers : Map[String, String],
   body : Bytes,
-) -> Result[@server_runtime.HttpResponse, String] {
+) -> Result[@mcp_runtime.HttpResponse, String] {
   ignore(headers)
   match path {
     "/health" =>
       if http_method == "GET" {
         Ok(
-          @server_runtime.json_response(200, {
+          @mcp_runtime.json_response(200, {
             "status": "ok",
             "name": "codeiq-mcp",
             "protocolVersion": "2025-11-25",
           }),
         )
       } else {
-        Ok(@server_runtime.text_response(405, "method not allowed"))
+        Ok(@mcp_runtime.text_response(405, "method not allowed"))
       }
     "/rpc" =>
       if http_method == "POST" {
         let request_out = parse_http_request(body)
         guard request_out is Ok(request) else {
           return Ok(
-            @server_runtime.json_response(
+            @mcp_runtime.json_response(
               400,
               @mcp_sdk.error_response(
                 Json::null(),
@@ -496,11 +557,11 @@ pub fn handle_http_request(
             ),
           )
         }
-        Ok(@server_runtime.json_response(200, handle_request(request)))
+        Ok(@mcp_runtime.json_response(200, handle_request(request)))
       } else {
-        Ok(@server_runtime.text_response(405, "method not allowed"))
+        Ok(@mcp_runtime.text_response(405, "method not allowed"))
       }
-    _ => Ok(@server_runtime.text_response(404, "not found"))
+    _ => Ok(@mcp_runtime.text_response(404, "not found"))
   }
 }
 
@@ -515,9 +576,16 @@ pub fn run_serve(
   let sync_out = sync_tools_state()
   guard sync_out is Ok(_) else { return Err(sync_out.unwrap_err()) }
   @mcp_sdk.clear_runtime_state()
-  let serve_out = @server_runtime.serve_http(params.port, handle_http_request)
+  let descriptor = descriptor_path()
+  let descriptor_out = write_descriptor(descriptor, server_info(params.port))
+  guard descriptor_out is Ok(_) else {
+    return Err(descriptor_out.unwrap_err())
+  }
+  let serve_out = @mcp_runtime.serve_http(params.port, handle_http_request)
   guard serve_out is Ok(_) else {
+    cleanup_descriptor(descriptor)
     return Err(mcp_error(serve_out.unwrap_err()))
   }
+  cleanup_descriptor(descriptor)
   Ok(())
 }

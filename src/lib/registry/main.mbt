@@ -3,14 +3,36 @@ pub(all) struct RegistryApiResponse {
   status : Int
   headers : Map[String, String]
   body : Json
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for RegistryApiResponse with output(self, logger) {
+  logger.write_string("{status: ")
+  logger.write_object(self.status)
+  logger.write_string(", headers: ")
+  logger.write_object(self.headers)
+  logger.write_string(", body: ")
+  logger.write_object(self.body)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct UploadResult {
   receipt : Json
   stored_bundle_path : String
   etag : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for UploadResult with output(self, logger) {
+  logger.write_string("{receipt: ")
+  logger.write_object(self.receipt)
+  logger.write_string(", stored_bundle_path: ")
+  logger.write_object(self.stored_bundle_path)
+  logger.write_string(", etag: ")
+  logger.write_object(self.etag)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct SignatureStatus {
@@ -18,7 +40,20 @@ pub(all) struct SignatureStatus {
   algorithm : String
   key_id : String?
   value : String?
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for SignatureStatus with output(self, logger) {
+  logger.write_string("{status: ")
+  logger.write_object(self.status)
+  logger.write_string(", algorithm: ")
+  logger.write_object(self.algorithm)
+  logger.write_string(", key_id: ")
+  logger.write_object(self.key_id)
+  logger.write_string(", value: ")
+  logger.write_object(self.value)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) enum RegistryRoute {
@@ -29,11 +64,79 @@ pub(all) enum RegistryRoute {
   BundleDownload(String)
   ResolveByPurl(String)
   Unknown
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for RegistryRoute with output(self, logger) {
+  match self {
+    Health => logger.write_string("Health")
+    PublishBundles => logger.write_string("PublishBundles")
+    PackageVersions(purl) => {
+      logger.write_string("PackageVersions(")
+      logger.write_object(purl)
+      logger.write_char(')')
+    }
+    BundleDetail(bundle_id) => {
+      logger.write_string("BundleDetail(")
+      logger.write_object(bundle_id)
+      logger.write_char(')')
+    }
+    BundleDownload(bundle_id) => {
+      logger.write_string("BundleDownload(")
+      logger.write_object(bundle_id)
+      logger.write_char(')')
+    }
+    ResolveByPurl(purl) => {
+      logger.write_string("ResolveByPurl(")
+      logger.write_object(purl)
+      logger.write_char(')')
+    }
+    Unknown => logger.write_string("Unknown")
+  }
+}
+
+///|
+fn trimmed_env_var_registry(name : String) -> String? {
+  match @sys.get_env_var(name) {
+    Some(value) => {
+      let trimmed = value.trim().to_string()
+      if trimmed == "" {
+        None
+      } else {
+        Some(trimmed)
+      }
+    }
+    None => None
+  }
+}
+
+///|
+fn config_store_dir(root_dir : String) -> String? {
+  let resolved_out = @config.resolve(root_dir)
+  guard resolved_out is Ok(resolved) else { return None }
+  let configured = resolved.config.registry.store_dir.trim().to_string()
+  if configured == "" {
+    None
+  } else {
+    Some(@config.resolve_project_path(resolved.root_dir, configured))
+  }
+}
+
+///|
+pub fn resolved_local_store_root(root_dir : String) -> String {
+  match trimmed_env_var_registry("CODEIQ_REGISTRY_STORE_DIR") {
+    Some(value) => value
+    None =>
+      match config_store_dir(root_dir) {
+        Some(path) => path
+        None => ".codeiq/cache/registry"
+      }
+  }
+}
 
 ///|
 pub fn local_store_root() -> String {
-  ".codeiq/cache/registry"
+  resolved_local_store_root(@env.current_dir().unwrap_or("."))
 }
 
 ///|
@@ -48,17 +151,7 @@ pub fn local_store_bundles_dir() -> String {
 
 ///|
 pub fn registry_base_url() -> String? {
-  match @sys.get_env_var("CODEIQ_REGISTRY_BASE_URL") {
-    Some(value) => {
-      let trimmed = value.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
+  trimmed_env_var_registry("CODEIQ_REGISTRY_BASE_URL")
 }
 
 ///|
@@ -122,47 +215,17 @@ pub fn string_field_optional(
 
 ///|
 pub fn signature_public_key_file() -> String? {
-  match @sys.get_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE") {
-    Some(raw) => {
-      let trimmed = raw.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
+  trimmed_env_var_registry("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE")
 }
 
 ///|
 pub fn load_signature_status_from_env() -> SignatureStatus {
-  let status = match @sys.get_env_var("CODEIQ_SIGNATURE_STATUS") {
-    Some(value) => parse_signature_status(value.trim().to_string())
+  let status = match trimmed_env_var_registry("CODEIQ_SIGNATURE_STATUS") {
+    Some(value) => parse_signature_status(value)
     None => "unsigned"
   }
-  let key_id = match @sys.get_env_var("CODEIQ_SIGNATURE_KEY_ID") {
-    Some(value) => {
-      let trimmed = value.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
-  let value = match @sys.get_env_var("CODEIQ_SIGNATURE_VALUE") {
-    Some(raw) => {
-      let trimmed = raw.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
+  let key_id = trimmed_env_var_registry("CODEIQ_SIGNATURE_KEY_ID")
+  let value = trimmed_env_var_registry("CODEIQ_SIGNATURE_VALUE")
   { status, algorithm: "sha256", key_id, value }
 }
 
@@ -246,6 +309,7 @@ pub fn signature_status_from_upload_request(
   }
 }
 
+///|
 pub fn verify_signature_for_file(
   bundle_file : String,
   signature : SignatureStatus,

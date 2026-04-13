@@ -15,7 +15,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup MoonBit
-        uses: ./action
+        uses: ./integrations/actions/setup-moonbit
+
+      - name: Setup CodeIQ
+        uses: ./integrations/actions/setup-codeiq
 
       - name: Check
         run: moon check
@@ -26,5 +29,8 @@ jobs:
       - name: Build
         run: moon build
 
-      - name: Run
-        run: moon run src/cmd/main
+      - name: Smoke test run-codeiq action
+        uses: ./integrations/actions/run-codeiq
+        with:
+          command: init
+          args: --output /tmp/codeiq-ci-smoke.yml

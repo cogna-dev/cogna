@@ -1,18 +1,15 @@
 import {
-}
-
-import {
-  "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
   "yufeiminds/codeiq/cmd/build" @build_cmd,
   "yufeiminds/codeiq/cmd/check" @check_cmd,
   "yufeiminds/codeiq/cmd/diff" @diff_cmd,
-  "yufeiminds/codeiq/cmd/mcp" @mcp_cmd,
   "yufeiminds/codeiq/cmd/mcp/core" @mcp_core,
   "yufeiminds/codeiq/cmd/query" @query_cmd,
 } for "test"
 
 options(
-  targets: { "lifecycle_test.mbt": [ "native" ], "main_test.mbt": [ "wasm" ] },
+  targets: {
+    "main_test.mbt": [ "native", "wasm" ],
+  },
 )

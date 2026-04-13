@@ -12,3 +12,6 @@ src/cmd/**/tmp_*/
 src/cmd/registry/tmp_sig_consts/
 src/cmd/registry/tmp_registry_sigcheck/
 **/pkg.generated.mbti
+integrations/vscode/node_modules/
+integrations/vscode/out/
+integrations/vscode/.vscode-test/

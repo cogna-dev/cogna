@@ -51,6 +51,20 @@ fn env_bool(name : String) -> Bool {
 }
 
 ///|
+fn join_url(base_url : String, path : String) -> String {
+  if path == "" || path == "/" {
+    return base_url
+  }
+  if base_url.has_suffix("/") && path.has_prefix("/") {
+    base_url[:base_url.length() - 1].to_string() + path
+  } else if !base_url.has_suffix("/") && !path.has_prefix("/") {
+    "\{base_url}/\{path}"
+  } else {
+    base_url + path
+  }
+}
+
+///|
 fn insecure_remote_http_allowed() -> Bool {
   env_bool("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
 }
@@ -151,7 +165,7 @@ fn ensure_remote_transport_policy(
 
 ///|
 fn cache_root() -> String {
-  ".codeiq/cache/registry"
+  local_store_root()
 }
 
 ///|
@@ -703,9 +717,9 @@ fn json_request(
   http_method : String,
   url : String,
   headers : Map[String, String],
-  body : @server_runtime.HttpBody,
-) -> Result[@server_runtime.HttpResult, @cli.CliError] {
-  let request_out = @server_runtime.http_request(
+  body : @registry_runtime.HttpBody,
+) -> Result[@registry_runtime.HttpResult, @cli.CliError] {
+  let request_out = @registry_runtime.http_request(
     http_method, url, headers, body,
   )
   guard request_out is Ok(result) else {
@@ -820,16 +834,16 @@ fn maybe_cache_bundle_download(
     let headers = collect_registry_headers()
     headers["Accept"] = "application/octet-stream"
     let request_out = json_request(
-      "GET",
-      download_url,
-      headers,
-      @server_runtime.HttpBody::Empty,
-    )
+        "GET",
+        download_url,
+        headers,
+        @registry_runtime.HttpBody::Empty,
+      )
     guard request_out is Ok(result) else {
       return Err(request_out.unwrap_err())
     }
     if result.status != 200 {
-      let text = @server_runtime.text_body(result).unwrap_or("")
+      let text = @registry_runtime.text_body(result).unwrap_or("")
       return Err(
         registry_error(
           "remote bundle download failed with http status \{result.status} for \{download_url}: \{text.trim().to_string()}",
@@ -947,30 +961,27 @@ pub fn upload_remote(
     Some(raw) =>
       parse_json_text(raw, "CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
     None => {
-      let endpoint = @server_runtime.join_url(
-        normalized_base_url,
-        upload_path(),
-      )
+      let endpoint = join_url(normalized_base_url, upload_path())
       let headers = request_headers()
       headers["Content-Type"] = "application/json"
       let request_out = json_request(
         "POST",
         endpoint,
         headers,
-        @server_runtime.HttpBody::Json(upload_request),
+        @registry_runtime.HttpBody::Json(upload_request),
       )
       guard request_out is Ok(result) else {
         return Err(request_out.unwrap_err())
       }
       if result.status != 200 && result.status != 201 {
-        let message = @server_runtime.text_body(result).unwrap_or("")
+        let message = @registry_runtime.text_body(result).unwrap_or("")
         return Err(
           registry_error(
             "remote registry upload failed with http status \{result.status}: \{message.trim().to_string()}",
           ),
         )
       }
-      let json_out = @server_runtime.json_body(result)
+      let json_out = @registry_runtime.json_body(result)
       guard json_out is Ok(value) else {
         return Err(registry_error(json_out.unwrap_err()))
       }
@@ -1044,15 +1055,12 @@ pub fn download_remote_by_purl(purl : String) -> Result[Json, @cli.CliError] {
       Ok(cached)
     }
     None => {
-      let endpoint = @server_runtime.join_url(
-        normalized_base_url,
-        resolve_path(purl),
-      )
+      let endpoint = join_url(normalized_base_url, resolve_path(purl))
       let request_out = json_request(
         "GET",
         endpoint,
         request_headers(if_none_match=resolved_if_none_match_header(purl)),
-        @server_runtime.HttpBody::Empty,
+        @registry_runtime.HttpBody::Empty,
       )
       guard request_out is Ok(result) else {
         return Err(request_out.unwrap_err())
@@ -1073,14 +1081,14 @@ pub fn download_remote_by_purl(purl : String) -> Result[Json, @cli.CliError] {
         Ok(not_modified)
       } else {
         if result.status != 200 {
-          let message = @server_runtime.text_body(result).unwrap_or("")
+          let message = @registry_runtime.text_body(result).unwrap_or("")
           return Err(
             registry_error(
               "remote registry download failed with http status \{result.status}: \{message.trim().to_string()}",
             ),
           )
         }
-        let parsed_out = @server_runtime.json_body(result)
+        let parsed_out = @registry_runtime.json_body(result)
         guard parsed_out is Ok(parsed) else {
           return Err(registry_error(parsed_out.unwrap_err()))
         }

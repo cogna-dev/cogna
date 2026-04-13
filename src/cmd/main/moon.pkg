@@ -1,7 +1,7 @@
 import {
   "moonbitlang/core/argparse" @argparse,
   "moonbitlang/core/env" @env,
-  "moonbitlang/core/strconv" @strconv,
+  "moonbitlang/core/string" @string,
   "yufeiminds/codeiq/cmd/init" @init_cmd,
   "yufeiminds/codeiq/cmd/build" @build_cmd,
   "yufeiminds/codeiq/cmd/diff" @diff_cmd,

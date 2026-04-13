@@ -1,8 +1,18 @@
 import {
+  "gmlewis/flate" @flate,
+  "gmlewis/gzip" @gzip,
+  "gmlewis/io" @gio,
   "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
-  "yufeiminds/codeiq/lib/shell" @shell,
+  "yufeiminds/codeiq/cmd/check/shell" @check_shell,
+  "yufeiminds/codeiq/policy" @policy_catalog,
   "yufeiminds/codeiq/cli" @cli,
+  "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/schema" @schema,
 }
+
+import {
+  "yufeiminds/codeiq/cmd/build" @build_cmd,
+} for "test"

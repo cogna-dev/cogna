@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/fs" @fs,
+  "shu-kitamura/sha256" @sha256,
+  "yufeiminds/codeiq/config" @config,
+  "yufeiminds/codeiq/sbom/npm" @sbom_npm,
+  "yufeiminds/codeiq/sbom/cargo" @sbom_cargo,
+  "yufeiminds/codeiq/sbom/go" @sbom_go,
+}

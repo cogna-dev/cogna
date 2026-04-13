@@ -1,0 +1,107 @@
+///|
+test "parse invocation uses config-driven check defaults" {
+  let argv = ["codeiq", "check"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(Check(params)) else {
+    fail("expected check invocation to parse")
+  }
+
+  inspect(params.diff_file, content="")
+  inspect(params.policy_bundle, content="")
+}
+
+///|
+test "parse invocation supports query positional file" {
+  let argv = ["codeiq", "query", "./query.json"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(Query(params)) else {
+    fail("expected query invocation to parse")
+  }
+
+  inspect(params.query_file, content="./query.json")
+}
+
+///|
+test "parse invocation supports config-driven publish defaults" {
+  let argv = ["codeiq", "publish"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(Publish(params)) else {
+    fail("expected publish invocation to parse")
+  }
+
+  inspect(params.bundle_file, content="")
+}
+
+///|
+test "parse invocation supports registry serve with custom port" {
+  let argv = ["codeiq", "registry", "serve", "--port", "8788"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(RegistryServe(params)) else {
+    fail("expected registry serve invocation to parse")
+  }
+
+  inspect(params.port, content="8788")
+}
+
+///|
+test "parse invocation supports registry status" {
+  let argv = ["codeiq", "registry", "status"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(RegistryStatus) else {
+    fail("expected registry status invocation to parse")
+  }
+}
+
+///|
+test "parse invocation supports mcp serve with custom port" {
+  let argv = ["codeiq", "mcp", "serve", "--port", "9090"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(McpServe(params)) else {
+    fail("expected mcp serve invocation to parse")
+  }
+
+  inspect(params.port, content="9090")
+}
+
+///|
+test "parse invocation supports config-driven build defaults" {
+  let argv = ["codeiq", "build"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(Build(params)) else {
+    fail("expected build invocation to parse")
+  }
+
+  inspect(params.repo, content="")
+}
+
+///|
+test "parse invocation supports config-driven diff defaults" {
+  let argv = ["codeiq", "diff"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(Diff(params)) else {
+    fail("expected diff invocation to parse")
+  }
+
+  inspect(params.repo, content="")
+}
+
+///|
+test "parse invocation leaves diff overrides empty for config resolution" {
+  let argv = ["codeiq", "diff"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(Diff(params)) else {
+    fail("expected diff invocation with options to parse")
+  }
+
+  inspect(params.repo, content="")
+  inspect(params.since.unwrap_or(""), content="")
+  inspect(params.include_test_changes, content="false")
+}
+
+///|
+test "parse invocation supports mcp status" {
+  let status_out = parse_cli_args(["codeiq", "mcp", "status"])
+  guard status_out is Ok(McpStatus) else {
+    fail("expected mcp status to parse")
+  }
+}

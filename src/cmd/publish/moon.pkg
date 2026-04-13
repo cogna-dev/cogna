@@ -6,6 +6,7 @@ import {
   "yufeiminds/codeiq/cmd/registry" @registry,
   "yufeiminds/codeiq/lib/registry" @registry_lib,
   "yufeiminds/codeiq/cli" @cli,
+  "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/schema" @schema,
 }
 

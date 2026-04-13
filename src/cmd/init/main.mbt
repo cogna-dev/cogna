@@ -1,13 +1,29 @@
 ///|
 pub(all) struct InitParams {
   output_path : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for InitParams with output(self, logger) {
+  logger.write_string("{output_path: ")
+  logger.write_object(self.output_path)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct InitResult {
   output_path : String
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for InitResult with output(self, logger) {
+  logger.write_string("{output_path: ")
+  logger.write_object(self.output_path)
+  logger.write_string(", summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub impl @cli.Display for InitResult with display(self : InitResult) -> String {

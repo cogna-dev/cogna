@@ -14,21 +14,44 @@ fn ensure_dir_removed(path : String) -> Unit {
 
 ///|
 fn cleanup_tmp_repo(repo : String) -> Unit {
+  @build_shell.run_command_capture("rm -rf '\{repo}'") |> ignore
+  ensure_file_removed("\{repo}/codeiq.yml")
   ensure_file_removed("\{repo}/codeiq.yaml")
   ensure_file_removed("\{repo}/policy.rego")
+  ensure_file_removed("\{repo}/a.rego")
+  ensure_file_removed("\{repo}/z.rego")
   ensure_file_removed("\{repo}/main.go")
   ensure_file_removed("\{repo}/lib.rs")
   ensure_file_removed("\{repo}/dist/manifest.json")
   ensure_file_removed("\{repo}/dist/declarations.ndjson")
   ensure_file_removed("\{repo}/dist/symbols.ndjson")
   ensure_file_removed("\{repo}/dist/software-components.ndjson")
-  ensure_file_removed("\{repo}/dist/sbom.cdx.json")
   ensure_file_removed("\{repo}/dist/sbom.spdx.json")
   ensure_file_removed("\{repo}/dist/metadata.json")
   ensure_file_removed("\{repo}/dist/checksums.txt")
   ensure_file_removed("\{repo}/dist/opa-bundle.tar.gz")
   ensure_file_removed("\{repo}/dist/policy.rules.json")
   ensure_file_removed("\{repo}/dist/bundle.ciq.tgz")
+  ensure_file_removed(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/manifest.json",
+  )
+  ensure_file_removed(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/package.files.json",
+  )
+  ensure_file_removed(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/metadata.json",
+  )
+  ensure_file_removed(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/checksums.txt",
+  )
+  ensure_file_removed(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/bundle.ciq.tgz",
+  )
+  ensure_dir_removed("\{repo}/dist/dependencies/pkg_npm_react_18.2.0")
+  ensure_dir_removed("\{repo}/dist/dependencies")
+  ensure_file_removed("\{repo}/node_modules/react/package.json")
+  ensure_dir_removed("\{repo}/node_modules/react")
+  ensure_dir_removed("\{repo}/node_modules")
   ensure_dir_removed("\{repo}/dist")
   ensure_dir_removed(repo)
 }
@@ -82,6 +105,40 @@ fn write_valid_config(path : String) -> Unit {
 }
 
 ///|
+fn write_valid_v2_config(path : String) -> Unit {
+  let content =
+    #|schemaVersion: ciq-config/v2
+    #|profile: openapi-spec
+    #|purl: pkg:openapi/acme/payment-api@2026.03.01
+    #|source:
+    #|  repo: https://github.com/acme/payment-api
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - openapi/**/*.yaml
+    #|checks:
+    #|  format: sarif
+    #|  policy: ./dist/policy.ciq.tgz
+    #|diff:
+    #|  includeTestChanges: false
+    #|sbom:
+    #|  format: spdx
+    #|  dependencyBundles: true
+    #|  requireLocalPackages: true
+    #|publish:
+    #|  includeDependencies: true
+    #|registry:
+    #|  port: 8787
+    #|  storeDir: .codeiq/cache/registry
+    #|mcp:
+    #|  port: 3000
+    #|
+  @fs.write_string_to_file(path, content) catch {
+    _ => abort("failed to write test v2 config")
+  }
+}
+
+///|
 fn write_policy_config(path : String) -> Unit {
   let content =
     #|schemaVersion: ciq-config/v1
@@ -110,8 +167,20 @@ fn read_text_main(path : String, fail_message : String) -> String {
 }
 
 ///|
+fn tmp_build_repo(name : String) -> String {
+  "/tmp/codeiq-build-\{name}"
+}
+
+///|
+fn write_policy_rego(repo : String, content : String) -> Unit {
+  @fs.write_string_to_file("\{repo}/policy.rego", content) catch {
+    _ => abort("failed to write policy file")
+  }
+}
+
+///|
 test "build creates bundle skeleton files" {
-  let repo = "src/cmd/build/tmp_build_repo"
+  let repo = tmp_build_repo("repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -124,7 +193,7 @@ test "build creates bundle skeleton files" {
 
   inspect(
     result.display(),
-    content="Generated CIQ bundle skeleton at src/cmd/build/tmp_build_repo/dist",
+    content="Generated CIQ bundle skeleton at /tmp/codeiq-build-repo/dist",
   )
 
   let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
@@ -148,10 +217,14 @@ test "build creates bundle skeleton files" {
   }
   assert_true(metadata.contains("\"schemaVersion\": \"ciq-metadata/v1\""))
   assert_true(metadata.contains("\"status\": \"completed\""))
-  assert_true(metadata.contains("\"role\": \"baseline\""))
+  assert_true(metadata.contains("\"role\": \"canonical\""))
+  assert_true(metadata.contains("\"backend\": \"canonical\""))
   assert_true(metadata.contains("\"mode\": \"parser-only\""))
-  assert_true(metadata.contains("\"version\": \"none | baseline-v2\""))
+  assert_true(metadata.contains("\"server\": \"canonical\""))
+  assert_true(metadata.contains("\"version\": \"canonical-v1\""))
   assert_true(metadata.contains("\"fallback\": false"))
+  assert_false(metadata.contains("\"requestedBackend\""))
+  assert_false(metadata.contains("\"effectiveBackend\""))
 
   let checksums = @fs.read_file_to_string("\{repo}/dist/checksums.txt") catch {
     _ => {
@@ -164,7 +237,6 @@ test "build creates bundle skeleton files" {
   assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson")))
   assert_true(has_64_hex(checksum_for(checksums, "symbols.ndjson")))
   assert_true(has_64_hex(checksum_for(checksums, "software-components.ndjson")))
-  assert_true(has_64_hex(checksum_for(checksums, "sbom.cdx.json")))
   assert_true(has_64_hex(checksum_for(checksums, "sbom.spdx.json")))
   assert_true(has_64_hex(checksum_for(checksums, "metadata.json")))
 
@@ -184,16 +256,15 @@ test "build creates bundle skeleton files" {
     "software components should exist",
   )
   assert_true(components.contains("\"kind\":\"component\""))
-  let cyclonedx = read_text_main(
-    "\{repo}/dist/sbom.cdx.json",
-    "cyclonedx sbom should exist",
-  )
-  assert_true(cyclonedx.contains("\"bomFormat\": \"CycloneDX\""))
   let spdx = read_text_main(
     "\{repo}/dist/sbom.spdx.json",
     "spdx sbom should exist",
   )
-  assert_true(spdx.contains("\"@context\": \"https://spdx.org/rdf/3.0.1/spdx-context.jsonld\""))
+  assert_true(
+    spdx.contains(
+      "\"@context\": \"https://spdx.org/rdf/3.0.1/spdx-context.jsonld\"",
+    ),
+  )
 
   let bundle = @fs.read_file_to_bytes("\{repo}/dist/bundle.ciq.tgz") catch {
     _ => {
@@ -208,8 +279,84 @@ test "build creates bundle skeleton files" {
 }
 
 ///|
+test "build writes dependency bundles for resolved local packages" {
+  let repo = tmp_build_repo("dependencies-repo")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  let node_modules_out = try? @fs.create_dir("\{repo}/node_modules")
+  guard node_modules_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to create node_modules")
+  }
+  let react_dir_out = try? @fs.create_dir("\{repo}/node_modules/react")
+  guard react_dir_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to create react package")
+  }
+
+  write_valid_v2_config("\{repo}/codeiq.yml")
+  let package_out = try? @fs.write_string_to_file(
+    "\{repo}/package.json",
+    Json::object({
+      "name": Json::string("payment-api"),
+      "version": Json::string("1.0.0"),
+      "dependencies": Json::object({ "react": Json::string("18.2.0") }),
+    }).stringify(indent=2),
+  )
+  guard package_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write package.json")
+  }
+  let dependency_package_out = try? @fs.write_string_to_file(
+    "\{repo}/node_modules/react/package.json",
+    Json::object({
+      "name": Json::string("react"),
+      "version": Json::string("18.2.0"),
+    }).stringify(indent=2),
+  )
+  guard dependency_package_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write dependency package")
+  }
+
+  let out = run({ repo, })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("build with dependencies should succeed")
+  }
+
+  let dependency_manifest = read_text_main(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/manifest.json",
+    "dependency manifest should exist",
+  )
+  assert_true(
+    dependency_manifest.contains("\"model\": \"dependency-files-only\""),
+  )
+  let dependency_files = read_text_main(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/package.files.json",
+    "dependency files should exist",
+  )
+  assert_true(
+    dependency_files.contains("react/package.json") ||
+    dependency_files.contains("package.json"),
+  )
+  let dependency_bundle = @fs.read_file_to_bytes(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/bundle.ciq.tgz",
+  ) catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("dependency bundle should exist")
+      b""
+    }
+  }
+  assert_true(dependency_bundle.length() > 0)
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
 test "build returns config error when config file is missing" {
-  let repo = "src/cmd/build/tmp_build_missing_config"
+  let repo = tmp_build_repo("missing-config")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -221,14 +368,14 @@ test "build returns config error when config file is missing" {
 
   let text = error.to_string()
   assert_true(text.contains("config error:"))
-  assert_true(text.contains("codeiq.yaml"))
+  assert_true(text.contains("codeiq.yml"))
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "build creates policy-bundle artifacts and opa manifest" {
-  let repo = "src/cmd/build/tmp_build_policy_repo"
+  let repo = tmp_build_repo("policy-repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -238,18 +385,14 @@ test "build creates policy-bundle artifacts and opa manifest" {
     #|
     #|deny contains out if {
     #|  out := {
-    #|    "rule_id": "compat.removed-public-api",
+    #|    "rule_id": "compat.core.removed-declaration",
     #|    "level": "error",
     #|    "message": "Removed public API requires compatibility review",
+    #|    "docs": "https://example.dev/policy/compat.core.removed-declaration"
     #|  }
     #|}
     #|
-  @fs.write_string_to_file("\{repo}/policy.rego", policy) catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("failed to write policy file")
-    }
-  }
+  write_policy_rego(repo, policy)
 
   let out = run({ repo, })
   guard out is Ok(_) else {
@@ -273,8 +416,8 @@ test "build creates policy-bundle artifacts and opa manifest" {
   assert_true(manifest.contains("\"path\": \"opa-bundle.tar.gz\""))
   assert_true(manifest.contains("\"path\": \"policy.rules.json\""))
   assert_true(manifest.contains("\"path\": \"software-components.ndjson\""))
-  assert_true(manifest.contains("\"path\": \"sbom.cdx.json\""))
   assert_true(manifest.contains("\"path\": \"sbom.spdx.json\""))
+  assert_true(!manifest.contains("\"path\": \"sbom.cdx.json\""))
   assert_true(!manifest.contains("\"declarationSchema\""))
 
   let opa_bundle = @fs.read_file_to_bytes("\{repo}/dist/opa-bundle.tar.gz") catch {
@@ -296,7 +439,12 @@ test "build creates policy-bundle artifacts and opa manifest" {
   assert_true(
     policy_rules.contains("\"schemaVersion\": \"codeiq-policy-rules/v1\""),
   )
-  assert_true(policy_rules.contains("compat.removed-public-api"))
+  assert_true(policy_rules.contains("compat.core.removed-declaration"))
+  assert_true(policy_rules.contains("\"family\": \"core\""))
+  assert_true(policy_rules.contains("\"defaultLevel\": \"error\""))
+  assert_true(
+    policy_rules.contains("\"entrypoint\": \"data.codeiq.compat.deny\""),
+  )
 
   let checksums = @fs.read_file_to_string("\{repo}/dist/checksums.txt") catch {
     _ => {
@@ -308,15 +456,228 @@ test "build creates policy-bundle artifacts and opa manifest" {
   assert_true(has_64_hex(checksum_for(checksums, "opa-bundle.tar.gz")))
   assert_true(has_64_hex(checksum_for(checksums, "policy.rules.json")))
   assert_true(has_64_hex(checksum_for(checksums, "software-components.ndjson")))
-  assert_true(has_64_hex(checksum_for(checksums, "sbom.cdx.json")))
   assert_true(has_64_hex(checksum_for(checksums, "sbom.spdx.json")))
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
+test "build policy-bundle uses builtin rego and generated catalog when repo has no rego files" {
+  let repo = tmp_build_repo("builtin-policy-repo")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  let out = run({ repo, })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("builtin policy bundle build should succeed")
+  }
+
+  let policy_rules = @fs.read_file_to_string("\{repo}/dist/policy.rules.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("policy rules should exist")
+      ""
+    }
+  }
+  assert_true(
+    policy_rules.contains("\"schemaVersion\": \"codeiq-policy-rules/v1\"") ||
+    policy_rules.contains("\"schemaVersion\":\"codeiq-policy-rules/v1\""),
+  )
+  assert_true(policy_rules.contains("compat.core.removed-declaration"))
+  assert_true(policy_rules.contains("compat.go.signature-changed"))
+  assert_true(policy_rules.contains("compat.rust.became-unsafe"))
+  assert_true(policy_rules.contains("compat.terraform.input-became-required"))
+  assert_true(policy_rules.contains("compat.terraform.output-removed"))
+  assert_true(policy_rules.contains("compat.openapi.response-status-removed"))
+  assert_true(policy_rules.contains("compat.openapi.response-schema-narrowed"))
+  assert_true(policy_rules.contains("compat.component.version-upgrade"))
+  assert_true(
+    policy_rules.contains("\"entrypoint\": \"data.codeiq.compat.deny\""),
+  )
+
+  let opa_bundle = @fs.read_file_to_bytes("\{repo}/dist/opa-bundle.tar.gz") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("opa bundle should exist")
+      b""
+    }
+  }
+  assert_true(opa_bundle.length() > 0)
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build rejects duplicate custom policy rule ids" {
+  let repo = tmp_build_repo("duplicate-policy-repo")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  let policy =
+    #|package codeiq.compat
+    #|
+    #|deny contains out if {
+    #|  out := {
+    #|    "rule_id": "compat.core.removed-declaration",
+    #|    "level": "error",
+    #|    "message": "first",
+    #|    "docs": "https://example.dev/policy/first"
+    #|  }
+    #|}
+    #|
+    #|deny contains out if {
+    #|  out := {
+    #|    "rule_id": "compat.core.removed-declaration",
+    #|    "level": "error",
+    #|    "message": "second",
+    #|    "docs": "https://example.dev/policy/second"
+    #|  }
+    #|}
+    #|
+  write_policy_rego(repo, policy)
+
+  let out = run({ repo, })
+  guard out is Err(error) else {
+    cleanup_tmp_repo(repo)
+    fail("duplicate custom rule ids should fail build")
+  }
+  assert_true(error.message.contains("duplicate rule_id"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build reads custom rego files in deterministic lexicographic order" {
+  let repo = tmp_build_repo("sorted-policy-repo")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  let z_policy =
+    #|package codeiq.compat
+    #|
+    #|deny contains out if {
+    #|  out := {
+    #|    "rule_id": "compat.custom.zeta-rule",
+    #|    "level": "warning",
+    #|    "message": "zeta",
+    #|    "docs": "https://example.dev/policy/zeta"
+    #|  }
+    #|}
+    #|
+  let a_policy =
+    #|package codeiq.compat
+    #|
+    #|deny contains out if {
+    #|  out := {
+    #|    "rule_id": "compat.custom.alpha-rule",
+    #|    "level": "error",
+    #|    "message": "alpha",
+    #|    "docs": "https://example.dev/policy/alpha"
+    #|  }
+    #|}
+    #|
+  @fs.write_string_to_file("\{repo}/z.rego", z_policy) catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("failed to write z.rego")
+    }
+  }
+  @fs.write_string_to_file("\{repo}/a.rego", a_policy) catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("failed to write a.rego")
+    }
+  }
+
+  let out = run({ repo, })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("sorted custom policy bundle build should succeed")
+  }
+
+  let policy_rules = @fs.read_file_to_string("\{repo}/dist/policy.rules.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("policy rules should exist")
+      ""
+    }
+  }
+  let alpha_index = policy_rules.find("compat.custom.alpha-rule")
+  let zeta_index = policy_rules.find("compat.custom.zeta-rule")
+  guard alpha_index is Some(alpha_pos) else {
+    cleanup_tmp_repo(repo)
+    fail("alpha rule should exist in policy rules catalog")
+  }
+  guard zeta_index is Some(zeta_pos) else {
+    cleanup_tmp_repo(repo)
+    fail("zeta rule should exist in policy rules catalog")
+  }
+  assert_true(alpha_pos < zeta_pos)
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build rejects custom policy rules missing literal metadata" {
+  let repo = tmp_build_repo("missing-metadata-policy-repo")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  let policy =
+    #|package codeiq.compat
+    #|
+    #|deny contains out if {
+    #|  out := {
+    #|    "rule_id": "compat.core.removed-declaration",
+    #|    "level": "error",
+    #|    "message": "Removed public API requires compatibility review"
+    #|  }
+    #|}
+    #|
+  write_policy_rego(repo, policy)
+
+  let out = run({ repo, })
+  guard out is Err(error) else {
+    cleanup_tmp_repo(repo)
+    fail("missing docs metadata should fail build")
+  }
+  assert_true(error.message.contains("missing literal docs metadata"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build rejects custom policy bundles with no extracted rules" {
+  let repo = tmp_build_repo("empty-catalog-policy-repo")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_policy_config("\{repo}/codeiq.yaml")
+  let policy =
+    #|package codeiq.compat
+    #|
+    #|default deny = []
+    #|
+  write_policy_rego(repo, policy)
+
+  let out = run({ repo, })
+  guard out is Err(error) else {
+    cleanup_tmp_repo(repo)
+    fail("empty extracted policy catalog should fail build")
+  }
+  assert_true(error.message.contains("no rules extracted"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
 test "build policy-bundle supports signature status and key id env" {
-  let repo = "src/cmd/build/tmp_build_policy_signature_repo"
+  let repo = tmp_build_repo("policy-signature-repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -346,7 +707,7 @@ test "build policy-bundle supports signature status and key id env" {
 
 ///|
 test "build policy-bundle includes signature value when provided" {
-  let repo = "src/cmd/build/tmp_build_policy_signature_value_repo"
+  let repo = tmp_build_repo("policy-signature-value-repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -379,13 +740,14 @@ test "build policy-bundle includes signature value when provided" {
 
 ///|
 test "build fails when lsp server is unavailable for go profile" {
-  let repo = "src/cmd/build/tmp_build_go_lsp_hardfail"
+  let repo = tmp_build_repo("go-lsp-hardfail")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
   let config =
     #|schemaVersion: ciq-config/v1
     #|profile: go-module
+    #|validation: lsp
     #|purl: pkg:golang/github.com/acme/demo@0.1.0
     #|source:
     #|  repo: https://github.com/acme/demo
@@ -422,13 +784,14 @@ test "build fails when lsp server is unavailable for go profile" {
 
 ///|
 test "build fails when lsp server is unavailable for rust profile" {
-  let repo = "src/cmd/build/tmp_build_rust_lsp_hardfail"
+  let repo = tmp_build_repo("rust-lsp-hardfail")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
   let config =
     #|schemaVersion: ciq-config/v1
     #|profile: rust-crate
+    #|validation: lsp
     #|purl: pkg:cargo/acme-demo@0.1.0
     #|source:
     #|  repo: https://github.com/acme/demo
@@ -459,6 +822,62 @@ test "build fails when lsp server is unavailable for rust profile" {
   }
   assert_true(e.message.contains("rust-analyzer"))
   assert_true(e.message.contains("missing:"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build keeps canonical metadata under lsp validation" {
+  let repo = tmp_build_repo("go-validation-metadata")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  let config =
+    #|schemaVersion: ciq-config/v1
+    #|profile: go-module
+    #|validation: lsp
+    #|purl: pkg:golang/github.com/acme/demo@0.1.0
+    #|source:
+    #|  repo: https://github.com/acme/demo
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - "**/*.go"
+    #|checks:
+    #|  format: sarif
+    #|  policy: default-compat
+    #|
+  @fs.write_string_to_file("\{repo}/codeiq.yaml", config) catch {
+    _ => abort("failed to write go validation config")
+  }
+  @fs.write_string_to_file(
+    "\{repo}/main.go",
+    "package main\n\nfunc Hello() string { return \"hi\" }\n",
+  ) catch {
+    _ => abort("failed to write go validation fixture")
+  }
+
+  let out = run({ repo, })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("build should succeed with lsp validation")
+  }
+
+  let metadata = read_text_main(
+    "\{repo}/dist/metadata.json",
+    "metadata should exist under validation",
+  )
+  assert_true(metadata.contains("\"mode\": \"parser-first\""))
+  assert_true(metadata.contains("\"fallback\": false"))
+  assert_true(metadata.contains("\"backend\": \"canonical\""))
+  assert_true(metadata.contains("\"server\": \"canonical\""))
+
+  let declarations = read_text_main(
+    "\{repo}/dist/declarations.ndjson",
+    "declarations should exist under validation",
+  )
+  assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
+  assert_true(declarations.contains("\"server\":\"gopls\""))
 
   cleanup_tmp_repo(repo)
 }

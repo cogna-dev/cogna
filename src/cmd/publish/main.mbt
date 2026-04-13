@@ -1,13 +1,29 @@
 ///|
 pub(all) struct PublishParams {
   bundle_file : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for PublishParams with output(self, logger) {
+  logger.write_string("{bundle_file: ")
+  logger.write_object(self.bundle_file)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct PublishResult {
   bundle_file : String
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for PublishResult with output(self, logger) {
+  logger.write_string("{bundle_file: ")
+  logger.write_object(self.bundle_file)
+  logger.write_string(", summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub impl @cli.Display for PublishResult with display(self : PublishResult) -> String {
@@ -100,6 +116,18 @@ fn parent_dir(path : String) -> String {
       out = "\{out}\{parts[i]}"
     }
     out
+  }
+}
+
+///|
+fn maybe_resolve_publish_config(
+  bundle_file : String,
+) -> @config.ResolvedConfig? {
+  let bundle_dir = parent_dir(bundle_file)
+  let repo_root = parent_dir(bundle_dir)
+  match @config.resolve(repo_root) {
+    Ok(resolved) => Some(resolved)
+    Err(_) => None
   }
 }
 
@@ -351,17 +379,50 @@ fn write_receipt(path : String, receipt : Json) -> Result[Unit, @cli.CliError] {
 pub fn run(
   params : PublishParams,
 ) -> @cli.CliResult[PublishResult, @cli.CliError] {
-  let exists_out = ensure_bundle_exists(params.bundle_file)
+  let resolved_config = if params.bundle_file == "" {
+    let resolved_out = @config.resolve(".")
+    guard resolved_out is Ok(resolved) else {
+      return Err(@cli.config_error(resolved_out.unwrap_err().to_string()))
+    }
+    Some(resolved)
+  } else {
+    maybe_resolve_publish_config(params.bundle_file)
+  }
+  let bundle_file = if params.bundle_file == "" {
+    match resolved_config {
+      Some(resolved) => "\{resolved.root_dir}/dist/bundle.ciq.tgz"
+      None => params.bundle_file
+    }
+  } else {
+    params.bundle_file
+  }
+  let exists_out = ensure_bundle_exists(bundle_file)
   guard exists_out is Ok(_) else { return Err(exists_out.unwrap_err()) }
 
-  let receipt_path = "\{parent_dir(params.bundle_file)}/publish.json"
-  let receipt_out = publish_receipt(params.bundle_file)
+  let receipt_path = "\{parent_dir(bundle_file)}/publish.json"
+  let receipt_out = publish_receipt(bundle_file)
   guard receipt_out is Ok(receipt) else { return Err(receipt_out.unwrap_err()) }
-  let write_out = write_receipt(receipt_path, receipt)
+  let final_receipt = match resolved_config {
+    Some(resolved) if resolved.config.publish.include_dependencies => {
+      let dependency_bundles = dependency_bundle_files(bundle_file)
+      let dependency_receipts : Array[Json] = []
+      for i in 0..<dependency_bundles.length() {
+        let dependency_receipt_out = publish_receipt(dependency_bundles[i])
+        guard dependency_receipt_out is Ok(dependency_receipt) else {
+          return Err(dependency_receipt_out.unwrap_err())
+        }
+        dependency_receipts.push(dependency_receipt)
+      }
+      let aggregate_out = aggregate_receipt(receipt, dependency_receipts)
+      guard aggregate_out is Ok(aggregated) else {
+        return Err(aggregate_out.unwrap_err())
+      }
+      aggregated
+    }
+    _ => receipt
+  }
+  let write_out = write_receipt(receipt_path, final_receipt)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 
-  Ok({
-    bundle_file: params.bundle_file,
-    summary: "Generated publish receipt at \{receipt_path}",
-  })
+  Ok({ bundle_file, summary: "Generated publish receipt at \{receipt_path}" })
 }

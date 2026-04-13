@@ -17,6 +17,23 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/bundle.ciq.tgz")
   remove_file_if_exists("\{repo}/dist/manifest.json")
   remove_file_if_exists("\{repo}/dist/publish.json")
+  remove_file_if_exists(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/manifest.json",
+  )
+  remove_file_if_exists(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/package.files.json",
+  )
+  remove_file_if_exists(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/metadata.json",
+  )
+  remove_file_if_exists(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/checksums.txt",
+  )
+  remove_file_if_exists(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/bundle.ciq.tgz",
+  )
+  remove_dir_if_exists("\{repo}/dist/dependencies/pkg_npm_react_18.2.0")
+  remove_dir_if_exists("\{repo}/dist/dependencies")
   remove_dir_if_exists(".codeiq/registry/http")
   remove_dir_if_exists(".codeiq/registry/index")
   remove_dir_if_exists(".codeiq/registry/bundles")
@@ -28,6 +45,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_dir_if_exists(".codeiq")
   remove_dir_if_exists("\{repo}/dist")
   remove_dir_if_exists(repo)
+  @sys.unset_env_var("CODEIQ_REGISTRY_STORE_DIR")
   @sys.unset_env_var("CODEIQ_REGISTRY_BASE_URL")
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
@@ -41,8 +59,13 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 }
 
 ///|
+fn tmp_publish_repo(name : String) -> String {
+  "/tmp/codeiq-publish-\{name}"
+}
+
+///|
 test "publish generates local publish receipt" {
-  let repo = "src/cmd/publish/tmp_publish_repo"
+  let repo = tmp_publish_repo("repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -60,7 +83,7 @@ test "publish generates local publish receipt" {
 
   inspect(
     result.display(),
-    content="Generated publish receipt at src/cmd/publish/tmp_publish_repo/dist/publish.json",
+    content="Generated publish receipt at /tmp/codeiq-publish-repo/dist/publish.json",
   )
 
   let receipt = @fs.read_file_to_string("\{repo}/dist/publish.json") catch {
@@ -85,8 +108,145 @@ test "publish generates local publish receipt" {
 }
 
 ///|
+test "publish aggregates dependency bundle receipts when config enables dependencies" {
+  let repo = tmp_publish_repo("with-dependencies")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+  let dependencies_dir_out = try? @fs.create_dir("\{repo}/dist/dependencies")
+  guard dependencies_dir_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to create dependency dir")
+  }
+  let dependency_bundle_dir_out = try? @fs.create_dir(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0",
+  )
+  guard dependency_bundle_dir_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to create dependency bundle dir")
+  }
+
+  let config =
+    #|schemaVersion: ciq-config/v2
+    #|profile: openapi-spec
+    #|purl: pkg:openapi/acme/payment-api@2026.03.01
+    #|source:
+    #|  repo: https://github.com/acme/payment-api
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - openapi/**/*.yaml
+    #|checks:
+    #|  format: sarif
+    #|  policy: ./dist/policy.ciq.tgz
+    #|diff:
+    #|  includeTestChanges: false
+    #|sbom:
+    #|  format: spdx
+    #|  dependencyBundles: true
+    #|  requireLocalPackages: true
+    #|publish:
+    #|  includeDependencies: true
+    #|registry:
+    #|  port: 8787
+    #|  storeDir: .codeiq/cache/registry
+    #|mcp:
+    #|  port: 3000
+    #|
+  let config_out = try? @fs.write_string_to_file("\{repo}/codeiq.yml", config)
+  guard config_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write config")
+  }
+
+  let bundle_path = "\{repo}/dist/bundle.ciq.tgz"
+  let bundle_out = try? @fs.write_string_to_file(
+    bundle_path, "bundle placeholder",
+  )
+  guard bundle_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write bundle fixture")
+  }
+  let main_manifest_out = try? @fs.write_string_to_file(
+    "\{repo}/dist/manifest.json",
+    (
+      {
+        "schemaVersion": "ciq-bundle/v1",
+        "purl": "pkg:openapi/acme/payment-api@2026.03.01",
+        "profile": "openapi-spec",
+        "declarationSchema": {
+          "version": "ciq-declarations/v1",
+          "format": "ndjson",
+          "model": "signature + shape + language_specific tagged union",
+        },
+        "source": {
+          "repo": "https://github.com/acme/payment-api",
+          "ref": "main",
+          "commit": "abcdef",
+        },
+        "artifacts": [],
+      } : Json).stringify(indent=2),
+  )
+  guard main_manifest_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write main manifest")
+  }
+  let dependency_bundle_out = try? @fs.write_string_to_file(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/bundle.ciq.tgz",
+    "dependency bundle placeholder",
+  )
+  guard dependency_bundle_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write dependency bundle")
+  }
+  let dependency_manifest_out = try? @fs.write_string_to_file(
+    "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/manifest.json",
+    (
+      {
+        "schemaVersion": "ciq-bundle/v1",
+        "purl": "pkg:npm/react@18.2.0",
+        "profile": "openapi-spec",
+        "declarationSchema": {
+          "version": "ciq-declarations/v1",
+          "format": "ndjson",
+          "model": "dependency-files-only",
+        },
+        "source": {
+          "repo": "local-package-cache",
+          "ref": "installed",
+          "commit": "sha256:abcd",
+        },
+        "artifacts": [],
+      } : Json).stringify(indent=2),
+  )
+  guard dependency_manifest_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("failed to write dependency manifest")
+  }
+
+  let out = run({ bundle_file: bundle_path })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("publish should aggregate dependency receipts")
+  }
+
+  let receipt = @fs.read_file_to_string("\{repo}/dist/publish.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("aggregated publish receipt should exist")
+      ""
+    }
+  }
+  assert_true(receipt.contains("\"dependencyCount\": 1"))
+  assert_true(receipt.contains("\"dependencyReceipts\""))
+  assert_true(receipt.contains("pkg:npm/react@18.2.0"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
 test "publish fails when bundle file is missing" {
-  let repo = "src/cmd/publish/tmp_publish_missing_bundle"
+  let repo = tmp_publish_repo("missing-bundle")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -106,7 +266,7 @@ test "publish fails when bundle file is missing" {
 
 ///|
 test "publish returns already-exists receipt when etag matches" {
-  let repo = "src/cmd/publish/tmp_publish_etag_match"
+  let repo = tmp_publish_repo("etag-match")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -161,7 +321,7 @@ test "publish returns already-exists receipt when etag matches" {
 
 ///|
 test "publish receipt uses shared local registry cache path" {
-  let repo = "src/cmd/publish/tmp_publish_shared_cache"
+  let repo = tmp_publish_repo("shared-cache")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -192,7 +352,7 @@ test "publish receipt uses shared local registry cache path" {
 
 ///|
 test "publish receipt includes signature metadata from local registry response" {
-  let repo = "src/cmd/publish/tmp_publish_signature_metadata"
+  let repo = tmp_publish_repo("signature-metadata")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -228,7 +388,7 @@ test "publish receipt includes signature metadata from local registry response" 
 
 ///|
 test "publish preserves verified signature without trust downgrade" {
-  let repo = "src/cmd/publish/tmp_publish_signature_preserved"
+  let repo = tmp_publish_repo("signature-preserved")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -262,7 +422,7 @@ test "publish preserves verified signature without trust downgrade" {
 
 ///|
 test "publish allows untrusted signature metadata in local-only mode" {
-  let repo = "src/cmd/publish/tmp_publish_untrusted_signature"
+  let repo = tmp_publish_repo("untrusted-signature")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")

@@ -1,7 +1,7 @@
 import {
   "moonbitlang/core/json" @json,
   "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/strconv" @strconv,
+  "moonbitlang/core/string" @string,
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/schema" @schema,

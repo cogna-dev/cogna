@@ -15,8 +15,8 @@ fn json_api_response(
   status : Int,
   headers : Map[String, String],
   body : Json,
-) -> @server_runtime.HttpResponse {
-  @server_runtime.json_response(status, body, headers~)
+) -> @registry_runtime.HttpResponse {
+  @registry_runtime.json_response(status, body, headers~)
 }
 
 ///|
@@ -62,18 +62,18 @@ pub fn handle_http_request(
     String,
   ],
   bundle_download_handler : (String) -> Result[
-    @server_runtime.HttpResponse,
+    @registry_runtime.HttpResponse,
     String,
   ],
   resolve_handler : (String, String?) -> Result[
     (Int, Map[String, String], Json),
     String,
   ],
-) -> Result[@server_runtime.HttpResponse, String] {
+) -> Result[@registry_runtime.HttpResponse, String] {
   match @registry_lib.route(http_method, path) {
     Health =>
       Ok(
-        @server_runtime.json_response(200, {
+        @registry_runtime.json_response(200, {
           "status": "ok",
           "service": "codeiq-registry",
         }),
@@ -82,7 +82,7 @@ pub fn handle_http_request(
       let request_out = parse_json_request(body)
       guard request_out is Ok(request) else {
         return Ok(
-          @server_runtime.json_response(400, {
+          @registry_runtime.json_response(400, {
             "error": request_out.unwrap_err(),
           }),
         )
@@ -91,7 +91,7 @@ pub fn handle_http_request(
         Ok((status, response_headers, response_body)) =>
           Ok(json_api_response(status, response_headers, response_body))
         Err(message) =>
-          Ok(@server_runtime.json_response(500, { "error": message }))
+          Ok(@registry_runtime.json_response(500, { "error": message }))
       }
     }
     PackageVersions(purl) =>
@@ -99,20 +99,20 @@ pub fn handle_http_request(
         Ok((status, response_headers, response_body)) =>
           Ok(json_api_response(status, response_headers, response_body))
         Err(message) =>
-          Ok(@server_runtime.json_response(500, { "error": message }))
+          Ok(@registry_runtime.json_response(500, { "error": message }))
       }
     BundleDetail(bundle_id) =>
       match bundle_detail_handler(bundle_id) {
         Ok((status, response_headers, response_body)) =>
           Ok(json_api_response(status, response_headers, response_body))
         Err(message) =>
-          Ok(@server_runtime.json_response(500, { "error": message }))
+          Ok(@registry_runtime.json_response(500, { "error": message }))
       }
     BundleDownload(bundle_id) =>
       match bundle_download_handler(bundle_id) {
         Ok(response) => Ok(response)
         Err(message) =>
-          Ok(@server_runtime.json_response(500, { "error": message }))
+          Ok(@registry_runtime.json_response(500, { "error": message }))
       }
     ResolveByPurl(purl) => {
       let if_none_match = @registry_lib.header_value(headers, "If-None-Match")
@@ -120,16 +120,16 @@ pub fn handle_http_request(
         Ok((status, response_headers, response_body)) =>
           Ok(json_api_response(status, response_headers, response_body))
         Err(message) =>
-          Ok(@server_runtime.json_response(500, { "error": message }))
+          Ok(@registry_runtime.json_response(500, { "error": message }))
       }
     }
-    Unknown => Ok(@server_runtime.text_response(404, "not found"))
+    Unknown => Ok(@registry_runtime.text_response(404, "not found"))
   }
 }
 
 ///|
 pub fn serve_registry(port : Int) -> Result[Unit, @cli.CliError] {
-  let serve_out = @server_runtime.serve_http(port, (
+  let serve_out = @registry_runtime.serve_http(port, (
     http_method,
     path,
     headers,

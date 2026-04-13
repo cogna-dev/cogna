@@ -2,7 +2,16 @@
 pub(all) struct CliError {
   code : Int
   message : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for CliError with output(self, logger) {
+  logger.write_string("{code: ")
+  logger.write_object(self.code)
+  logger.write_string(", message: ")
+  logger.write_object(self.message)
+  logger.write_char('}')
+}
 
 ///|
 pub fn usage_error(message : String) -> CliError {

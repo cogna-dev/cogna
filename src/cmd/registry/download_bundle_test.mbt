@@ -1,10 +1,8 @@
 ///|
 test "registry run_download_bundle materializes local download into output directory" {
-  let repo = "src/cmd/registry/tmp_registry_download_bundle"
+  let repo = tmp_registry_repo("download-bundle")
   dbt_cleanup_registry()
-  @fs.remove_dir(repo) catch {
-    _ => ()
-  }
+  remove_dir_if_exists(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
 
@@ -59,9 +57,7 @@ test "registry run_download_bundle materializes local download into output direc
   let upload_out = upload_local(request)
   guard upload_out is Ok(_) else {
     dbt_cleanup_registry()
-    @fs.remove_dir(repo) catch {
-      _ => ()
-    }
+    remove_dir_if_exists(repo)
     fail("upload_local should succeed")
   }
 
@@ -69,9 +65,7 @@ test "registry run_download_bundle materializes local download into output direc
   let run_out = run_download_bundle({ purl, output_dir: out_dir })
   guard run_out is Ok(result) else {
     dbt_cleanup_registry()
-    @fs.remove_dir(repo) catch {
-      _ => ()
-    }
+    remove_dir_if_exists(repo)
     fail("run_download_bundle should succeed")
   }
   assert_true(result.summary.contains("Downloaded and materialized bundle"))
@@ -82,31 +76,5 @@ test "registry run_download_bundle materializes local download into output direc
   assert_true(@fs.path_exists("\{out_dir}/checksums.txt"))
 
   dbt_cleanup_registry()
-  @fs.remove_file("\{out_dir}/manifest.json") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{out_dir}/declarations.ndjson") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{out_dir}/symbols.ndjson") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{out_dir}/metadata.json") catch {
-    _ => ()
-  }
-  @fs.remove_file("\{out_dir}/checksums.txt") catch {
-    _ => ()
-  }
-  @fs.remove_dir(out_dir) catch {
-    _ => ()
-  }
-  @fs.remove_file(bundle_path) catch {
-    _ => ()
-  }
-  @fs.remove_dir("\{repo}/dist") catch {
-    _ => ()
-  }
-  @fs.remove_dir(repo) catch {
-    _ => ()
-  }
+  remove_dir_if_exists(repo)
 }

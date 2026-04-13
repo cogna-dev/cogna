@@ -1,0 +1,8 @@
+import {
+  "yufeiminds/codeiq/scripts/gendoc" @gendoc,
+  "yufeiminds/codeiq/cli" @cli,
+}
+
+options(
+  "is-main": true,
+)

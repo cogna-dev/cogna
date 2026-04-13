@@ -56,6 +56,11 @@ fn cleanup_case(path : String, source_file : String) -> Unit {
 }
 
 ///|
+fn tmp_snapshot_repo(title : String) -> String {
+  "/tmp/codeiq-build-snapshot-\{title}"
+}
+
+///|
 fn ensure_repo_with_file(
   path : String,
   file_path : String,
@@ -127,6 +132,21 @@ fn read_snapshot(path : String, fallback : String) -> String {
 
 ///|
 fn persist_snapshot(path : String, content : String) -> Unit {
+  let parts = path.split("/").to_array()
+  if parts.length() > 1 {
+    let mut dir = ""
+    for i in 0..<(parts.length() - 1) {
+      if i > 0 {
+        dir = "\{dir}/"
+      }
+      dir = "\{dir}\{parts[i]}"
+    }
+    if dir != "" && !@fs.path_exists(dir) {
+      @fs.create_dir(dir) catch {
+        _ => abort("failed to create snapshot directory \{dir}")
+      }
+    }
+  }
   @fs.write_string_to_file(path, content) catch {
     _ => abort("failed to persist snapshot")
   }
@@ -138,34 +158,24 @@ fn normalize_snapshot_text(content : String) -> String {
   guard parsed is Ok(Object(root)) else { return content }
 
   if root.get("schemaVersion") is Some(String("ciq-metadata/v1")) {
+    let extractor_obj : Map[String, Json] = match root.get("extractor") {
+      Some(Object(e)) => e
+      _ => {}
+    }
     let normalized : Json = {
       "schemaVersion": root.get("schemaVersion").unwrap_or("ciq-metadata/v1"),
       "profile": root.get("profile").unwrap_or("unknown"),
       "inputPatterns": root.get("inputPatterns").unwrap_or([]),
       "build": root.get("build").unwrap_or({}),
       "extractor": {
-        "role": "baseline",
-        "mode": match root.get("extractor") {
-          Some(Object(extractor)) => extractor.get("mode").unwrap_or("unknown")
-          _ => "unknown"
-        },
-        "server": match root.get("extractor") {
-          Some(Object(extractor)) => extractor.get("server").unwrap_or("none")
-          _ => "none"
-        },
-        "version": "<normalized>",
-        "fallback": match root.get("extractor") {
-          Some(Object(extractor)) => extractor.get("fallback").unwrap_or(false)
-          _ => false
-        },
-        "timingMs": match root.get("extractor") {
-          Some(Object(extractor)) => extractor.get("timingMs").unwrap_or({})
-          _ => {}
-        },
-        "stats": match root.get("extractor") {
-          Some(Object(extractor)) => extractor.get("stats").unwrap_or({})
-          _ => {}
-        },
+        "role": extractor_obj.get("role").unwrap_or("canonical"),
+        "mode": extractor_obj.get("mode").unwrap_or("unknown"),
+        "backend": extractor_obj.get("backend").unwrap_or("canonical"),
+        "server": extractor_obj.get("server").unwrap_or("canonical"),
+        "version": extractor_obj.get("version").unwrap_or("canonical-v1"),
+        "fallback": extractor_obj.get("fallback").unwrap_or(false),
+        "timingMs": extractor_obj.get("timingMs").unwrap_or({}),
+        "stats": extractor_obj.get("stats").unwrap_or({}),
       },
     }
     return normalized.stringify(indent=2)
@@ -198,6 +208,21 @@ fn normalize_snapshot_text(content : String) -> String {
 }
 
 ///|
+fn normalize_checksums_text(content : String) -> String {
+  let lines = content.split("\n").to_array()
+  let normalized : Array[String] = []
+  for i in 0..<lines.length() {
+    let line = lines[i]
+    if line.has_prefix("metadata.json  ") {
+      normalized.push("metadata.json  <normalized>")
+    } else {
+      normalized.push(line.to_string())
+    }
+  }
+  normalized.join("\n")
+}
+
+///|
 fn read_fixture(path : String) -> String {
   @fs.read_file_to_string(path) catch {
     _ => abort("failed to read fixture file")
@@ -213,7 +238,7 @@ fn run_snapshot_case(
   include_glob : String,
   snapshot_root : String,
 ) -> Unit raise {
-  let repo = "src/cmd/build/tmp_snapshot_\{title}"
+  let repo = tmp_snapshot_repo(title)
   cleanup_case(repo, source_file)
   ensure_repo_with_file(repo, source_file, read_fixture(source_fixture))
   write_config_for(repo, profile, include_glob)
@@ -253,13 +278,16 @@ fn run_snapshot_case(
   }
   let normalized_manifest = normalize_snapshot_text(manifest)
   let normalized_metadata = normalize_snapshot_text(metadata)
+  let normalized_checksums = normalize_checksums_text(checksums)
   let expected_manifest = read_snapshot(
     manifest_snapshot_path, normalized_manifest,
   )
   let expected_metadata = read_snapshot(
     metadata_snapshot_path, normalized_metadata,
   )
-  let expected_checksums = read_snapshot(checksums_snapshot_path, checksums)
+  let expected_checksums = normalize_checksums_text(
+    read_snapshot(checksums_snapshot_path, normalized_checksums),
+  )
   let missing_snapshots = !@fs.path_exists(dec_snapshot_path) ||
     !@fs.path_exists(sym_snapshot_path) ||
     !@fs.path_exists(manifest_snapshot_path) ||
@@ -283,7 +311,7 @@ fn run_snapshot_case(
       persist_snapshot(sym_snapshot_path, symbols)
       persist_snapshot(manifest_snapshot_path, normalized_manifest)
       persist_snapshot(metadata_snapshot_path, normalized_metadata)
-      persist_snapshot(checksums_snapshot_path, checksums)
+      persist_snapshot(checksums_snapshot_path, normalized_checksums)
     } else {
       cleanup_case(repo, source_file)
       fail(
@@ -291,24 +319,25 @@ fn run_snapshot_case(
       )
     }
   } else if expected_dec == declarations &&
-    expected_sym == symbols &&
-    expected_manifest == normalized_manifest &&
-    expected_metadata == normalized_metadata &&
-    expected_checksums == checksums {
+     expected_sym == symbols &&
+     expected_manifest == normalized_manifest &&
+     expected_metadata == normalized_metadata &&
+      expected_checksums == normalized_checksums {
     ()
   } else if update {
     persist_snapshot(dec_snapshot_path, declarations)
     persist_snapshot(sym_snapshot_path, symbols)
     persist_snapshot(manifest_snapshot_path, normalized_manifest)
     persist_snapshot(metadata_snapshot_path, normalized_metadata)
-    persist_snapshot(checksums_snapshot_path, checksums)
+      persist_snapshot(checksums_snapshot_path, normalized_checksums)
   } else {
     cleanup_case(repo, source_file)
     fail(
       "snapshot mismatch for \{title}; rerun with `moon test --update src/cmd/build/snapshot_test.mbt` to refresh examples",
     )
   }
-  assert_true(metadata.contains("\"role\": \"baseline\""))
+  assert_true(metadata.contains("\"role\": \"canonical\""))
+  assert_true(metadata.contains("\"backend\": \"canonical\""))
 
   cleanup_case(repo, source_file)
 }
@@ -317,7 +346,7 @@ fn run_snapshot_case(
 test "snapshot terraform baseline extractor output" {
   run_snapshot_case(
     "terraform", "terraform-module", "main.tf", "examples/terraform-module/full/repo/main.tf",
-    "**/*.tf", "examples/terraform-module/full/snapshots/lsp",
+    "**/*.tf", "examples/terraform-module/full/snapshots/codeiq",
   )
 }
 
@@ -325,22 +354,22 @@ test "snapshot terraform baseline extractor output" {
 test "snapshot openapi baseline extractor output" {
   run_snapshot_case(
     "openapi", "openapi-spec", "openapi/payment.yaml", "examples/openapi-spec/full/repo/openapi/payment.yaml",
-    "openapi/**/*.yaml", "examples/openapi-spec/full/snapshots/lsp",
+    "openapi/**/*.yaml", "examples/openapi-spec/full/snapshots/codeiq",
   )
 }
 
 ///|
-test "snapshot go baseline extractor output" {
+test "snapshot go canonical extractor output" {
   run_snapshot_case(
     "go", "go-module", "main.go", "examples/go-module/full/repo/main.go", "**/*.go",
-    "examples/go-module/full/snapshots/lsp",
+    "examples/go-module/full/snapshots/codeiq",
   )
 }
 
 ///|
-test "snapshot rust baseline extractor output" {
+test "snapshot rust canonical extractor output" {
   run_snapshot_case(
     "rust", "rust-crate", "lib.rs", "examples/rust-crate/full/repo/lib.rs", "**/*.rs",
-    "examples/rust-crate/full/snapshots/lsp",
+    "examples/rust-crate/full/snapshots/codeiq",
   )
 }

@@ -13,7 +13,6 @@
     "mode": "parser-first",
     "server": "hcl-parser",
     "version": "<normalized>",
-    "fallback": false,
     "timingMs": {
       "initialize": 1,
       "extract": 1,

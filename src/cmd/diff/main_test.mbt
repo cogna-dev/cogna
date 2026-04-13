@@ -30,8 +30,13 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 }
 
 ///|
+fn tmp_diff_repo(name : String) -> String {
+  "/tmp/codeiq-diff-\{name}"
+}
+
+///|
 fn write_manifest(path : String, purl : String, profile : String) -> Unit {
-  let sha = @sha256.sha256_hexdigest(@utf8.encode("fixture"))
+  let sha = "0000000000000000000000000000000000000000000000000000000000000000"
   let content : Json = {
     "schemaVersion": "ciq-bundle/v1",
     "purl": purl,
@@ -64,7 +69,7 @@ fn write_records(path : String, lines : String) -> Unit {
 
 ///|
 test "diff generates skeleton diff output" {
-  let repo = "src/cmd/diff/tmp_diff_repo"
+  let repo = tmp_diff_repo("repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -110,7 +115,7 @@ test "diff generates skeleton diff output" {
 
   inspect(
     result.display(),
-    content="Generated CIQ declaration diff at src/cmd/diff/tmp_diff_repo/dist/diff.json",
+    content="Generated CIQ declaration diff at /tmp/codeiq-diff-repo/dist/diff.json",
   )
 
   let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {
@@ -140,15 +145,16 @@ test "diff generates skeleton diff output" {
   assert_true(diff_text.contains("\"decl:payment:create\""))
   assert_true(diff_text.contains("\"afterRecord\""))
   assert_true(diff_text.contains("\"beforeRecord\""))
-  // R13-1: semantic fields present on all change kinds
-  assert_true(diff_text.contains("\"semanticCategory\""))
+  // A002: semantic findings are present on all change kinds
+  assert_true(diff_text.contains("\"semanticDiff\""))
+  assert_true(diff_text.contains("\"findings\""))
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "diff fails when base manifest is missing" {
-  let repo = "src/cmd/diff/tmp_diff_missing_base"
+  let repo = tmp_diff_repo("missing-base")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -174,7 +180,7 @@ test "diff fails when base manifest is missing" {
 
 ///|
 test "diff includes since and test changes fields when requested" {
-  let repo = "src/cmd/diff/tmp_diff_since_test_changes"
+  let repo = tmp_diff_repo("since-test-changes")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -228,7 +234,7 @@ test "diff includes since and test changes fields when requested" {
 
 ///|
 test "diff computes go test changes when requested" {
-  let repo = "src/cmd/diff/tmp_diff_go_test_changes"
+  let repo = tmp_diff_repo("go-test-changes")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -300,7 +306,7 @@ test "diff computes go test changes when requested" {
 
 ///|
 test "diff includes software component changes" {
-  let repo = "src/cmd/diff/tmp_diff_components"
+  let repo = tmp_diff_repo("components")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -327,10 +333,7 @@ test "diff includes software component changes" {
   let target_component =
     #|{"id":"pkg:npm/react@19.0.0","kind":"component","path":"package.json","signature":"library react@19.0.0","name":"react","componentType":"library","scope":"dependency","version":"19.0.0","purl":"pkg:npm/react@19.0.0","location":{"uri":"package.json","startLine":1,"endLine":1}}
     #|
-  write_records(
-    "\{repo}/dist/base/software-components.ndjson",
-    base_component,
-  )
+  write_records("\{repo}/dist/base/software-components.ndjson", base_component)
   write_records(
     "\{repo}/dist/target/software-components.ndjson",
     target_component,
@@ -351,16 +354,22 @@ test "diff includes software component changes" {
   }
   assert_true(diff_text.contains("pkg:npm/react@18.2.0"))
   assert_true(diff_text.contains("pkg:npm/react@19.0.0"))
-  assert_true(diff_text.contains("\"kind\": \"changed\"") || diff_text.contains("\"kind\":\"changed\""))
+  assert_true(
+    diff_text.contains("\"kind\": \"changed\"") ||
+    diff_text.contains("\"kind\":\"changed\""),
+  )
   assert_true(diff_text.contains("\"componentDiff\""))
-  assert_true(diff_text.contains("\"upgradeKind\": \"version-upgrade\"") || diff_text.contains("\"upgradeKind\":\"version-upgrade\""))
+  assert_true(
+    diff_text.contains("\"upgradeKind\": \"version-upgrade\"") ||
+    diff_text.contains("\"upgradeKind\":\"version-upgrade\""),
+  )
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "diff marks declarations changed when richer shape metadata changes" {
-  let repo = "src/cmd/diff/tmp_diff_shape_change"
+  let repo = tmp_diff_repo("shape-change")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -404,10 +413,15 @@ test "diff marks declarations changed when richer shape metadata changes" {
     }
   }
   assert_true(diff_text.contains("\"kind\": \"changed\""))
-  assert_true(diff_text.contains("\"decl:go-module:go-module::main.go::Greet\""))
+  assert_true(
+    diff_text.contains("\"decl:go-module:go-module::main.go::Greet\""),
+  )
   assert_true(diff_text.contains("\"beforeRecord\""))
   assert_true(diff_text.contains("\"afterRecord\""))
-  assert_true(diff_text.contains("\"owner\": \"Greeter\"") || diff_text.contains("\"owner\":\"Greeter\""))
+  assert_true(
+    diff_text.contains("\"owner\": \"Greeter\"") ||
+    diff_text.contains("\"owner\":\"Greeter\""),
+  )
   assert_true(diff_text.contains("\"returns\""))
   assert_true(diff_text.contains("\"Message\""))
 
@@ -416,7 +430,7 @@ test "diff marks declarations changed when richer shape metadata changes" {
 
 ///|
 test "diff marks rust declarations changed when richer language metadata changes" {
-  let repo = "src/cmd/diff/tmp_diff_rust_shape_change"
+  let repo = tmp_diff_repo("rust-shape-change")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -459,21 +473,35 @@ test "diff marks rust declarations changed when richer language metadata changes
       ""
     }
   }
-  assert_true(diff_text.contains("\"kind\": \"changed\"") || diff_text.contains("\"kind\":\"changed\""))
-  assert_true(diff_text.contains("\"decl:rust-crate:rust-crate::lib.rs::dangerous\""))
+  assert_true(
+    diff_text.contains("\"kind\": \"changed\"") ||
+    diff_text.contains("\"kind\":\"changed\""),
+  )
+  assert_true(
+    diff_text.contains("\"decl:rust-crate:rust-crate::lib.rs::dangerous\""),
+  )
   assert_true(diff_text.contains("\"beforeRecord\""))
   assert_true(diff_text.contains("\"afterRecord\""))
-  assert_true(diff_text.contains("\"unsafe\":true") || diff_text.contains("\"unsafe\": true"))
+  assert_true(
+    diff_text.contains("\"unsafe\":true") ||
+    diff_text.contains("\"unsafe\": true"),
+  )
   // R13-1: semantic level should be "breaking" for rust-became-unsafe
-  assert_true(diff_text.contains("\"level\": \"breaking\"") || diff_text.contains("\"level\":\"breaking\""))
-  assert_true(diff_text.contains("\"semanticCategory\": \"rust-became-unsafe\"") || diff_text.contains("\"semanticCategory\":\"rust-became-unsafe\""))
+  assert_true(
+    diff_text.contains("\"level\": \"breaking\"") ||
+    diff_text.contains("\"level\":\"breaking\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"rust-became-unsafe\"") ||
+    diff_text.contains("\"code\":\"rust-became-unsafe\""),
+  )
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "diff marks terraform declarations changed when richer language metadata changes" {
-  let repo = "src/cmd/diff/tmp_diff_terraform_shape_change"
+  let repo = tmp_diff_repo("terraform-shape-change")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -516,20 +544,103 @@ test "diff marks terraform declarations changed when richer language metadata ch
       ""
     }
   }
-  assert_true(diff_text.contains("\"kind\": \"changed\"") || diff_text.contains("\"kind\":\"changed\""))
-  assert_true(diff_text.contains("\"decl:terraform-module:terraform-module::main.tf::aws_vpc.main\""))
+  assert_true(
+    diff_text.contains("\"kind\": \"changed\"") ||
+    diff_text.contains("\"kind\":\"changed\""),
+  )
+  assert_true(
+    diff_text.contains(
+      "\"decl:terraform-module:terraform-module::main.tf::aws_vpc.main\"",
+    ),
+  )
   assert_true(diff_text.contains("\"beforeRecord\""))
   assert_true(diff_text.contains("\"afterRecord\""))
-  assert_true(diff_text.contains("\"preventDestroy\":true") || diff_text.contains("\"preventDestroy\": true"))
-  // R13-1: semantic level should be "warning" for terraform-prevent-destroy-added
-  assert_true(diff_text.contains("\"semanticCategory\": \"terraform-prevent-destroy-added\"") || diff_text.contains("\"semanticCategory\":\"terraform-prevent-destroy-added\""))
+  assert_true(
+    diff_text.contains("\"preventDestroy\":true") ||
+    diff_text.contains("\"preventDestroy\": true"),
+  )
+  // A002: terraform findings can accumulate on one changed declaration
+  assert_true(
+    diff_text.contains("\"code\": \"terraform-prevent-destroy-added\"") ||
+    diff_text.contains("\"code\":\"terraform-prevent-destroy-added\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"terraform-create-before-destroy-added\"") ||
+    diff_text.contains("\"code\":\"terraform-create-before-destroy-added\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"terraform-ignore-changes-expanded\"") ||
+    diff_text.contains("\"code\":\"terraform-ignore-changes-expanded\""),
+  )
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "diff marks terraform variables becoming required and outputs being removed" {
+  let repo = tmp_diff_repo("terraform-deeper-rules")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+  @fs.create_dir("\{repo}/dist/base")
+  @fs.create_dir("\{repo}/dist/target")
+
+  write_manifest(
+    "\{repo}/dist/base/manifest.json",
+    "pkg:terraform/example/demo@0.1.0",
+    "terraform-module",
+  )
+  write_manifest(
+    "\{repo}/dist/target/manifest.json",
+    "pkg:terraform/example/demo@0.2.0",
+    "terraform-module",
+  )
+
+  let base_declarations =
+    #|{"id":"decl:terraform-module:terraform-module::vars.tf::env","kind":"variable","path":"vars.tf","signature":"variable \"env\" {","shape":{"kind":"variable","subkind":"variable","form":"symbol","signature":"variable \"env\" {"},"language_specific":{"profile":"terraform-module","server":"hcl-parser","terraform":{"required":false}},"location":{"uri":"vars.tf","startLine":1,"endLine":3}}
+    #|{"id":"decl:terraform-module:terraform-module::main.tf::vpc_id","kind":"output","path":"main.tf","signature":"output \"vpc_id\" {","shape":{"kind":"output","subkind":"output","form":"symbol","signature":"output \"vpc_id\" {"},"language_specific":{"profile":"terraform-module","server":"hcl-parser"},"location":{"uri":"main.tf","startLine":10,"endLine":12}}
+    #|
+  let target_declarations =
+    #|{"id":"decl:terraform-module:terraform-module::vars.tf::env","kind":"variable","path":"vars.tf","signature":"variable \"env\" {","shape":{"kind":"variable","subkind":"variable","form":"symbol","signature":"variable \"env\" {"},"language_specific":{"profile":"terraform-module","server":"hcl-parser","terraform":{"required":true}},"location":{"uri":"vars.tf","startLine":1,"endLine":3}}
+    #|
+
+  write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
+  write_records("\{repo}/dist/base/symbols.ndjson", "")
+  write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
+  write_records("\{repo}/dist/target/symbols.ndjson", "")
+
+  let out = run({ repo, since: None, include_test_changes: false })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("terraform deeper diff should succeed")
+  }
+
+  let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("terraform deeper diff output should exist")
+      ""
+    }
+  }
+  assert_true(
+    diff_text.contains("\"code\": \"terraform-input-became-required\"") ||
+    diff_text.contains("\"code\":\"terraform-input-became-required\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"terraform-output-removed\"") ||
+    diff_text.contains("\"code\":\"terraform-output-removed\""),
+  )
+  assert_true(
+    diff_text.contains("\"kind\": \"removed\"") ||
+    diff_text.contains("\"kind\":\"removed\""),
+  )
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "diff marks openapi declarations changed when richer language metadata changes" {
-  let repo = "src/cmd/diff/tmp_diff_openapi_shape_change"
+  let repo = tmp_diff_repo("openapi-shape-change")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -572,23 +683,98 @@ test "diff marks openapi declarations changed when richer language metadata chan
       ""
     }
   }
-  assert_true(diff_text.contains("\"kind\": \"changed\"") || diff_text.contains("\"kind\":\"changed\""))
-  assert_true(diff_text.contains("\"decl:openapi-spec:openapi-spec::openapi::payment.yaml::createPayment\""))
+  assert_true(
+    diff_text.contains("\"kind\": \"changed\"") ||
+    diff_text.contains("\"kind\":\"changed\""),
+  )
+  assert_true(
+    diff_text.contains(
+      "\"decl:openapi-spec:openapi-spec::openapi::payment.yaml::createPayment\"",
+    ),
+  )
   assert_true(diff_text.contains("\"beforeRecord\""))
   assert_true(diff_text.contains("\"afterRecord\""))
   assert_true(diff_text.contains("\"statusCodes\""))
   assert_true(diff_text.contains("\"201\""))
-  // R13-1: OpenAPI became-required fires first (required added); statusCodes is in the after record but doesn't determine level
-  // The openapi diff has both "required":true added (breaking) and "statusCodes" added (warning)
-  // required takes priority → breaking + openapi-became-required
-  assert_true(diff_text.contains("\"semanticCategory\": \"openapi-became-required\"") || diff_text.contains("\"semanticCategory\":\"openapi-became-required\""))
+  // A002: OpenAPI findings can accumulate on one changed declaration.
+  assert_true(
+    diff_text.contains("\"code\": \"openapi-became-required\"") ||
+    diff_text.contains("\"code\":\"openapi-became-required\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"openapi-status-codes-added\"") ||
+    diff_text.contains("\"code\":\"openapi-status-codes-added\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"openapi-media-types-added\"") ||
+    diff_text.contains("\"code\":\"openapi-media-types-added\""),
+  )
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "diff marks openapi deeper status and schema narrowing findings" {
+  let repo = tmp_diff_repo("openapi-deeper-rules")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+  @fs.create_dir("\{repo}/dist/base")
+  @fs.create_dir("\{repo}/dist/target")
+
+  write_manifest(
+    "\{repo}/dist/base/manifest.json",
+    "pkg:openapi/acme/payment-api@2026.03.01",
+    "openapi-spec",
+  )
+  write_manifest(
+    "\{repo}/dist/target/manifest.json",
+    "pkg:openapi/acme/payment-api@2026.04.01",
+    "openapi-spec",
+  )
+
+  let base_declarations =
+    #|{"id":"decl:openapi-spec:openapi-spec::openapi::payment.yaml::getPayment","kind":"operation","path":"openapi/payment.yaml","signature":"operation getPayment","shape":{"kind":"operation","subkind":"operation","form":"symbol","signature":"operation getPayment"},"language_specific":{"profile":"openapi-spec","server":"none","openapi":{"operationId":"getPayment","statusCodes":["200","404"],"mediaTypes":["application/json"]}},"location":{"uri":"openapi/payment.yaml","startLine":20,"endLine":20}}
+    #|{"id":"decl:openapi-spec:openapi-spec::openapi::payment.yaml::Payment.oneOf","kind":"oneOf","path":"openapi/payment.yaml","signature":"oneOf:","shape":{"kind":"oneOf","subkind":"oneOf","form":"symbol","signature":"oneOf:"},"language_specific":{"profile":"openapi-spec","server":"none","openapi":{"memberRefs":["#/components/schemas/CardPayment","#/components/schemas/BankPayment"]}},"location":{"uri":"openapi/payment.yaml","startLine":140,"endLine":140}}
+    #|
+  let target_declarations =
+    #|{"id":"decl:openapi-spec:openapi-spec::openapi::payment.yaml::getPayment","kind":"operation","path":"openapi/payment.yaml","signature":"operation getPayment","shape":{"kind":"operation","subkind":"operation","form":"symbol","signature":"operation getPayment"},"language_specific":{"profile":"openapi-spec","server":"none","openapi":{"operationId":"getPayment","statusCodes":["200"],"mediaTypes":["application/json"]}},"location":{"uri":"openapi/payment.yaml","startLine":20,"endLine":20}}
+    #|{"id":"decl:openapi-spec:openapi-spec::openapi::payment.yaml::Payment.oneOf","kind":"oneOf","path":"openapi/payment.yaml","signature":"oneOf:","shape":{"kind":"oneOf","subkind":"oneOf","form":"symbol","signature":"oneOf:"},"language_specific":{"profile":"openapi-spec","server":"none","openapi":{"memberRefs":["#/components/schemas/CardPayment"]}},"location":{"uri":"openapi/payment.yaml","startLine":140,"endLine":140}}
+    #|
+
+  write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
+  write_records("\{repo}/dist/base/symbols.ndjson", "")
+  write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
+  write_records("\{repo}/dist/target/symbols.ndjson", "")
+
+  let out = run({ repo, since: None, include_test_changes: false })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("openapi deeper diff should succeed")
+  }
+
+  let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("openapi deeper diff output should exist")
+      ""
+    }
+  }
+  assert_true(
+    diff_text.contains("\"code\": \"openapi-response-status-removed\"") ||
+    diff_text.contains("\"code\":\"openapi-response-status-removed\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"openapi-response-schema-narrowed\"") ||
+    diff_text.contains("\"code\":\"openapi-response-schema-narrowed\""),
+  )
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "diff includes semanticDiff in changed entries" {
-  let repo = "src/cmd/diff/tmp_diff_semantic_diff"
+  let repo = tmp_diff_repo("semantic-diff")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -635,19 +821,28 @@ test "diff includes semanticDiff in changed entries" {
 
   assert_true(diff_text.contains("\"kind\": \"changed\""))
   assert_true(diff_text.contains("\"semanticDiff\""))
+  assert_true(diff_text.contains("\"findings\""))
   assert_true(diff_text.contains("\"changedFields\""))
   // both shape and language_specific changed
   assert_true(diff_text.contains("\"shape\""))
   assert_true(diff_text.contains("\"language_specific\""))
   assert_true(diff_text.contains("\"shapeDiff\""))
   assert_true(diff_text.contains("\"languageSpecificDiff\""))
+  assert_true(
+    diff_text.contains("\"code\": \"go-pointer-receiver-changed\"") ||
+    diff_text.contains("\"code\":\"go-pointer-receiver-changed\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"go-signature-changed\"") ||
+    diff_text.contains("\"code\":\"go-signature-changed\""),
+  )
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
 test "diff includes componentDiff in changed component entries" {
-  let repo = "src/cmd/diff/tmp_diff_component_diff"
+  let repo = tmp_diff_repo("component-diff")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -676,10 +871,7 @@ test "diff includes componentDiff in changed component entries" {
   let target_component =
     #|{"id":"pkg:npm/react","kind":"component","path":"package.json","signature":"library react@19.0.0","version":"19.0.0","purl":"pkg:npm/react@19.0.0","componentType":"library","scope":"required","location":{"uri":"package.json","startLine":1,"endLine":1}}
     #|
-  write_records(
-    "\{repo}/dist/base/software-components.ndjson",
-    base_component,
-  )
+  write_records("\{repo}/dist/base/software-components.ndjson", base_component)
   write_records(
     "\{repo}/dist/target/software-components.ndjson",
     target_component,
@@ -702,6 +894,10 @@ test "diff includes componentDiff in changed component entries" {
   assert_true(diff_text.contains("\"kind\": \"changed\""))
   assert_true(diff_text.contains("pkg:npm/react"))
   assert_true(diff_text.contains("\"semanticDiff\""))
+  assert_true(
+    diff_text.contains("\"findings\": []") ||
+    diff_text.contains("\"findings\":[]"),
+  )
   assert_true(diff_text.contains("\"componentDiff\""))
   assert_true(diff_text.contains("\"upgradeKind\""))
   assert_true(
@@ -718,7 +914,7 @@ test "diff includes componentDiff in changed component entries" {
 
 ///|
 test "diff includes richer records for added removed and deprecated declarations" {
-  let repo = "src/cmd/diff/tmp_diff_handoff_records"
+  let repo = tmp_diff_repo("handoff-records")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -767,11 +963,27 @@ test "diff includes richer records for added removed and deprecated declarations
   assert_true(diff_text.contains("\"kind\": \"added\""))
   assert_true(diff_text.contains("\"kind\": \"removed\""))
   assert_true(diff_text.contains("\"kind\": \"deprecated\""))
-  assert_true(diff_text.contains("decl:go-module:go-module::main.go::AddedGreet"))
-  assert_true(diff_text.contains("decl:go-module:go-module::main.go::RemovedGreet"))
+  assert_true(
+    diff_text.contains("decl:go-module:go-module::main.go::AddedGreet"),
+  )
+  assert_true(
+    diff_text.contains("decl:go-module:go-module::main.go::RemovedGreet"),
+  )
   assert_true(diff_text.contains("decl:go-module:go-module::main.go::OldGreet"))
   assert_true(diff_text.contains("\"afterRecord\""))
   assert_true(diff_text.contains("\"beforeRecord\""))
+  assert_true(
+    diff_text.contains("\"code\": \"new-declaration\"") ||
+    diff_text.contains("\"code\":\"new-declaration\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"removed-declaration\"") ||
+    diff_text.contains("\"code\":\"removed-declaration\""),
+  )
+  assert_true(
+    diff_text.contains("\"code\": \"deprecated-declaration\"") ||
+    diff_text.contains("\"code\":\"deprecated-declaration\""),
+  )
 
   cleanup_tmp_repo(repo)
 }

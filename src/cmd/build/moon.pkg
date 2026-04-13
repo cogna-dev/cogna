@@ -2,11 +2,17 @@ import {
   "gmlewis/gzip" @gzip,
   "gmlewis/io" @gio,
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/json" @json,
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/lib/shell" @shell,
-  "yufeiminds/codeiq/lib/sbom" @sbom,
+  "yufeiminds/codeiq/cmd/build/shell" @build_shell,
+  "yufeiminds/codeiq/extractors" @extract,
+  "yufeiminds/codeiq/extractors/go" @extract_go,
+  "yufeiminds/codeiq/extractors/rust" @extract_rust,
+  "yufeiminds/codeiq/sbom/snapshot" @sbom_snapshot,
+  "yufeiminds/codeiq/policy" @policy_catalog,
+  "yufeiminds/codeiq/sbom" @sbom,
   "yufeiminds/codeiq/lib/hcl" @hcl,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/config" @config,
@@ -14,6 +20,7 @@ import {
 }
 
 import {
+  "yufeiminds/codeiq/cmd/build/shell" @build_shell,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/json" @json,
 } for "test"

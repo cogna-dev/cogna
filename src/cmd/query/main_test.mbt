@@ -27,6 +27,11 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 }
 
 ///|
+fn tmp_query_repo(name : String) -> String {
+  "/tmp/codeiq-query-\{name}"
+}
+
+///|
 fn write_query(path : String) -> Unit {
   let query : Json = {
     "schemaVersion": "ciq-query/v1",
@@ -41,7 +46,7 @@ fn write_query(path : String) -> Unit {
 
 ///|
 test "query generates ciq result from query file" {
-  let repo = "src/cmd/query/tmp_query_repo"
+  let repo = tmp_query_repo("repo")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -56,7 +61,7 @@ test "query generates ciq result from query file" {
 
   inspect(
     result.display(),
-    content="Generated CIQ result at src/cmd/query/tmp_query_repo/query.result.json",
+    content="Generated CIQ result at /tmp/codeiq-query-repo/query.result.json",
   )
 
   let result_json = @fs.read_file_to_string("\{repo}/query.result.json") catch {
@@ -79,7 +84,7 @@ test "query generates ciq result from query file" {
 
 ///|
 test "query uses local declarations when repo is provided" {
-  let repo = "src/cmd/query/tmp_query_repo_with_bundle"
+  let repo = tmp_query_repo("repo-with-bundle")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -124,7 +129,7 @@ test "query uses local declarations when repo is provided" {
 
 ///|
 test "query preserves shape and language_specific fields in matches" {
-  let repo = "src/cmd/query/tmp_query_repo_rich_matches"
+  let repo = tmp_query_repo("repo-rich-matches")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -169,7 +174,9 @@ test "query preserves shape and language_specific fields in matches" {
   assert_true(result_json.contains("\"*Greeter\""))
   assert_true(result_json.contains("\"path\": \"main.go\""))
   assert_true(result_json.contains("\"name\": \"Greet\""))
-  assert_true(result_json.contains("\"canonical_name\": \"go-module::main.go::Greet\""))
+  assert_true(
+    result_json.contains("\"canonical_name\": \"go-module::main.go::Greet\""),
+  )
   assert_true(result_json.contains("\"language\": \"go\""))
   assert_true(result_json.contains("\"baselineRole\": \"baseline\""))
   assert_true(result_json.contains("\"visibility\": \"public\""))
@@ -183,7 +190,7 @@ test "query preserves shape and language_specific fields in matches" {
 
 ///|
 test "query uses symbols when declaration kind does not match" {
-  let repo = "src/cmd/query/tmp_query_repo_symbols"
+  let repo = tmp_query_repo("repo-symbols")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -233,8 +240,61 @@ test "query uses symbols when declaration kind does not match" {
 }
 
 ///|
+test "query infers candidates across kinds when selector kind is omitted" {
+  let repo = tmp_query_repo("repo-inferred-kind")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+  @fs.create_dir("\{repo}/dist")
+
+  let query_path = "\{repo}/query.json"
+  let query : Json = {
+    "schemaVersion": "ciq-query/v1",
+    "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+    "selector": { "path": "openapi/payment.yaml" },
+    "intent": "lookup",
+    "repo": repo,
+  }
+  @fs.write_string_to_file(query_path, query.stringify(indent=2)) catch {
+    _ => abort("failed to write query fixture")
+  }
+
+  let declarations =
+    #|{"id":"decl:openapi:payment:create","kind":"operation","path":"openapi/payment.yaml","canonical_name":"payment.api.create","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
+    #|
+  let symbols =
+    #|{"id":"sym:openapi:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
+    #|
+  @fs.write_string_to_file("\{repo}/dist/declarations.ndjson", declarations) catch {
+    _ => abort("failed to write declarations fixture")
+  }
+  @fs.write_string_to_file("\{repo}/dist/symbols.ndjson", symbols) catch {
+    _ => abort("failed to write symbols fixture")
+  }
+
+  let out = run({ query_file: query_path })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("query should succeed")
+  }
+
+  let result_json = @fs.read_file_to_string("\{repo}/query.result.json") catch {
+    _ => {
+      cleanup_tmp_repo(repo)
+      fail("query result should exist")
+      ""
+    }
+  }
+  assert_true(result_json.contains("operation createPayment"))
+  assert_true(result_json.contains("symbol createPayment"))
+  assert_true(result_json.contains("decl:openapi:payment:create"))
+  assert_true(result_json.contains("sym:openapi:payment:create"))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
 test "query uses software components when component kind is requested" {
-  let repo = "src/cmd/query/tmp_query_repo_components"
+  let repo = tmp_query_repo("repo-components")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -254,7 +314,10 @@ test "query uses software components when component kind is requested" {
   let components =
     #|{"id":"pkg:npm/react@18.2.0","kind":"component","path":"package.json","signature":"library react@18.2.0","location":{"uri":"package.json","startLine":1,"endLine":1}}
     #|
-  @fs.write_string_to_file("\{repo}/dist/software-components.ndjson", components) catch {
+  @fs.write_string_to_file(
+    "\{repo}/dist/software-components.ndjson",
+    components,
+  ) catch {
     _ => abort("failed to write components fixture")
   }
 
@@ -279,7 +342,7 @@ test "query uses software components when component kind is requested" {
 
 ///|
 test "query fails when schemaVersion is invalid" {
-  let repo = "src/cmd/query/tmp_query_bad_schema"
+  let repo = tmp_query_repo("bad-schema")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
@@ -308,7 +371,7 @@ test "query fails when schemaVersion is invalid" {
 
 ///|
 test "query preserves richer rust language_specific facts in matches" {
-  let repo = "src/cmd/query/tmp_query_repo_rust_rich_matches"
+  let repo = tmp_query_repo("repo-rust-rich-matches")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -347,8 +410,13 @@ test "query preserves richer rust language_specific facts in matches" {
   }
   assert_true(result_json.contains("\"language_specific\""))
   assert_true(result_json.contains("\"rust\""))
-  assert_true(result_json.contains("\"externAbi\": \"C\"") || result_json.contains("\"externAbi\":\"C\""))
-  assert_true(result_json.contains("\"canonical_name\": \"rust-crate::lib.rs::c_add\""))
+  assert_true(
+    result_json.contains("\"externAbi\": \"C\"") ||
+    result_json.contains("\"externAbi\":\"C\""),
+  )
+  assert_true(
+    result_json.contains("\"canonical_name\": \"rust-crate::lib.rs::c_add\""),
+  )
   assert_true(result_json.contains("\"source_refs\""))
   assert_true(result_json.contains("\"relations\""))
 
@@ -357,7 +425,7 @@ test "query preserves richer rust language_specific facts in matches" {
 
 ///|
 test "query preserves terraform language_specific facts in matches" {
-  let repo = "src/cmd/query/tmp_query_repo_terraform_rich_matches"
+  let repo = tmp_query_repo("repo-terraform-rich-matches")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -396,10 +464,17 @@ test "query preserves terraform language_specific facts in matches" {
   }
   assert_true(result_json.contains("\"language_specific\""))
   assert_true(result_json.contains("\"terraform\""))
-  assert_true(result_json.contains("\"preventDestroy\": true") || result_json.contains("\"preventDestroy\":true"))
+  assert_true(
+    result_json.contains("\"preventDestroy\": true") ||
+    result_json.contains("\"preventDestroy\":true"),
+  )
   assert_true(result_json.contains("\"ignoreChanges\""))
   assert_true(result_json.contains("aws.east"))
-  assert_true(result_json.contains("\"canonical_name\": \"terraform-module::main.tf::aws_vpc.main\""))
+  assert_true(
+    result_json.contains(
+      "\"canonical_name\": \"terraform-module::main.tf::aws_vpc.main\"",
+    ),
+  )
   assert_true(result_json.contains("\"relations\""))
   assert_true(result_json.contains("\"uses_provider\""))
 
@@ -408,7 +483,7 @@ test "query preserves terraform language_specific facts in matches" {
 
 ///|
 test "query preserves openapi language_specific facts in matches" {
-  let repo = "src/cmd/query/tmp_query_repo_openapi_rich_matches"
+  let repo = tmp_query_repo("repo-openapi-rich-matches")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
@@ -450,7 +525,11 @@ test "query preserves openapi language_specific facts in matches" {
   assert_true(result_json.contains("\"201\""))
   assert_true(result_json.contains("application/json"))
   assert_true(result_json.contains("callbackUrl"))
-  assert_true(result_json.contains("\"canonical_name\": \"openapi-spec::openapi::payment.yaml::createPayment\""))
+  assert_true(
+    result_json.contains(
+      "\"canonical_name\": \"openapi-spec::openapi::payment.yaml::createPayment\"",
+    ),
+  )
   assert_true(result_json.contains("\"baselineRole\": \"baseline\""))
   assert_true(result_json.contains("\"source_refs\""))
 

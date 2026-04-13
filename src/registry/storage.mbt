@@ -291,11 +291,22 @@ pub fn registry_server_base_url(port : Int) -> String {
 }
 
 ///|
+fn join_url(base_url : String, path : String) -> String {
+  if path == "" || path == "/" {
+    return base_url
+  }
+  if base_url.has_suffix("/") && path.has_prefix("/") {
+    base_url[:base_url.length() - 1].to_string() + path
+  } else if !base_url.has_suffix("/") && !path.has_prefix("/") {
+    "\{base_url}/\{path}"
+  } else {
+    base_url + path
+  }
+}
+
+///|
 fn server_bundle_download_url(port : Int, bundle_id : String) -> String {
-  @server_runtime.join_url(
-    registry_server_base_url(port),
-    @registry_lib.bundle_download_path(bundle_id),
-  )
+  join_url(registry_server_base_url(port), @registry_lib.bundle_download_path(bundle_id))
 }
 
 ///|
@@ -356,9 +367,7 @@ pub fn registry_bundle_detail_response(
   guard receipt_out is Ok(receipt) else { return Err(receipt_out.unwrap_err()) }
   let etag = read_etag(
     "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
-  ).unwrap_or(
-    "\"\{bundle_id}\"",
-  )
+  ).unwrap_or("\"\{bundle_id}\"")
   let body : Map[String, Json] = {
     "schemaVersion": Json::string("codeiq-registry-bundle-detail/v1"),
     "bundleId": Json::string(bundle_id),
@@ -389,7 +398,7 @@ pub fn registry_bundle_detail_response(
 ///|
 pub fn registry_bundle_download_http(
   bundle_id : String,
-) -> Result[@server_runtime.HttpResponse, @cli.CliError] {
+) -> Result[@registry_runtime.HttpResponse, @cli.CliError] {
   let path_out = bundle_path_for_bundle_id(bundle_id)
   guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
   let bytes = @fs.read_file_to_bytes(path) catch {
@@ -404,11 +413,9 @@ pub fn registry_bundle_download_http(
   }
   let etag = read_etag(
     "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
-  ).unwrap_or(
-    "\"\{bundle_id}\"",
-  )
+  ).unwrap_or("\"\{bundle_id}\"")
   headers["ETag"] = etag
-  Ok(@server_runtime.binary_response(200, bytes, headers~))
+  Ok(@registry_runtime.binary_response(200, bytes, headers~))
 }
 
 ///|

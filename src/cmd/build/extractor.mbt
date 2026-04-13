@@ -3,8 +3,6 @@ priv struct ExtractOutput {
   declarations_text : String
   symbols_text : String
   mode : String
-  server : String
-  version : String
   fallback : Bool
   declaration_count : Int
   symbol_count : Int
@@ -92,21 +90,6 @@ fn terraform_provider_json(info : TerraformProviderInfo) -> Json {
 }
 
 ///|
-fn declaration_id(profile : String, path : String, name : String) -> String {
-  let canonical = canonical_name(profile, path, name)
-  "decl:\{profile}:\{canonical}"
-}
-
-///|
-fn append_relation(record : Json, kind : String, target : String) -> Unit {
-  guard record is Object(record_object) else { return }
-  match record_object.get("relations") {
-    Some(Array(relations)) => push_unique_relation(relations, kind, target)
-    _ => ()
-  }
-}
-
-///|
 fn set_terraform_providers(
   record : Json,
   providers : Array[TerraformProviderInfo],
@@ -115,7 +98,8 @@ fn set_terraform_providers(
     return
   }
   guard record is Object(record_object) else { return }
-  guard record_object.get("language_specific") is Some(Object(language_specific)) else {
+  guard record_object.get("language_specific")
+    is Some(Object(language_specific)) else {
     return
   }
   let providers_object : Map[String, Json] = {}
@@ -123,238 +107,6 @@ fn set_terraform_providers(
     providers.map(info => terraform_provider_json(info)),
   )
   language_specific["providers"] = Json::object(providers_object)
-}
-
-///|
-fn last_record(records : Array[Json]) -> Json? {
-  if records.is_empty() {
-    None
-  } else {
-    Some(records[records.length() - 1])
-  }
-}
-
-///|
-fn ensure_shape_object(record : Json) -> Map[String, Json]? {
-  guard record is Object(record_object) else { return None }
-  match record_object.get("shape") {
-    Some(Object(shape)) => Some(shape)
-    _ => None
-  }
-}
-
-///|
-fn ensure_language_specific_profile(
-  record : Json,
-  profile_key : String,
-) -> Map[String, Json]? {
-  guard record is Object(record_object) else { return None }
-  guard record_object.get("language_specific") is Some(Object(language_specific)) else {
-    return None
-  }
-  match language_specific.get(profile_key) {
-    Some(Object(profile_object)) => Some(profile_object)
-    _ => {
-      let profile_object : Map[String, Json] = {}
-      language_specific[profile_key] = Json::object(profile_object)
-      Some(profile_object)
-    }
-  }
-}
-
-///|
-fn set_shape_string(record : Json, key : String, value : String) -> Unit {
-  if value == "" {
-    return
-  }
-  guard ensure_shape_object(record) is Some(shape) else { return }
-  shape[key] = Json::string(value)
-}
-
-///|
-fn set_shape_string_array(record : Json, key : String, values : Array[String]) -> Unit {
-  if values.is_empty() {
-    return
-  }
-  guard ensure_shape_object(record) is Some(shape) else { return }
-  shape[key] = Json::array(values.map(Json::string))
-}
-
-///|
-fn put_shape_string_array(record : Json, key : String, values : Array[String]) -> Unit {
-  guard ensure_shape_object(record) is Some(shape) else { return }
-  shape[key] = Json::array(values.map(Json::string))
-}
-
-///|
-fn set_language_specific_string(
-  record : Json,
-  profile_key : String,
-  key : String,
-  value : String,
-) -> Unit {
-  if value == "" {
-    return
-  }
-  guard ensure_language_specific_profile(record, profile_key) is Some(profile_object) else {
-    return
-  }
-  profile_object[key] = Json::string(value)
-}
-
-///|
-fn set_language_specific_bool(
-  record : Json,
-  profile_key : String,
-  key : String,
-  value : Bool,
-) -> Unit {
-  guard ensure_language_specific_profile(record, profile_key) is Some(profile_object) else {
-    return
-  }
-  profile_object[key] = Json::boolean(value)
-}
-
-///|
-fn set_language_specific_string_array(
-  record : Json,
-  profile_key : String,
-  key : String,
-  values : Array[String],
-) -> Unit {
-  if values.is_empty() {
-    return
-  }
-  guard ensure_language_specific_profile(record, profile_key) is Some(profile_object) else {
-    return
-  }
-  profile_object[key] = Json::array(values.map(Json::string))
-}
-
-///|
-fn shape_string(record : Json, key : String) -> String {
-  guard ensure_shape_object(record) is Some(shape) else { return "" }
-  match shape.get(key) {
-    Some(String(value)) => value
-    _ => ""
-  }
-}
-
-///|
-fn language_specific_profile_string(
-  record : Json,
-  profile_key : String,
-  key : String,
-) -> String {
-  guard record is Object(record_object) else { return "" }
-  guard record_object.get("language_specific") is Some(Object(language_specific)) else {
-    return ""
-  }
-  guard language_specific.get(profile_key) is Some(Object(profile_object)) else {
-    return ""
-  }
-  match profile_object.get(key) {
-    Some(String(value)) => value
-    _ => ""
-  }
-}
-
-///|
-fn language_specific_profile_bool(
-  record : Json,
-  profile_key : String,
-  key : String,
-) -> Bool? {
-  guard record is Object(record_object) else { return None }
-  guard record_object.get("language_specific") is Some(Object(language_specific)) else {
-    return None
-  }
-  guard language_specific.get(profile_key) is Some(Object(profile_object)) else {
-    return None
-  }
-  match profile_object.get(key) {
-    Some(value) => parse_bool_literal(value.stringify())
-    _ => None
-  }
-}
-
-///|
-fn set_record_relations(record : Json, relations : Array[Json]) -> Unit {
-  guard record is Object(record_object) else { return }
-  record_object["relations"] = Json::array(relations)
-}
-
-///|
-fn filter_record_relations(record : Json, removed_kinds : Array[String]) -> Array[Json] {
-  let filtered : Array[Json] = []
-  guard record is Object(record_object) else { return filtered }
-  guard record_object.get("relations") is Some(Array(relations)) else {
-    return filtered
-  }
-  for i in 0..<relations.length() {
-    guard relations[i] is Object(relation_object) else { continue }
-    let kind = match relation_object.get("kind") {
-      Some(String(value)) => value
-      _ => ""
-    }
-    let mut removed = false
-    for j in 0..<removed_kinds.length() {
-      if kind == removed_kinds[j] {
-        removed = true
-        break
-      }
-    }
-    if !removed {
-      filtered.push(relations[i])
-    }
-  }
-  filtered
-}
-
-///|
-fn append_unique_string(values : Array[String], value : String) -> Unit {
-  let trimmed = trim_spaces(value)
-  if trimmed == "" {
-    return
-  }
-  for i in 0..<values.length() {
-    if values[i] == trimmed {
-      return
-    }
-  }
-  values.push(trimmed)
-}
-
-///|
-fn contains_string(values : Array[String], target : String) -> Bool {
-  for i in 0..<values.length() {
-    if values[i] == target {
-      return true
-    }
-  }
-  false
-}
-
-///|
-fn matching_delimiter_index(
-  value : String,
-  start : Int,
-  open_char : UInt16,
-  close_char : UInt16,
-) -> Int? {
-  let mut depth = 0
-  for i in start..<value.length() {
-    let c = value.code_unit_at(i)
-    if c == open_char {
-      depth = depth + 1
-    } else if c == close_char {
-      depth = depth - 1
-      if depth == 0 {
-        return Some(i)
-      }
-    }
-  }
-  None
 }
 
 fn split_top_level(value : String, delimiter : UInt16) -> Array[String] {
@@ -390,7 +142,11 @@ fn split_top_level(value : String, delimiter : UInt16) -> Array[String] {
       if angle > 0 {
         angle = angle - 1
       }
-    } else if c == delimiter && paren == 0 && bracket == 0 && brace == 0 && angle == 0 {
+    } else if c == delimiter &&
+      paren == 0 &&
+      bracket == 0 &&
+      brace == 0 &&
+      angle == 0 {
       parts.push(value[start:i].to_string())
       start = i + 1
     }
@@ -483,16 +239,6 @@ fn strip_braces(value : String) -> String {
     out = out.strip_suffix(";").unwrap_or(out).to_string() |> trim_spaces
   }
   out
-}
-
-///|
-fn starts_with_any(value : String, prefixes : Array[String]) -> Bool {
-  for i in 0..<prefixes.length() {
-    if value.has_prefix(prefixes[i]) {
-      return true
-    }
-  }
-  false
 }
 
 ///|
@@ -652,8 +398,41 @@ fn leading_spaces(line : String) -> Int {
 ///|
 fn profile_mode(profile : String) -> (String, String) {
   match profile {
-    "go-module" => ("lsp-assisted", "gopls")
-    "rust-crate" => ("lsp-assisted", "rust-analyzer")
+    "go-module" => ("parser-first", "gopls")
+    "rust-crate" => ("parser-first", "rust-analyzer")
+    "terraform-module" => ("parser-first", "hcl-parser")
+    "openapi-spec" => ("parser-only", "none")
+    "policy-bundle" => ("policy-bundle", "opa")
+    _ => ("parser-only", "none")
+  }
+}
+
+///|
+fn resolve_backend_override() -> String {
+  match @sys.get_env_var("CODEIQ_EXTRACTOR_BACKEND") {
+    Some("native") => "native"
+    Some("lsp") => "lsp"
+    Some("canonical") => "canonical"
+    Some("none") => "canonical"
+    _ => "canonical"
+  }
+}
+
+///|
+fn resolve_validation_mode(config : @config.Config) -> String {
+  match @sys.get_env_var("CODEIQ_EXTRACTOR_BACKEND") {
+    Some("lsp") => "lsp"
+    Some("native") => "none"
+    Some("none") => "none"
+    _ => config.validation
+  }
+}
+
+///|
+fn profile_mode_native(profile : String) -> (String, String) {
+  match profile {
+    "go-module" => ("native-assisted", "gopls")
+    "rust-crate" => ("native-assisted", "rust-analyzer")
     "terraform-module" => ("parser-first", "hcl-parser")
     "openapi-spec" => ("parser-only", "none")
     "policy-bundle" => ("policy-bundle", "opa")
@@ -673,7 +452,7 @@ fn lsp_probe(server : String, version_arg : String) -> (String, Bool) {
     return ("none", false)
   }
   let command = "\{shell_escape(server)} \{version_arg}"
-  let (exit_code, stdout, stderr) = @shell.run_command_capture(command)
+  let (exit_code, stdout, stderr) = @build_shell.run_command_capture(command)
   if exit_code != 0 {
     let details = if stderr != "" { stderr } else { stdout }
     let normalized = trim_spaces(details)
@@ -709,331 +488,334 @@ fn lsp_runtime_probe(
 }
 
 ///|
-fn declaration_shape(kind : String, signature : String) -> Json {
-  let form = if signature.contains("(") && signature.contains(")") {
-    "callable"
+fn last_code_unit_index(value : String, target : UInt16) -> Int? {
+  let mut i = value.length()
+  while i > 0 {
+    i = i - 1
+    if value.code_unit_at(i) == target {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn substring_between(
+  value : String,
+  start_marker : String,
+  end_marker : String,
+) -> String? {
+  match segment_after(value, start_marker) {
+    Some(rest) =>
+      match rest.find(end_marker) {
+        Some(idx) => Some(rest[0:idx].to_string())
+        None => None
+      }
+    None => None
+  }
+}
+
+///|
+fn normalize_inventory_name(profile : String, name : String) -> String {
+  let trimmed = trim_spaces(name)
+  if profile == "go-module" {
+    match last_code_unit_index(trimmed, '.') {
+      Some(idx) if idx + 1 < trimmed.length() =>
+        trim_spaces(trimmed[idx + 1:].to_string())
+      _ => trimmed
+    }
+  } else if profile == "rust-crate" {
+    match trimmed.find("<") {
+      Some(idx) => trim_spaces(trimmed[0:idx].to_string())
+      None => trimmed
+    }
   } else {
-    "symbol"
-  }
-  { "kind": kind, "subkind": kind, "form": form, "signature": signature }
-}
-
-///|
-fn signature_type_params(signature : String) -> Array[String] {
-  match signature.find("[") {
-    Some(open_idx) => {
-      let equals_idx = signature.find("=").unwrap_or(signature.length())
-      let paren_idx = signature.find("(").unwrap_or(signature.length())
-      if open_idx > equals_idx || open_idx > paren_idx {
-        return []
-      }
-      match matching_delimiter_index(signature, open_idx, '[', ']') {
-        Some(close_idx) if close_idx > open_idx + 1 =>
-          split_top_level(signature[open_idx + 1:close_idx].to_string(), ',')
-          .map(part => first_token(part))
-          |> unique_trimmed_strings
-        _ => []
-      }
-    }
-    None => {
-      match signature.find("<") {
-        Some(open_idx) => {
-          let equals_idx = signature.find("=").unwrap_or(signature.length())
-          let paren_idx = signature.find("(").unwrap_or(signature.length())
-          if open_idx > equals_idx || open_idx > paren_idx {
-            return []
-          }
-          match matching_delimiter_index(signature, open_idx, '<', '>') {
-            Some(close_idx) if close_idx > open_idx + 1 =>
-              split_top_level(signature[open_idx + 1:close_idx].to_string(), ',')
-              .map(part => first_token(part))
-              |> unique_trimmed_strings
-            _ => []
-          }
-        }
-        None => []
-      }
-    }
+    trimmed
   }
 }
 
 ///|
-fn signature_param_types(signature : String) -> Array[String] {
-  match signature.find("(") {
-    Some(open_idx) =>
-      match matching_delimiter_index(signature, open_idx, '(', ')') {
-        Some(close_idx) if close_idx > open_idx + 1 => {
-          let body = signature[open_idx + 1:close_idx].to_string()
-          if trim_spaces(body) == "" {
-            []
-          } else {
-            split_top_level(body, ',')
-            .map(part => {
-              let candidate = trim_spaces(part)
-              if candidate == "" {
-                ""
-              } else {
-                match candidate.find(":") {
-                  Some(idx) => candidate[idx + 1:].to_string() |> trim_spaces
-                  None =>
-                    match candidate.find(" ") {
-                      Some(idx) => candidate[idx + 1:].to_string() |> trim_spaces
-                      None => candidate
-                    }
-                }
-              }
-            })
-            |> unique_trimmed_strings
-          }
-        }
-        _ => []
-      }
-    None => []
+fn is_go_exported_name(name : String) -> Bool {
+  if name == "" {
+    return false
+  }
+  let first = name.code_unit_at(0)
+  first >= 'A' && first <= 'Z'
+}
+
+///|
+fn comparable_inventory_kind(kind : String) -> String? {
+  match kind {
+    "callable" => Some("callable")
+    "function" => Some("callable")
+    "method" => Some("callable")
+    "struct" => Some("struct")
+    "interface" => Some("interface")
+    "enum" => Some("enum")
+    "union" => Some("union")
+    "trait" => Some("trait")
+    "type_alias" => Some("type_alias")
+    "const" => Some("const")
+    "static" => Some("static")
+    "var" => Some("var")
+    "module" => Some("module")
+    "macro" => Some("macro")
+    _ => None
   }
 }
 
 ///|
-fn signature_return_types(signature : String) -> Array[String] {
-  let ret = parse_return_type(signature)
-  if ret == "" {
-    []
-  } else {
-    unique_trimmed_strings([ret])
+fn inventory_key(profile : String, kind : String, name : String) -> String? {
+  guard comparable_inventory_kind(kind) is Some(normalized_kind) else {
+    return None
   }
+  let normalized_name = normalize_inventory_name(profile, name)
+  if normalized_name == "" {
+    return None
+  }
+  if profile == "go-module" && !is_go_exported_name(normalized_name) {
+    return None
+  }
+  Some("\{normalized_kind}|\{normalized_name}")
 }
 
 ///|
-fn enrich_shape_metadata(record : Json) -> Unit {
-  let kind = field_string(record, "kind")
-  let name = field_string(record, "name")
-  let signature = field_string(record, "signature")
-  if signature == "" {
-    return
+fn inventory_validation_path_allowed(profile : String, path : String) -> Bool {
+  if path == "" {
+    return true
   }
-  if kind == "method" ||
-    kind == "field" ||
-    kind == "embedded_field" ||
-    kind == "associated_type" ||
-    kind == "associated_const" ||
-    kind == "associated_fn" {
-    match name.find(".") {
-      Some(idx) if idx > 0 =>
-        set_shape_string(record, "owner", name[0:idx].to_string() |> trim_spaces)
-      _ =>
-        match name.find("::") {
-          Some(idx) if idx > 0 =>
-            set_shape_string(record, "owner", name[0:idx].to_string() |> trim_spaces)
-          _ => ()
-        }
-    }
+  if profile == "go-module" && path.has_suffix("_test.go") {
+    return false
   }
-  if kind == "function" ||
-    kind == "method" ||
-    kind == "associated_fn" ||
-    kind == "struct" ||
-    kind == "interface" ||
-    kind == "trait" ||
-    kind == "impl" {
-    set_shape_string_array(record, "type_params", signature_type_params(signature))
-  }
-  if kind == "function" || kind == "method" || kind == "associated_fn" {
-    set_shape_string_array(record, "parameters", signature_param_types(signature))
-    set_shape_string_array(record, "returns", signature_return_types(signature))
-  }
+  true
 }
 
 ///|
-fn parse_first_param(signature : String) -> String {
-  match signature.find("(") {
-    Some(open_idx) =>
-      match signature.find(")") {
-        Some(close_idx) if close_idx > open_idx + 1 => {
-          let body = signature[open_idx + 1:close_idx].to_string()
-            |> trim_spaces
-          if body == "" {
-            ""
-          } else {
-            let first = body.split(",").to_array()[0].to_string() |> trim_spaces
-            match first.find(" ") {
-              Some(space_idx) if space_idx > 0 =>
-                first[space_idx + 1:].to_string() |> trim_spaces
-              _ => first
-            }
-          }
-        }
-        _ => ""
-      }
-    _ => ""
-  }
-}
-
-///|
-fn parse_return_type(signature : String) -> String {
-  match signature.find(")") {
-    Some(close_idx) => {
-      let tail = signature[close_idx + 1:].to_string() |> trim_spaces
-      if tail.has_prefix("{") || tail == "" {
-        return ""
-      }
-      if tail.has_prefix("->") {
-        return tail[2:].to_string() |> trim_spaces |> strip_braces
-      }
-      if tail.has_prefix("(") ||
-        tail.has_prefix("[") ||
-        tail.has_prefix("*") ||
-        tail.has_prefix("&") ||
-        tail.has_prefix("string") ||
-        tail.has_prefix("int") ||
-        tail.has_prefix("bool") ||
-        tail.has_prefix("float") ||
-        tail.has_prefix("byte") ||
-        tail.has_prefix("char") {
-        return strip_braces(tail)
-      }
-      ""
-    }
-    _ => ""
-  }
-}
-
-///|
-fn push_unique_relation(
-  relations : Array[Json],
-  kind : String,
-  target : String,
-) -> Unit {
-  if kind == "" || target == "" {
-    return
-  }
-  let candidate = "\{kind}::\{target}"
-  for i in 0..<relations.length() {
-    guard relations[i] is Object(object) else { continue }
-    let existing_kind = match object.get("kind") {
-      Some(String(value)) => value
-      _ => ""
-    }
-    let existing_target = match object.get("target") {
-      Some(String(value)) => value
-      _ => ""
-    }
-    if "\{existing_kind}::\{existing_target}" == candidate {
-      return
-    }
-  }
-  relations.push({ "kind": kind, "target": target })
-}
-
-///|
-fn declaration_relations_v2(
+fn inventory_validation_declarations(
   profile : String,
-  path : String,
-  kind : String,
-  name : String,
-  signature : String,
+  declarations : Array[Json],
 ) -> Array[Json] {
-  let relations : Array[Json] = []
-  push_unique_relation(relations, "declared_in", "file:\{path}")
-
-  if kind == "struct" ||
-    kind == "enum" ||
-    kind == "interface" ||
-    kind == "trait" ||
-    kind == "module" ||
-    kind == "resource" ||
-    kind == "schema" {
-    push_unique_relation(relations, "contains", "decl:\{profile}::\{name}")
-    push_unique_relation(relations, "has_member", "decl:\{profile}::\{name}")
-  }
-
-  if kind == "function" ||
-    kind == "method" ||
-    kind == "associated_fn" ||
-    kind == "operation" {
-    let first_param = parse_first_param(signature)
-    if first_param != "" {
-      push_unique_relation(
-        relations,
-        "has_parameter",
-        "type:\{profile}::\{first_param}",
-      )
-      push_unique_relation(
-        relations,
-        "references_type",
-        "type:\{profile}::\{first_param}",
-      )
-    }
-    let ret = parse_return_type(signature)
-    if ret != "" {
-      push_unique_relation(relations, "returns", "type:\{profile}::\{ret}")
-      push_unique_relation(
-        relations,
-        "references_type",
-        "type:\{profile}::\{ret}",
-      )
+  let filtered : Array[Json] = []
+  for i in 0..<declarations.length() {
+    if
+      inventory_validation_path_allowed(
+        profile,
+        @extract.field_string(declarations[i], "path"),
+      ) {
+      filtered.push(declarations[i])
     }
   }
+  filtered
+}
 
-  if kind == "impl" {
-    if signature.contains(" for ") {
-      let parts = signature.split(" for ").to_array()
-      if parts.length() >= 2 {
-        let trait_name = parts[0]
-          .to_string()
-          .strip_prefix("impl")
-          .unwrap_or(parts[0].to_string())
-          .to_string()
-          |> trim_spaces
-        let target_type = parts[1].to_string() |> strip_braces |> trim_spaces
-        if trait_name != "" && target_type != "" {
-          push_unique_relation(
-            relations,
-            "implements",
-            "type:\{profile}::\{trait_name}",
-          )
-          push_unique_relation(
-            relations,
-            "references_type",
-            "type:\{profile}::\{target_type}",
-          )
-        }
+///|
+fn inventory_keys_from_declarations(
+  profile : String,
+  declarations : Array[Json],
+) -> Array[String] {
+  let keys : Array[String] = []
+  for i in 0..<declarations.length() {
+    match inventory_key(
+      profile,
+      @extract.field_string(declarations[i], "kind"),
+      @extract.field_string(declarations[i], "name"),
+    ) {
+      Some(key) => @extract.append_unique_string(keys, key)
+      None => ()
+    }
+  }
+  keys.sort()
+  keys
+}
+
+///|
+fn go_symbol_kind(kind : String) -> String? {
+  match kind {
+    "Function" => Some("callable")
+    "Method" => Some("callable")
+    "Struct" => Some("struct")
+    "Interface" => Some("interface")
+    "Constant" => Some("const")
+    "Variable" => Some("var")
+    "Class" => Some("type_alias")
+    _ => None
+  }
+}
+
+///|
+fn rust_symbol_kind(kind : String) -> String? {
+  match kind {
+    "Function" => Some("callable")
+    "Method" => Some("callable")
+    "Struct" => Some("struct")
+    "Enum" => Some("enum")
+    "Union" => Some("union")
+    "Trait" => Some("trait")
+    "TypeAlias" => Some("type_alias")
+    "Const" => Some("const")
+    "Static" => Some("static")
+    "Module" => Some("module")
+    "Macro" => Some("macro")
+    _ => None
+  }
+}
+
+///|
+fn collect_go_lsp_inventory(
+  profile : String,
+  files : Array[String],
+  repo : String,
+) -> Result[Array[String], @cli.CliError] {
+  let keys : Array[String] = []
+  for i in 0..<files.length() {
+    let relative_path = files[i]
+    if !relative_path.has_suffix(".go") {
+      continue
+    }
+    let absolute_path = "\{repo}/\{relative_path}"
+    let command = "gopls symbols \{shell_escape(absolute_path)}"
+    let (exit_code, stdout, stderr) = @build_shell.run_command_capture(command)
+    if exit_code != 0 {
+      let details = if stderr != "" { trim_spaces(stderr) } else { trim_spaces(stdout) }
+      let message_details = if details == "" { "command failed" } else { details }
+      return Err(
+        extractor_error(
+          "gopls symbols failed for \{relative_path}: \{message_details}",
+        ),
+      )
+    }
+    for raw_line in stdout.split("\n") {
+      let line = raw_line.to_string()
+      if line.has_prefix("\t") {
+        continue
       }
-    } else {
-      let target = signature
-        .strip_prefix("impl")
-        .unwrap_or(signature)
-        .to_string()
-        |> strip_braces
-        |> trim_spaces
-      if target != "" {
-        push_unique_relation(
-          relations,
-          "references_type",
-          "type:\{profile}::\{target}",
-        )
+      let trimmed = trim_spaces(line)
+      if trimmed == "" {
+        continue
+      }
+      guard last_code_unit_index(trimmed, ' ') is Some(last_space) else { continue }
+      let before_range = trimmed[0:last_space].to_string()
+      guard last_code_unit_index(before_range, ' ') is Some(kind_space) else {
+        continue
+      }
+      let raw_name = trim_spaces(before_range[0:kind_space].to_string())
+      let raw_kind = trim_spaces(before_range[kind_space + 1:].to_string())
+        match go_symbol_kind(raw_kind) {
+          Some(kind) =>
+            match inventory_key(profile, kind, raw_name) {
+              Some(key) => @extract.append_unique_string(keys, key)
+              None => ()
+            }
+          None => ()
       }
     }
   }
+  keys.sort()
+  Ok(keys)
+}
 
-  if kind == "reference" {
-    let reference_target = normalize_reference_target(signature)
-    if reference_target != "" {
-      push_unique_relation(relations, "references_type", reference_target)
+///|
+fn collect_rust_lsp_inventory(
+  profile : String,
+  files : Array[String],
+  repo : String,
+) -> Result[Array[String], @cli.CliError] {
+  let keys : Array[String] = []
+  for i in 0..<files.length() {
+    let relative_path = files[i]
+    if !relative_path.has_suffix(".rs") {
+      continue
+    }
+    let absolute_path = "\{repo}/\{relative_path}"
+    let command = "rust-analyzer symbols < \{shell_escape(absolute_path)}"
+    let (exit_code, stdout, stderr) = @build_shell.run_command_capture(command)
+    if exit_code != 0 {
+      let details = if stderr != "" { trim_spaces(stderr) } else { trim_spaces(stdout) }
+      let message_details = if details == "" { "command failed" } else { details }
+      return Err(
+        extractor_error(
+          "rust-analyzer symbols failed for \{relative_path}: \{message_details}",
+        ),
+      )
+    }
+    for raw_line in stdout.split("\n") {
+      let line = trim_spaces(raw_line.to_string())
+      if line == "" {
+        continue
+      }
+      guard substring_between(line, "label: \"", "\"") is Some(raw_name) else {
+        continue
+      }
+      guard substring_between(line, "kind: SymbolKind(", ")") is Some(raw_kind) else {
+        continue
+      }
+      match rust_symbol_kind(raw_kind) {
+        Some(kind) =>
+          match inventory_key(profile, kind, raw_name) {
+            Some(key) => @extract.append_unique_string(keys, key)
+            None => ()
+          }
+        None => ()
+      }
     }
   }
+  keys.sort()
+  Ok(keys)
+}
 
-  if kind == "meta_for_each" || kind == "meta_depends_on" {
-    let parts = signature.split("=").to_array()
-    let target = if parts.length() >= 2 {
-      parts[1].to_string() |> trim_spaces
-    } else {
-      ""
-    }
-    if target != "" {
-      push_unique_relation(relations, "references_type", target)
+///|
+fn collect_lsp_inventory(
+  config : @config.Config,
+  repo : String,
+  files : Array[String],
+) -> Result[Array[String], @cli.CliError] {
+  match config.profile {
+    "go-module" => collect_go_lsp_inventory(config.profile, files, repo)
+    "rust-crate" => collect_rust_lsp_inventory(config.profile, files, repo)
+    _ => Ok([])
+  }
+}
+
+///|
+fn missing_inventory_keys(expected : Array[String], actual : Array[String]) -> Array[String] {
+  let actual_set : Map[String, Bool] = {}
+  for i in 0..<actual.length() {
+    actual_set[actual[i]] = true
+  }
+  let missing : Array[String] = []
+  for i in 0..<expected.length() {
+    if !actual_set.contains(expected[i]) {
+      missing.push(expected[i])
     }
   }
+  missing
+}
 
-  relations
+///|
+fn validate_backend_inventory(
+  profile : String,
+  backend : String,
+  inventory_keys : Array[String],
+  declarations : Array[Json],
+) -> Result[Unit, @cli.CliError] {
+  let canonical_keys = inventory_keys_from_declarations(
+    profile,
+    inventory_validation_declarations(profile, declarations),
+  )
+  let missing = missing_inventory_keys(canonical_keys, inventory_keys)
+  if missing.is_empty() {
+    return Ok(())
+  }
+  let sample = if missing.length() > 6 {
+    missing.view(end=6).to_array().join(", ") + ", ..."
+  } else {
+    missing.join(", ")
+  }
+  Err(
+    extractor_error(
+      "\{backend} inventory missed canonical API items for profile '\{profile}': \{sample}",
+    ),
+  )
 }
 
 ///|
@@ -1049,73 +831,14 @@ fn profile_language(profile : String) -> String {
 }
 
 ///|
-fn canonical_name(profile : String, path : String, name : String) -> String {
-  let scoped = path.replace(old="/", new="::")
-  "\{profile}::\{scoped}::\{name}"
-}
-
-///|
-fn make_declaration(
-  profile : String,
-  server : String,
-  language : String,
-  path : String,
-  line_no : Int,
-  kind : String,
-  name : String,
-  signature : String,
-  docs : String,
-) -> Json {
-  let canonical = canonical_name(profile, path, name)
-  {
-    "id": "decl:\{profile}:\{canonical}",
-    "kind": kind,
-    "name": name,
-    "canonical_name": canonical,
-    "path": path,
-    "signature": signature,
-    "shape": declaration_shape(kind, signature),
-    "visibility": "public",
-    "docs": docs,
-    "baselineRole": "baseline",
-    "language": language,
-    "source_refs": [{ "uri": path, "startLine": line_no, "endLine": line_no }],
-    "relations": declaration_relations_v2(profile, path, kind, name, signature),
-    "location": { "uri": path, "startLine": line_no, "endLine": line_no },
-    "language_specific": { "profile": profile, "server": server },
-  }
-}
-
-///|
 fn enrich_declaration_metadata(record : Json) -> Unit {
-  enrich_shape_metadata(record)
-  match field_string(record, "language") {
-    "go" => enrich_go_record(record)
-    "rust" => enrich_rust_record(record)
+  @extract.enrich_shape_metadata(record)
+  match @extract.field_string(record, "language") {
+    "go" => @extract_go.enrich_record(record)
+    "rust" => @extract_rust.enrich_record(record)
     "terraform" => enrich_terraform_record(record)
     "openapi" => enrich_openapi_record(record)
     _ => ()
-  }
-}
-
-///|
-fn make_symbol(
-  profile : String,
-  path : String,
-  line_no : Int,
-  kind : String,
-  name : String,
-  signature : String,
-) -> Json {
-  let canonical = canonical_name(profile, path, name)
-  {
-    "id": "sym:\{profile}:\{canonical}",
-    "path": "\{path}:\{line_no}",
-    "kind": kind,
-    "name": name,
-    "summary": signature,
-    "owner": path,
-    "location": { "uri": path, "startLine": line_no, "endLine": line_no },
   }
 }
 
@@ -1137,16 +860,16 @@ fn push_record(
     return
   }
   declarations.push(
-    make_declaration(
+    @extract.make_declaration(
       profile, server, language, path, line_no, kind, name, signature, docs,
     ),
   )
-  guard last_record(declarations) is Some(record) else {
-    symbols.push(make_symbol(profile, path, line_no, kind, name, signature))
+  guard @extract.last_record(declarations) is Some(record) else {
+    symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, signature))
     return
   }
   enrich_declaration_metadata(record)
-  symbols.push(make_symbol(profile, path, line_no, kind, name, signature))
+  symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, signature))
 }
 
 ///|
@@ -1166,1681 +889,6 @@ fn push_simple_record(
     declarations, symbols, profile, server, language, path, line_no, kind, name,
     signature, "",
   )
-}
-
-///|
-fn go_names(segment : String) -> Array[String] {
-  let lhs = match segment.find("=") {
-    Some(idx) => segment[0:idx].to_string()
-    None => segment
-  }
-  let normalized = strip_braces(lhs)
-  let names : Array[String] = []
-  let pieces = normalized.split(",").to_array()
-  for i in 0..<pieces.length() {
-    let name = first_token(pieces[i].to_string())
-    if name != "" && name != "_" {
-      names.push(name)
-    }
-  }
-  names
-}
-
-///|
-fn push_go_records(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  line_no : Int,
-  kind : String,
-  names : Array[String],
-  signature : String,
-  docs : String,
-) -> Unit {
-  for i in 0..<names.length() {
-    push_record(
-      declarations,
-      symbols,
-      profile,
-      server,
-      "go",
-      path,
-      line_no,
-      kind,
-      names[i],
-      signature,
-      docs,
-    )
-  }
-}
-
-///|
-fn go_import_name(clean_line : String) -> String {
-  let parts = quoted_parts(clean_line)
-  if parts.length() == 0 {
-    return ""
-  }
-  let import_path = parts[0]
-  let tail = trim_spaces(clean_line[7:].to_string())
-  let import_alias = first_token(tail)
-  if import_alias == "" || import_alias.has_prefix("\"") {
-    import_path
-  } else {
-    "\{import_alias} \{import_path}"
-  }
-}
-
-///|
-fn strip_go_tag(line : String) -> String {
-  match line.find("`") {
-    Some(idx) => line[0:idx].to_string() |> trim_spaces
-    None => line
-  }
-}
-
-///|
-fn go_type_name(signature : String) -> String {
-  let body = signature
-    .strip_prefix("type ")
-    .unwrap_or(signature)
-    .to_string()
-    |> trim_spaces
-  let plain = match body.find("=") {
-    Some(idx) => body[0:idx].to_string() |> trim_spaces
-    None => body
-  }
-  let base = match plain.find("[") {
-    Some(idx) => plain[0:idx].to_string()
-    None => first_token(plain)
-  }
-  trim_spaces(base)
-}
-
-///|
-fn go_method_param_types(signature : String) -> Array[String] {
-  let rest = signature.strip_prefix("func ").unwrap_or(signature).to_string()
-  if !rest.has_prefix("(") {
-    return signature_param_types(signature)
-  }
-  match matching_delimiter_index(rest, 0, '(', ')') {
-    Some(close_idx) if close_idx + 1 < rest.length() =>
-      signature_param_types(rest[close_idx + 1:].to_string() |> trim_spaces)
-    _ => signature_param_types(signature)
-  }
-}
-
-///|
-fn go_return_types_after_params(value : String) -> Array[String] {
-  let tail = strip_braces(trim_spaces(value))
-  if tail == "" {
-    return []
-  }
-  if tail.has_prefix("(") {
-    return match matching_delimiter_index(tail, 0, '(', ')') {
-      Some(close_idx) if close_idx > 1 =>
-        split_top_level(tail[1:close_idx].to_string(), ',') |> unique_trimmed_strings
-      _ => []
-    }
-  }
-  unique_trimmed_strings([tail])
-}
-
-///|
-fn go_function_return_types(signature : String) -> Array[String] {
-  match signature.find("(") {
-    Some(open_idx) =>
-      match matching_delimiter_index(signature, open_idx, '(', ')') {
-        Some(close_idx) if close_idx + 1 < signature.length() =>
-          go_return_types_after_params(signature[close_idx + 1:].to_string())
-        _ => []
-      }
-    None => []
-  }
-}
-
-///|
-fn go_method_return_types(signature : String) -> Array[String] {
-  let rest = signature.strip_prefix("func ").unwrap_or(signature).to_string()
-  if !rest.has_prefix("(") {
-    return go_function_return_types(signature)
-  }
-  match matching_delimiter_index(rest, 0, '(', ')') {
-    Some(close_idx) if close_idx + 1 < rest.length() =>
-      go_function_return_types(rest[close_idx + 1:].to_string() |> trim_spaces)
-    _ => go_function_return_types(signature)
-  }
-}
-
-///|
-fn go_receiver_parts(signature : String) -> (String, Bool) {
-  let rest = signature.strip_prefix("func ").unwrap_or(signature).to_string()
-  if !rest.has_prefix("(") {
-    return ("", false)
-  }
-  match matching_delimiter_index(rest, 0, '(', ')') {
-    Some(close_idx) if close_idx > 1 => {
-      let receiver = trim_spaces(rest[1:close_idx].to_string())
-      let pointer = receiver.contains("*")
-      let base = match receiver.find("*") {
-        Some(idx) => receiver[idx + 1:].to_string()
-        None => receiver
-      }
-      let name = match base.find(" ") {
-        Some(idx) => base[idx + 1:].to_string()
-        None => base
-      }
-      let trimmed = match name.find("[") {
-        Some(idx) => name[0:idx].to_string()
-        None => name
-      }
-      (trim_spaces(trimmed), pointer)
-    }
-    _ => ("", false)
-  }
-}
-
-///|
-fn normalize_go_type_reference(value : String) -> String {
-  let trimmed = strip_braces(trim_spaces(value))
-  if trimmed == "" {
-    return ""
-  }
-  if trimmed.has_prefix("*") {
-    return normalize_go_type_reference(trimmed[1:].to_string())
-  }
-  trimmed
-}
-
-///|
-fn enrich_go_record(record : Json) -> Unit {
-  let kind = field_string(record, "kind")
-  let name = field_string(record, "name")
-  let signature = field_string(record, "signature")
-  let type_params = signature_type_params(signature)
-  set_language_specific_string_array(record, "go", "typeParams", type_params)
-  if kind == "struct" || kind == "interface" {
-    let owner = go_type_name(signature)
-    set_shape_string(record, "owner", owner)
-    set_language_specific_string(record, "go", "owner", owner)
-  }
-  if kind == "field" || kind == "embedded_field" {
-    match name.find(".") {
-      Some(idx) if idx > 0 => {
-        let owner = name[0:idx].to_string()
-        set_shape_string(record, "owner", owner)
-        set_language_specific_string(record, "go", "owner", owner)
-      }
-      _ => ()
-    }
-    let field_type = if kind == "embedded_field" {
-      signature
-    } else {
-      match signature.find(" ") {
-        Some(idx) => signature[idx + 1:].to_string() |> trim_spaces
-        None => ""
-      }
-    }
-    set_language_specific_string(record, "go", "fieldType", field_type)
-    if kind == "embedded_field" {
-      set_language_specific_bool(record, "go", "embedded", true)
-    }
-  }
-  if kind == "import" {
-    let quoted = quoted_parts(signature)
-    if !quoted.is_empty() {
-      set_language_specific_string(record, "go", "importPath", quoted[0])
-    }
-    let import_name = name
-    match import_name.find(" ") {
-      Some(idx) if idx > 0 =>
-        set_language_specific_string(
-          record,
-          "go",
-          "importAlias",
-          import_name[0:idx].to_string() |> trim_spaces,
-        )
-      _ => ()
-    }
-  }
-  if kind == "method" {
-    let (receiver, pointer) = go_receiver_parts(signature)
-    set_language_specific_string(record, "go", "receiver", receiver)
-    set_language_specific_bool(record, "go", "pointerReceiver", pointer)
-    set_shape_string(record, "owner", receiver)
-    set_language_specific_string(record, "go", "owner", receiver)
-    put_shape_string_array(record, "parameters", go_method_param_types(signature))
-    put_shape_string_array(record, "returns", go_method_return_types(signature))
-  }
-}
-
-///|
-fn append_relation_to_record_by_id(
-  declarations : Array[Json],
-  id : String,
-  kind : String,
-  target : String,
-) -> Unit {
-  if id == "" || kind == "" || target == "" {
-    return
-  }
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "id") == id {
-      append_relation(declarations[i], kind, target)
-      return
-    }
-  }
-}
-
-///|
-fn collect_go_embedding_index(
-  declarations : Array[Json],
-) -> Map[String, Array[(String, Bool)]] {
-  let embeddings : Map[String, Array[(String, Bool)]] = {}
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "go" ||
-      field_string(declarations[i], "kind") != "embedded_field" {
-      continue
-    }
-    let owner = shape_string(declarations[i], "owner")
-    let field_type = language_specific_profile_string(
-      declarations[i],
-      "go",
-      "fieldType",
-    )
-    let target = normalize_go_type_reference(field_type)
-    let is_pointer = field_type.has_prefix("*")
-    if owner == "" || target == "" {
-      continue
-    }
-    match embeddings.get(owner) {
-      Some(entries) => entries.push((target, is_pointer))
-      None => embeddings[owner] = [(target, is_pointer)]
-    }
-  }
-  embeddings
-}
-
-///|
-fn go_method_set_types(
-  owner : String,
-  pointer_receiver : Bool,
-  embeddings : Map[String, Array[(String, Bool)]],
-) -> Array[String] {
-  let method_sets : Array[String] = []
-  if owner == "" {
-    return method_sets
-  }
-  if pointer_receiver {
-    append_unique_string(method_sets, "*\{owner}")
-  } else {
-    append_unique_string(method_sets, owner)
-    append_unique_string(method_sets, "*\{owner}")
-  }
-  let mut changed = true
-  while changed {
-    changed = false
-    for embedder, embedded_types in embeddings {
-      let before = method_sets.length()
-      for i in 0..<embedded_types.length() {
-        let (embedded_type, embedded_pointer) = embedded_types[i]
-        let has_value = contains_string(method_sets, embedded_type)
-        let has_pointer = contains_string(method_sets, "*\{embedded_type}")
-        if embedded_pointer {
-          if has_value || has_pointer {
-            append_unique_string(method_sets, embedder)
-            append_unique_string(method_sets, "*\{embedder}")
-          }
-        } else {
-          if has_value {
-            append_unique_string(method_sets, embedder)
-          }
-          if has_value || has_pointer {
-            append_unique_string(method_sets, "*\{embedder}")
-          }
-        }
-      }
-      if method_sets.length() != before {
-        changed = true
-      }
-    }
-  }
-  method_sets
-}
-
-///|
-fn rewrite_go_relations(record : Json, profile : String) -> Unit {
-  let kind = field_string(record, "kind")
-  let signature = field_string(record, "signature")
-  if kind == "function" || kind == "method" {
-    let relations = filter_record_relations(
-      record,
-      ["has_parameter", "returns", "references_type"],
-    )
-    let param_types = if kind == "method" {
-      go_method_param_types(signature)
-    } else {
-      signature_param_types(signature)
-    }
-    for i in 0..<param_types.length() {
-      let ty = normalize_go_type_reference(param_types[i])
-      if ty == "" {
-        continue
-      }
-      push_unique_relation(relations, "has_parameter", "type:\{profile}::\{ty}")
-      push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
-    }
-    let return_types = if kind == "method" {
-      go_method_return_types(signature)
-    } else {
-      go_function_return_types(signature)
-    }
-    for i in 0..<return_types.length() {
-      let ty = normalize_go_type_reference(return_types[i])
-      if ty == "" {
-        continue
-      }
-      push_unique_relation(relations, "returns", "type:\{profile}::\{ty}")
-      push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
-    }
-    set_record_relations(record, relations)
-    return
-  }
-  if kind == "field" || kind == "embedded_field" {
-    let relations = filter_record_relations(record, ["references_type"])
-    let field_type = language_specific_profile_string(record, "go", "fieldType")
-    let ty = normalize_go_type_reference(field_type)
-    if ty != "" {
-      push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
-    }
-    set_record_relations(record, relations)
-  }
-}
-
-///|
-fn postprocess_go_declarations(
-  declarations : Array[Json],
-  profile : String,
-) -> Unit {
-  let type_ids : Map[String, String] = {}
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "go" {
-      continue
-    }
-    let kind = field_string(declarations[i], "kind")
-    if kind == "struct" || kind == "interface" || kind == "type" {
-      let name = field_string(declarations[i], "name")
-      let id = field_string(declarations[i], "id")
-      if name != "" && id != "" {
-        type_ids[name] = id
-      }
-    }
-  }
-
-  let embeddings = collect_go_embedding_index(declarations)
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "go" {
-      continue
-    }
-    rewrite_go_relations(declarations[i], profile)
-  }
-
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "go" {
-      continue
-    }
-    let kind = field_string(declarations[i], "kind")
-    let id = field_string(declarations[i], "id")
-    if kind == "field" || kind == "embedded_field" || kind == "method" {
-      let owner = shape_string(declarations[i], "owner")
-      match type_ids.get(owner) {
-        Some(owner_id) => append_relation_to_record_by_id(
-          declarations,
-          owner_id,
-          "has_member",
-          id,
-        )
-        None => ()
-      }
-    }
-    if kind == "method" {
-      let owner = shape_string(declarations[i], "owner")
-      let pointer_receiver = language_specific_profile_bool(
-        declarations[i],
-        "go",
-        "pointerReceiver",
-      ).unwrap_or(false)
-      let method_set_types = go_method_set_types(owner, pointer_receiver, embeddings)
-      set_language_specific_string_array(
-        declarations[i],
-        "go",
-        "methodSetTypes",
-        method_set_types,
-      )
-      for j in 0..<method_set_types.length() {
-        let owner_type = normalize_go_type_reference(method_set_types[j])
-        match type_ids.get(owner_type) {
-          Some(owner_id) => append_relation_to_record_by_id(
-            declarations,
-            owner_id,
-            "has_member",
-            id,
-          )
-          None => ()
-        }
-      }
-    }
-  }
-}
-
-///|
-fn go_struct_name(line : String, grouped~ : Bool) -> String {
-  let source = if grouped {
-    line
-  } else {
-    line.strip_prefix("type ").unwrap_or(line).to_string()
-  }
-  first_token(source)
-}
-
-///|
-fn extract_go_struct_field(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  line_no : Int,
-  owner : String,
-  line : String,
-  docs : String,
-) -> Unit {
-  let clean = line_before_comment(line) |> trim_spaces |> strip_go_tag
-  if clean == "" || clean == "{" || clean == "}" {
-    return
-  }
-
-  let is_embedded = !clean.contains(" ") && !clean.contains("\t")
-  let raw_name = if is_embedded { clean } else { first_token(clean) }
-  let name = raw_name.strip_prefix("*").unwrap_or(raw_name).to_string()
-  if name == "" {
-    return
-  }
-
-  push_record(
-    declarations,
-    symbols,
-    profile,
-    server,
-    "go",
-    path,
-    line_no,
-    if is_embedded {
-      "embedded_field"
-    } else {
-      "field"
-    },
-    "\{owner}.\{name}",
-    clean,
-    docs,
-  )
-  guard last_record(declarations) is Some(record) else { return }
-  enrich_go_record(record)
-}
-
-///|
-fn extract_go_record(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  line_no : Int,
-  line : String,
-  docs : String,
-) -> Unit {
-  let clean_line = line_before_comment(line) |> trim_spaces
-  if clean_line == "" {
-    return
-  }
-
-  if clean_line.has_prefix("type ") {
-    let rest = clean_line[5:].to_string()
-    let type_name = first_token(rest)
-    if rest.contains("=") {
-      push_record(
-        declarations, symbols, profile, server, "go", path, line_no, "type_alias",
-        type_name, clean_line, docs,
-      )
-      guard last_record(declarations) is Some(record) else { return }
-      enrich_go_record(record)
-    } else if rest.contains("struct") {
-      push_record(
-        declarations, symbols, profile, server, "go", path, line_no, "struct", type_name,
-        clean_line, docs,
-      )
-      guard last_record(declarations) is Some(record) else { return }
-      enrich_go_record(record)
-    } else if rest.contains("interface") {
-      push_record(
-        declarations, symbols, profile, server, "go", path, line_no, "interface",
-        type_name, clean_line, docs,
-      )
-      guard last_record(declarations) is Some(record) else { return }
-      enrich_go_record(record)
-    } else {
-      push_record(
-        declarations, symbols, profile, server, "go", path, line_no, "type", type_name,
-        clean_line, docs,
-      )
-      guard last_record(declarations) is Some(record) else { return }
-      enrich_go_record(record)
-    }
-    return
-  }
-
-  if clean_line.has_prefix("package ") {
-    let name = first_token(clean_line[8:].to_string())
-    push_record(
-      declarations, symbols, profile, server, "go", path, line_no, "package", name,
-      clean_line, docs,
-    )
-    return
-  }
-
-  if clean_line.has_prefix("import ") {
-    let name = go_import_name(clean_line)
-    push_record(
-      declarations, symbols, profile, server, "go", path, line_no, "import", name,
-      clean_line, docs,
-    )
-    guard last_record(declarations) is Some(record) else { return }
-    enrich_go_record(record)
-    return
-  }
-
-  if clean_line.has_prefix("func ") {
-    let mut rest = clean_line[5:].to_string()
-    let kind = if rest.has_prefix("(") {
-      match rest.find(") ") {
-        Some(idx) => {
-          rest = rest[idx + 2:].to_string()
-          "method"
-        }
-        None => "method"
-      }
-    } else {
-      "function"
-    }
-    let name = token_before(rest, "(")
-    push_record(
-      declarations, symbols, profile, server, "go", path, line_no, kind, name, clean_line,
-      docs,
-    )
-    guard last_record(declarations) is Some(record) else { return }
-    enrich_go_record(record)
-    return
-  }
-
-  if clean_line.has_prefix("const ") {
-    let names = go_names(clean_line[6:].to_string())
-    push_go_records(
-      declarations, symbols, profile, server, path, line_no, "const", names, clean_line,
-      docs,
-    )
-    return
-  }
-
-  if clean_line.has_prefix("var ") {
-    let names = go_names(clean_line[4:].to_string())
-    push_go_records(
-      declarations, symbols, profile, server, path, line_no, "var", names, clean_line,
-      docs,
-    )
-  }
-}
-
-///|
-fn extract_go_file(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  lines : Array[String],
-) -> Unit {
-  let mut pending_doc = ""
-  let mut pending_doc_line = 0
-  let mut group_kind = ""
-  let mut group_scope_depth = 0
-  let mut active_struct = ""
-  let mut active_struct_depth = 0
-
-  for i in 0..<lines.length() {
-    let line_no = i + 1
-    let line = trim_spaces(lines[i].to_string())
-
-    if line.has_prefix("//") {
-      let piece = line.strip_prefix("//").unwrap_or(line).to_string()
-        |> trim_spaces
-      pending_doc = if pending_doc == "" {
-        piece
-      } else {
-        "\{pending_doc}\n\{piece}"
-      }
-      pending_doc_line = line_no
-      continue
-    }
-    if line == "" {
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-
-    if line == ")" {
-      group_kind = ""
-      group_scope_depth = 0
-      active_struct = ""
-      active_struct_depth = 0
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-
-    if line.has_prefix("const (") || line == "const(" {
-      group_kind = "const"
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-    if line.has_prefix("var (") || line == "var(" {
-      group_kind = "var"
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-    if line.has_prefix("type (") || line == "type(" {
-      group_kind = "type"
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-    if line.has_prefix("import (") || line == "import(" {
-      group_kind = "import"
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-
-    if group_kind != "" {
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
-        pending_doc
-      } else {
-        ""
-      }
-      if active_struct != "" && active_struct_depth > 0 {
-        extract_go_struct_field(
-          declarations, symbols, profile, server, path, line_no, active_struct, line,
-          docs,
-        )
-      }
-      let group_line = strip_braces(line)
-      if group_scope_depth == 0 && group_line != "" {
-        let synthetic = "\{group_kind} \{group_line}"
-        extract_go_record(
-          declarations, symbols, profile, server, path, line_no, synthetic, docs,
-        )
-        if group_kind == "type" &&
-          line.contains("struct") &&
-          line.has_suffix("{") {
-          active_struct = go_struct_name(group_line, grouped=true)
-          active_struct_depth = 0
-        }
-      }
-      for c in line {
-        if c == '{' {
-          group_scope_depth = group_scope_depth + 1
-          if active_struct != "" {
-            active_struct_depth = active_struct_depth + 1
-          }
-        } else if c == '}' && group_scope_depth > 0 {
-          group_scope_depth = group_scope_depth - 1
-          if active_struct != "" {
-            active_struct_depth = active_struct_depth - 1
-            if active_struct_depth <= 0 {
-              active_struct = ""
-              active_struct_depth = 0
-            }
-          }
-        }
-      }
-      pending_doc = ""
-      pending_doc_line = 0
-      continue
-    }
-
-    let declaration_prefixes = [
-      "package ", "import ", "type ", "func ", "const ", "var ",
-    ]
-    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
-      pending_doc
-    } else {
-      ""
-    }
-    if active_struct != "" && active_struct_depth > 0 {
-      extract_go_struct_field(
-        declarations, symbols, profile, server, path, line_no, active_struct, line,
-        docs,
-      )
-    }
-    if starts_with_any(line, declaration_prefixes) {
-      extract_go_record(
-        declarations, symbols, profile, server, path, line_no, line, docs,
-      )
-      if line.has_prefix("type ") &&
-        line.contains("struct") &&
-        line.has_suffix("{") {
-        active_struct = go_struct_name(line, grouped=false)
-        active_struct_depth = 0
-      }
-      pending_doc = ""
-      pending_doc_line = 0
-    }
-    for c in line {
-      if c == '{' {
-        if active_struct != "" {
-          active_struct_depth = active_struct_depth + 1
-        }
-      } else if c == '}' {
-        if active_struct != "" {
-          active_struct_depth = active_struct_depth - 1
-          if active_struct_depth <= 0 {
-            active_struct = ""
-            active_struct_depth = 0
-          }
-        }
-      }
-    }
-  }
-}
-
-///|
-fn rust_type_name(signature : String, prefix : String) -> String {
-  let body = signature.strip_prefix(prefix).unwrap_or(signature).to_string() |> trim_spaces
-  let base = match body.find("<") {
-    Some(idx) => body[0:idx].to_string()
-    None => token_before(body, " ")
-  }
-  trim_spaces(base)
-}
-
-///|
-fn rust_where_clause(signature : String) -> String {
-  match signature.find(" where ") {
-    Some(idx) => signature[idx + 7:].to_string() |> trim_spaces |> strip_braces
-    None => ""
-  }
-}
-
-///|
-fn rust_strip_leading_generics(value : String) -> String {
-  let trimmed = trim_spaces(value)
-  if !trimmed.has_prefix("<") {
-    return trimmed
-  }
-  match matching_delimiter_index(trimmed, 0, '<', '>') {
-    Some(close_idx) if close_idx + 1 < trimmed.length() =>
-      trim_spaces(trimmed[close_idx + 1:].to_string())
-    Some(_) => ""
-    None => trimmed
-  }
-}
-
-///|
-fn rust_decl_name(text : String) -> String {
-  let trimmed = trim_spaces(text)
-  if trimmed == "" {
-    return ""
-  }
-  let mut end = 0
-  while end < trimmed.length() {
-    let c = trimmed.code_unit_at(end)
-    if c == '<' {
-      match matching_delimiter_index(trimmed, end, '<', '>') {
-        Some(close_idx) => {
-          end = close_idx + 1
-          continue
-        }
-        None => break
-      }
-    }
-    if c == ' ' ||
-      c == '\t' ||
-      c == '{' ||
-      c == '(' ||
-      c == '=' ||
-      c == ':' ||
-      c == ';' {
-      break
-    }
-    end = end + 1
-  }
-  trim_spaces(trimmed[0:end].to_string())
-}
-
-///|
-fn rust_strip_decl_modifiers(value : String) -> String {
-  let mut out = trim_spaces(value)
-  let mut changed = true
-  while changed {
-    changed = false
-    if out.has_prefix("unsafe ") {
-      out = trim_spaces(out[7:].to_string())
-      changed = true
-      continue
-    }
-    if out.has_prefix("async ") {
-      out = trim_spaces(out[6:].to_string())
-      changed = true
-      continue
-    }
-    if out.has_prefix("extern ") {
-      let rest = trim_spaces(out[7:].to_string())
-      if rest.has_prefix("\"") {
-        match rest[1:].find("\"") {
-          Some(close_idx) => {
-            out = trim_spaces(rest[close_idx + 2:].to_string())
-            changed = true
-            continue
-          }
-          None => {
-            out = rest
-            changed = true
-            continue
-          }
-        }
-      }
-      out = rest
-      changed = true
-      continue
-    }
-  }
-  out
-}
-
-///|
-fn rust_signature_type_params(signature : String) -> Array[String] {
-  match signature.find("<") {
-    Some(open_idx) => {
-      let equals_idx = signature.find("=").unwrap_or(signature.length())
-      let paren_idx = signature.find("(").unwrap_or(signature.length())
-      if open_idx > equals_idx || open_idx > paren_idx {
-        return []
-      }
-      match matching_delimiter_index(signature, open_idx, '<', '>') {
-        Some(close_idx) if close_idx > open_idx + 1 =>
-          split_top_level(signature[open_idx + 1:close_idx].to_string(), ',')
-          |> unique_trimmed_strings
-        _ => []
-      }
-    }
-    None => []
-  }
-}
-
-///|
-fn rust_multiline_clause(lines : Array[String], start_idx : Int) -> String {
-  let parts : Array[String] = []
-  let mut saw_where = false
-  for i in (start_idx + 1)..<lines.length() {
-    let clean = trim_spaces(line_before_comment(lines[i].to_string()))
-    if clean == "" {
-      continue
-    }
-    if clean.has_prefix("where") {
-      saw_where = true
-      let clause = clean.strip_prefix("where").unwrap_or(clean).to_string() |> trim_spaces |> strip_braces
-      if clause != "" {
-        parts.push(clause)
-      }
-      if clean.has_suffix("{") || clean.has_suffix(";") {
-        break
-      }
-      continue
-    }
-    if !saw_where {
-      break
-    }
-    let clause = strip_braces(clean)
-    if clause != "" {
-      parts.push(clause)
-    }
-    if clean.has_suffix("{") || clean.has_suffix(";") {
-      break
-    }
-  }
-  if parts.is_empty() {
-    ""
-  } else {
-    parts.join(", ")
-  }
-}
-
-///|
-fn rust_impl_targets(signature : String) -> (String, String) {
-  let trimmed = signature.strip_prefix("impl").unwrap_or(signature).to_string() |> trim_spaces
-  let normalized = strip_braces(trimmed)
-  match normalized.find(" for ") {
-    Some(idx) => {
-      let trait_target = normalized[0:idx].to_string() |> trim_spaces
-      let impl_target = normalized[idx + 5:].to_string() |> trim_spaces
-      (trait_target, impl_target)
-    }
-    None => ("", normalized)
-  }
-}
-
-///|
-fn rust_is_unsafe(signature : String) -> Bool {
-  let clean = trim_spaces(line_before_comment(signature))
-  clean.has_prefix("unsafe ") || clean.contains(" unsafe ")
-}
-
-///|
-fn rust_extern_abi(signature : String) -> String {
-  let clean = trim_spaces(line_before_comment(signature))
-  if !clean.contains("extern") {
-    return ""
-  }
-  let quoted = quoted_parts(clean)
-  if !quoted.is_empty() {
-    return quoted[0]
-  }
-  if clean.contains("extern fn") || clean.contains("extern unsafe fn") {
-    return "C"
-  }
-  ""
-}
-
-///|
-fn rust_normalize_owner_key(value : String) -> String {
-  let trimmed = line_before_comment(value) |> trim_spaces |> strip_braces
-  if trimmed == "" {
-    return ""
-  }
-  let without_where = match trimmed.find(" where ") {
-    Some(idx) => trimmed[0:idx].to_string() |> trim_spaces
-    None => trimmed
-  }
-  rust_strip_leading_generics(without_where) |> trim_spaces
-}
-
-///|
-fn rust_record_type_params(record : Json) -> Array[String] {
-  let kind = field_string(record, "kind")
-  let name = field_string(record, "name")
-  let signature = field_string(record, "signature")
-  if kind == "impl" || kind == "struct" || kind == "trait" || kind == "enum" ||
-    kind == "union" || kind == "type_alias" || kind == "function" {
-    return rust_signature_type_params(signature)
-  }
-  if kind == "associated_type" || kind == "associated_const" || kind == "associated_fn" {
-    match name.find("<") {
-      Some(_) => {
-        let owner = match name.find("::") {
-          Some(idx) if idx > 0 => name[0:idx].to_string()
-          _ => name
-        }
-        return match owner.find("<") {
-          Some(open_idx) =>
-            match matching_delimiter_index(owner, open_idx, '<', '>') {
-              Some(close_idx) if close_idx > open_idx + 1 =>
-                split_top_level(owner[open_idx + 1:close_idx].to_string(), ',')
-                .map(part => first_token(part))
-                |> unique_trimmed_strings
-              _ => []
-            }
-          None => []
-        }
-      }
-      None => return []
-    }
-  }
-  match name.find("<") {
-    Some(open_idx) =>
-      match matching_delimiter_index(name, open_idx, '<', '>') {
-        Some(close_idx) if close_idx > open_idx + 1 =>
-          split_top_level(name[open_idx + 1:close_idx].to_string(), ',')
-          .map(part => first_token(part))
-          |> unique_trimmed_strings
-        _ => []
-      }
-    None => []
-  }
-}
-
-///|
-fn enrich_rust_record(record : Json) -> Unit {
-  let kind = field_string(record, "kind")
-  let name = field_string(record, "name")
-  let signature = field_string(record, "signature")
-  let type_params = rust_record_type_params(record)
-  set_shape_string_array(record, "type_params", type_params)
-  set_language_specific_string_array(record, "rust", "typeParams", type_params)
-  let where_clause = rust_where_clause(signature)
-  set_language_specific_string(record, "rust", "whereClause", where_clause)
-  if rust_is_unsafe(signature) {
-    set_language_specific_bool(record, "rust", "unsafe", true)
-  }
-  let extern_abi = rust_extern_abi(signature)
-  set_language_specific_string(record, "rust", "externAbi", extern_abi)
-  if kind == "struct" {
-    let owner = rust_type_name(signature, "pub struct ")
-    set_shape_string(record, "owner", owner)
-    set_language_specific_string(record, "rust", "owner", owner)
-  } else if kind == "trait" {
-    let owner = rust_type_name(signature, "pub trait ")
-    set_shape_string(record, "owner", owner)
-    set_language_specific_string(record, "rust", "owner", owner)
-  } else if kind == "impl" {
-    let (trait_target, impl_target) = rust_impl_targets(signature)
-    set_language_specific_string(record, "rust", "traitTarget", trait_target)
-    set_language_specific_string(record, "rust", "implTarget", impl_target)
-    set_shape_string(record, "owner", impl_target)
-  } else if kind == "associated_type" ||
-    kind == "associated_const" ||
-    kind == "associated_fn" {
-    let owner = match name.find("::") {
-      Some(idx) if idx > 0 => name[0:idx].to_string()
-      _ => ""
-    }
-    set_shape_string(record, "owner", owner)
-    set_language_specific_string(record, "rust", "owner", owner)
-    set_language_specific_bool(record, "rust", "associated", true)
-    if owner != "" {
-      set_language_specific_string(record, "rust", "traitTarget", owner)
-    }
-  }
-}
-
-///|
-fn set_rust_multiline_clause(record : Json, lines : Array[String], line_no : Int) -> Unit {
-  if rust_where_clause(field_string(record, "signature")) != "" {
-    return
-  }
-  set_language_specific_string(
-    record,
-    "rust",
-    "whereClause",
-    rust_multiline_clause(lines, line_no - 1),
-  )
-}
-
-///|
-fn rust_append_type_relation(
-  relations : Array[Json],
-  profile : String,
-  value : String,
-) -> Unit {
-  let normalized = rust_normalize_owner_key(value)
-  if normalized == "" {
-    return
-  }
-  push_unique_relation(relations, "references_type", "type:\{profile}::\{normalized}")
-}
-
-///|
-fn rewrite_rust_relations(record : Json, profile : String) -> Unit {
-  let kind = field_string(record, "kind")
-  let signature = field_string(record, "signature")
-  if kind == "function" || kind == "associated_fn" {
-    let relations = filter_record_relations(
-      record,
-      ["has_parameter", "returns", "references_type"],
-    )
-    let param_types = signature_param_types(signature)
-    for i in 0..<param_types.length() {
-      let ty = trim_spaces(param_types[i])
-      if ty == "" {
-        continue
-      }
-      push_unique_relation(relations, "has_parameter", "type:\{profile}::\{ty}")
-      push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
-    }
-    let return_types = signature_return_types(signature)
-    for i in 0..<return_types.length() {
-      let ty = trim_spaces(return_types[i])
-      if ty == "" {
-        continue
-      }
-      push_unique_relation(relations, "returns", "type:\{profile}::\{ty}")
-      push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
-    }
-    rust_append_type_relation(
-      relations,
-      profile,
-      language_specific_profile_string(record, "rust", "owner"),
-    )
-    rust_append_type_relation(
-      relations,
-      profile,
-      language_specific_profile_string(record, "rust", "traitTarget"),
-    )
-    rust_append_type_relation(
-      relations,
-      profile,
-      language_specific_profile_string(record, "rust", "implTarget"),
-    )
-    set_record_relations(record, relations)
-    return
-  }
-  if kind == "impl" {
-    let relations = filter_record_relations(record, ["implements", "references_type"])
-    let trait_target = rust_normalize_owner_key(
-      language_specific_profile_string(record, "rust", "traitTarget"),
-    )
-    let impl_target = rust_normalize_owner_key(
-      language_specific_profile_string(record, "rust", "implTarget"),
-    )
-    if trait_target != "" {
-      push_unique_relation(relations, "implements", "type:\{profile}::\{trait_target}")
-      push_unique_relation(
-        relations,
-        "references_type",
-        "type:\{profile}::\{trait_target}",
-      )
-    }
-    if impl_target != "" {
-      push_unique_relation(
-        relations,
-        "references_type",
-        "type:\{profile}::\{impl_target}",
-      )
-    }
-    set_record_relations(record, relations)
-    return
-  }
-  if kind == "associated_type" || kind == "associated_const" || kind == "const" ||
-    kind == "type_alias" {
-    let relations = filter_record_relations(record, ["references_type"])
-    rust_append_type_relation(
-      relations,
-      profile,
-      language_specific_profile_string(record, "rust", "owner"),
-    )
-    rust_append_type_relation(
-      relations,
-      profile,
-      language_specific_profile_string(record, "rust", "traitTarget"),
-    )
-    rust_append_type_relation(
-      relations,
-      profile,
-      language_specific_profile_string(record, "rust", "implTarget"),
-    )
-    set_record_relations(record, relations)
-  }
-}
-
-///|
-fn postprocess_rust_declarations(
-  declarations : Array[Json],
-  profile : String,
-) -> Unit {
-  let type_ids : Map[String, String] = {}
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "rust" {
-      continue
-    }
-    let kind = field_string(declarations[i], "kind")
-    if kind == "struct" || kind == "enum" || kind == "union" || kind == "trait" ||
-      kind == "type_alias" {
-      let name = rust_normalize_owner_key(field_string(declarations[i], "name"))
-      let id = field_string(declarations[i], "id")
-      if name != "" && id != "" {
-        type_ids[name] = id
-      }
-    }
-  }
-
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "rust" {
-      continue
-    }
-    rewrite_rust_relations(declarations[i], profile)
-  }
-
-  for i in 0..<declarations.length() {
-    if field_string(declarations[i], "language") != "rust" {
-      continue
-    }
-    let kind = field_string(declarations[i], "kind")
-    let id = field_string(declarations[i], "id")
-    let owner = rust_normalize_owner_key(
-      language_specific_profile_string(declarations[i], "rust", "owner"),
-    )
-    if (kind == "associated_type" || kind == "associated_const" ||
-      kind == "associated_fn" || kind == "function" || kind == "const" ||
-      kind == "type_alias") && owner != "" {
-      match type_ids.get(owner) {
-        Some(owner_id) => append_relation_to_record_by_id(
-          declarations,
-          owner_id,
-          "has_member",
-          id,
-        )
-        None => ()
-      }
-    }
-    if kind == "impl" {
-      let trait_target = rust_normalize_owner_key(
-        language_specific_profile_string(declarations[i], "rust", "traitTarget"),
-      )
-      let impl_target = rust_normalize_owner_key(
-        language_specific_profile_string(declarations[i], "rust", "implTarget"),
-      )
-      if trait_target != "" && impl_target != "" {
-        match type_ids.get(impl_target) {
-          Some(type_id) => append_relation_to_record_by_id(
-            declarations,
-            type_id,
-            "implements",
-            "type:\{profile}::\{trait_target}",
-          )
-          None => ()
-        }
-      }
-    }
-  }
-}
-
-///|
-fn extract_rust_record(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  lines : Array[String],
-  line_no : Int,
-  line : String,
-  docs : String,
-  active_impl_target : String,
-  active_impl_trait : String,
-) -> Unit {
-  let clean = line_before_comment(line) |> trim_spaces
-  if clean == "" {
-    return
-  }
-
-  let mut normalized = clean
-  let mut vis = "public"
-  if normalized.has_prefix("pub(crate) ") {
-    vis = "pub(crate)"
-    normalized = normalized[11:].to_string()
-  } else if normalized.has_prefix("pub(super) ") {
-    vis = "pub(super)"
-    normalized = normalized[11:].to_string()
-  } else if normalized.has_prefix("pub(in ") {
-    vis = "pub(in)"
-    match normalized.find(") ") {
-      Some(idx) => normalized = normalized[idx + 2:].to_string()
-      None => ()
-    }
-  } else if normalized.has_prefix("pub ") {
-    normalized = normalized[4:].to_string()
-  } else {
-    return
-  }
-
-  let kind_source = rust_strip_decl_modifiers(normalized)
-  let (kind, name) = if kind_source.has_prefix("fn ") {
-    ("function", token_before(kind_source[3:].to_string(), "("))
-  } else if kind_source.has_prefix("struct ") {
-    ("struct", rust_decl_name(kind_source[7:].to_string()))
-  } else if kind_source.has_prefix("enum ") {
-    ("enum", rust_decl_name(kind_source[5:].to_string()))
-  } else if kind_source.has_prefix("union ") {
-    ("union", rust_decl_name(kind_source[6:].to_string()))
-  } else if kind_source.has_prefix("trait ") {
-    ("trait", rust_decl_name(kind_source[6:].to_string()))
-  } else if kind_source.has_prefix("type ") {
-    ("type_alias", rust_decl_name(kind_source[5:].to_string()))
-  } else if kind_source.has_prefix("const ") {
-    ("const", token_before(kind_source[6:].to_string(), ":"))
-  } else if kind_source.has_prefix("static ") {
-    ("static", token_before(kind_source[7:].to_string(), ":"))
-  } else if kind_source.has_prefix("mod ") {
-    ("module", token_before(kind_source[4:].to_string(), "{"))
-  } else if kind_source.has_prefix("use ") {
-    ("use", strip_braces(kind_source[4:].to_string()))
-  } else if kind_source.has_prefix("macro ") {
-    ("macro", token_before(kind_source[6:].to_string(), "{"))
-  } else {
-    ("", "")
-  }
-
-  if name == "" || kind == "" {
-    return
-  }
-
-  let signature = if vis == "public" { clean } else { "\{clean} // \{vis}" }
-  push_record(
-    declarations, symbols, profile, server, "rust", path, line_no, kind, name, signature,
-    docs,
-  )
-  guard last_record(declarations) is Some(record) else { return }
-  enrich_rust_record(record)
-  set_rust_multiline_clause(record, lines, line_no)
-  if active_impl_target != "" &&
-    (kind == "function" || kind == "const" || kind == "type_alias") {
-    set_shape_string(record, "owner", active_impl_target)
-    set_language_specific_string(record, "rust", "owner", active_impl_target)
-    set_language_specific_string(record, "rust", "implTarget", active_impl_target)
-    if active_impl_trait != "" {
-      set_language_specific_string(record, "rust", "traitTarget", active_impl_trait)
-    }
-  }
-}
-
-///|
-fn extract_rust_file(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  lines : Array[String],
-) -> Unit {
-  let mut pending_doc = ""
-  let mut pending_doc_line = 0
-  let mut pending_deprecated = ""
-  let mut pending_macro_export = false
-  let mut active_trait = ""
-  let mut active_trait_depth = 0
-  let mut pending_trait = ""
-  let mut active_impl_target = ""
-  let mut active_impl_trait = ""
-  let mut active_impl_depth = 0
-  let mut pending_impl_target = ""
-  let mut pending_impl_trait = ""
-
-  for i in 0..<lines.length() {
-    let line_no = i + 1
-    let line = trim_spaces(lines[i].to_string())
-
-    if line.has_prefix("///") {
-      let piece = line.strip_prefix("///").unwrap_or(line).to_string()
-        |> trim_spaces
-      pending_doc = if pending_doc == "" {
-        piece
-      } else {
-        "\{pending_doc}\n\{piece}"
-      }
-      pending_doc_line = line_no
-      continue
-    }
-    if line.has_prefix("#[deprecated") {
-      pending_deprecated = "Deprecated"
-      continue
-    }
-    if line.has_prefix("#[macro_export") {
-      pending_macro_export = true
-      continue
-    }
-    if line == "" {
-      pending_doc = ""
-      pending_doc_line = 0
-      pending_deprecated = ""
-      continue
-    }
-
-    let clean = line_before_comment(line) |> trim_spaces
-    if pending_macro_export && clean.has_prefix("macro_rules!") {
-      let macro_name = token_before(clean[12:].to_string(), "{")
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
-        pending_doc
-      } else {
-        ""
-      }
-      let docs_with_attrs = if pending_deprecated == "" {
-        docs
-      } else if docs == "" {
-        pending_deprecated
-      } else {
-        "\{docs}\n\{pending_deprecated}"
-      }
-      push_record(
-        declarations, symbols, profile, server, "rust", path, line_no, "macro", macro_name,
-        clean, docs_with_attrs,
-      )
-      guard last_record(declarations) is Some(record) else {
-        pending_doc = ""
-        pending_doc_line = 0
-        pending_deprecated = ""
-        pending_macro_export = false
-        continue
-      }
-      enrich_rust_record(record)
-      pending_doc = ""
-      pending_doc_line = 0
-      pending_deprecated = ""
-      pending_macro_export = false
-      continue
-    }
-
-    if active_trait != "" &&
-      !clean.has_prefix("#") &&
-      clean != "{" &&
-      clean != "}" {
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
-        pending_doc
-      } else {
-        ""
-      }
-      let docs_with_attrs = if pending_deprecated == "" {
-        docs
-      } else if docs == "" {
-        pending_deprecated
-      } else {
-        "\{docs}\n\{pending_deprecated}"
-      }
-      if clean.has_prefix("type ") {
-        let name = token_before(clean[5:].to_string(), ":")
-        push_record(
-          declarations,
-          symbols,
-          profile,
-          server,
-          "rust",
-          path,
-          line_no,
-          "associated_type",
-          "\{active_trait}::\{name}",
-          clean,
-          docs_with_attrs,
-        )
-        guard last_record(declarations) is Some(record) else {
-          pending_doc = ""
-          pending_doc_line = 0
-          pending_deprecated = ""
-          continue
-        }
-        enrich_rust_record(record)
-      } else if clean.has_prefix("const ") {
-        let name = token_before(clean[6:].to_string(), ":")
-        push_record(
-          declarations,
-          symbols,
-          profile,
-          server,
-          "rust",
-          path,
-          line_no,
-          "associated_const",
-          "\{active_trait}::\{name}",
-          clean,
-          docs_with_attrs,
-        )
-        guard last_record(declarations) is Some(record) else {
-          pending_doc = ""
-          pending_doc_line = 0
-          pending_deprecated = ""
-          continue
-        }
-        enrich_rust_record(record)
-      } else if clean.has_prefix("fn ") {
-        let name = token_before(clean[3:].to_string(), "(")
-        push_record(
-          declarations,
-          symbols,
-          profile,
-          server,
-          "rust",
-          path,
-          line_no,
-          "associated_fn",
-          "\{active_trait}::\{name}",
-          clean,
-          docs_with_attrs,
-        )
-        guard last_record(declarations) is Some(record) else {
-          pending_doc = ""
-          pending_doc_line = 0
-          pending_deprecated = ""
-          continue
-        }
-        enrich_rust_record(record)
-      }
-      pending_doc = ""
-      pending_doc_line = 0
-      pending_deprecated = ""
-    }
-
-    let impl_source = rust_strip_decl_modifiers(clean)
-    if impl_source.has_prefix("impl ") || impl_source.has_prefix("impl<") {
-      let name = clean.strip_prefix("impl").unwrap_or(clean).to_string()
-        |> trim_spaces
-        |> strip_braces
-      push_simple_record(
-        declarations, symbols, profile, server, "rust", path, line_no, "impl", name,
-        clean,
-      )
-      match last_record(declarations) {
-        Some(record) => enrich_rust_record(record)
-        None => ()
-      }
-      let (impl_trait, impl_target) = rust_impl_targets(impl_source)
-      pending_impl_trait = rust_normalize_owner_key(impl_trait)
-      pending_impl_target = rust_normalize_owner_key(impl_target)
-      if clean.has_suffix("{") {
-        active_impl_target = pending_impl_target
-        active_impl_trait = pending_impl_trait
-        pending_impl_target = ""
-        pending_impl_trait = ""
-        active_impl_depth = 0
-      }
-    }
-
-    let mut vis_normalized = clean
-    let mut trait_visible = false
-    if vis_normalized.has_prefix("pub(crate) ") {
-      vis_normalized = vis_normalized[11:].to_string()
-      trait_visible = true
-    } else if vis_normalized.has_prefix("pub(super) ") {
-      vis_normalized = vis_normalized[11:].to_string()
-      trait_visible = true
-    } else if vis_normalized.has_prefix("pub(in ") {
-      trait_visible = true
-      match vis_normalized.find(") ") {
-        Some(idx) => vis_normalized = vis_normalized[idx + 2:].to_string()
-        None => ()
-      }
-    } else if vis_normalized.has_prefix("pub ") {
-      trait_visible = true
-      vis_normalized = vis_normalized[4:].to_string()
-    }
-    let trait_source = rust_strip_decl_modifiers(vis_normalized)
-    if trait_visible && trait_source.has_prefix("trait ") {
-      pending_trait = rust_decl_name(trait_source[6:].to_string())
-      if clean.has_suffix("{") {
-        active_trait = pending_trait
-        pending_trait = ""
-        active_trait_depth = 0
-      }
-    }
-    if pending_impl_target != "" && clean.has_suffix("{") {
-      active_impl_target = pending_impl_target
-      active_impl_trait = pending_impl_trait
-      pending_impl_target = ""
-      pending_impl_trait = ""
-      active_impl_depth = 0
-    }
-    if pending_trait != "" && clean.has_suffix("{") {
-      active_trait = pending_trait
-      pending_trait = ""
-      active_trait_depth = 0
-    }
-
-    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
-      pending_doc
-    } else {
-      ""
-    }
-    let docs_with_attrs = if pending_deprecated == "" {
-      docs
-    } else if docs == "" {
-      pending_deprecated
-    } else {
-      "\{docs}\n\{pending_deprecated}"
-    }
-    extract_rust_record(
-      declarations,
-      symbols,
-      profile,
-      server,
-      path,
-      lines,
-      line_no,
-      line,
-      docs_with_attrs,
-      active_impl_target,
-      active_impl_trait,
-    )
-
-    for c in clean {
-      if c == '{' {
-        if active_trait != "" {
-          active_trait_depth = active_trait_depth + 1
-        }
-        if active_impl_target != "" {
-          active_impl_depth = active_impl_depth + 1
-        }
-      } else if c == '}' {
-        if active_trait != "" {
-          active_trait_depth = active_trait_depth - 1
-          if active_trait_depth <= 0 {
-            active_trait = ""
-            active_trait_depth = 0
-          }
-        }
-        if active_impl_target != "" {
-          active_impl_depth = active_impl_depth - 1
-          if active_impl_depth <= 0 {
-            active_impl_target = ""
-            active_impl_trait = ""
-            active_impl_depth = 0
-          }
-        }
-      }
-    }
-
-    pending_doc = ""
-    pending_doc_line = 0
-    pending_deprecated = ""
-    pending_macro_export = false
-  }
 }
 
 ///|
@@ -2937,10 +985,10 @@ fn scan_terraform_attributes(
       name,
       "type = \{ty}",
     )
-    match last_record(declarations) {
-      Some(record) => enrich_terraform_record(record)
-      None => ()
-    }
+      match @extract.last_record(declarations) {
+        Some(record) => enrich_terraform_record(record)
+        None => ()
+      }
   }
 
   if clean.has_prefix("validation") && clean.has_suffix("{") {
@@ -3084,7 +1132,10 @@ fn scan_terraform_attributes(
   }
 
   if active_block.has_prefix("resource.") &&
-    (clean.has_prefix("prevent_destroy ") || clean.has_prefix("prevent_destroy=")) {
+    (
+      clean.has_prefix("prevent_destroy ") ||
+      clean.has_prefix("prevent_destroy=")
+    ) {
     match segment_after(clean, "=") {
       Some(value) =>
         match parse_bool_literal(value) {
@@ -3105,7 +1156,10 @@ fn scan_terraform_attributes(
   }
 
   if active_block.has_prefix("resource.") &&
-    (clean.has_prefix("create_before_destroy ") || clean.has_prefix("create_before_destroy=")) {
+    (
+      clean.has_prefix("create_before_destroy ") ||
+      clean.has_prefix("create_before_destroy=")
+    ) {
     match segment_after(clean, "=") {
       Some(value) =>
         match parse_bool_literal(value) {
@@ -3160,9 +1214,11 @@ fn scan_terraform_attributes(
   }
 
   if (clean.has_prefix("provider ") || clean.has_prefix("provider=")) &&
-    (active_block.has_prefix("resource.") ||
+    (
+      active_block.has_prefix("resource.") ||
       active_block.has_prefix("data.") ||
-      active_block.has_prefix("provider.")) {
+      active_block.has_prefix("provider.")
+    ) {
     match segment_after(clean, "=") {
       Some(value) =>
         set_terraform_metadata(
@@ -3205,10 +1261,11 @@ fn terraform_attr_value(block : @hcl.HclBlock, name : String) -> String {
 fn terraform_provider_ref_parts(value : String) -> (String, String) {
   let trimmed = trim_quotes(trim_spaces(value))
   match trimmed.find(".") {
-    Some(idx) => (
-      trimmed[0:idx].to_string() |> trim_spaces,
-      trimmed[idx + 1:].to_string() |> trim_spaces,
-    )
+    Some(idx) =>
+      (
+        trimmed[0:idx].to_string() |> trim_spaces,
+        trimmed[idx + 1:].to_string() |> trim_spaces,
+      )
     None => (trimmed, "")
   }
 }
@@ -3245,19 +1302,15 @@ fn terraform_provider_info(
         provider_alias: resolved_alias,
       }
     }
-    None => {
-      name: provider_name,
-      source: "",
-      version: "",
-      provider_alias,
-    }
+    None => { name: provider_name, source: "", version: "", provider_alias }
   }
 }
 
 ///|
 fn terraform_language_record_name(active_block : String) -> String {
   match active_block.find(".") {
-    Some(idx) if idx + 1 < active_block.length() => active_block[idx + 1:].to_string()
+    Some(idx) if idx + 1 < active_block.length() =>
+      active_block[idx + 1:].to_string()
     _ => active_block
   }
 }
@@ -3275,10 +1328,11 @@ fn set_terraform_metadata(
   if target_name == "" {
     return
   }
-  let decl_id = declaration_id(profile, path, target_name)
+  let decl_id = @extract.declaration_id(profile, path, target_name)
   match find_declaration_index(declarations, decl_id, declaration_start) {
     Some(idx) => {
-      guard ensure_language_specific_profile(declarations[idx], "terraform") is Some(terraform) else {
+      guard @extract.ensure_language_specific_profile(declarations[idx], "terraform")
+        is Some(terraform) else {
         return
       }
       terraform[key] = value
@@ -3300,10 +1354,11 @@ fn set_openapi_metadata(
   if target_name == "" {
     return
   }
-  let decl_id = declaration_id(profile, path, target_name)
+  let decl_id = @extract.declaration_id(profile, path, target_name)
   match find_declaration_index(declarations, decl_id, declaration_start) {
     Some(idx) => {
-      guard ensure_language_specific_profile(declarations[idx], "openapi") is Some(openapi) else {
+      guard @extract.ensure_language_specific_profile(declarations[idx], "openapi")
+        is Some(openapi) else {
         return
       }
       openapi[key] = value
@@ -3325,9 +1380,9 @@ fn append_openapi_relation(
   if target_name == "" || kind == "" || relation_target == "" {
     return
   }
-  let decl_id = declaration_id(profile, path, target_name)
+  let decl_id = @extract.declaration_id(profile, path, target_name)
   match find_declaration_index(declarations, decl_id, declaration_start) {
-    Some(idx) => append_relation(declarations[idx], kind, relation_target)
+    Some(idx) => @extract.append_relation(declarations[idx], kind, relation_target)
     None => ()
   }
 }
@@ -3346,8 +1401,7 @@ fn terraform_list_values(value : String) -> Array[String] {
     if trimmed == "" {
       []
     } else {
-      split_top_level(trimmed, ',')
-      .map(part => trim_quotes(trim_spaces(part)))
+      split_top_level(trimmed, ',').map(part => trim_quotes(trim_spaces(part)))
       |> unique_trimmed_strings
     }
   }
@@ -3359,8 +1413,10 @@ fn terraform_provider_map_refs(value : String) -> Array[String] {
   if body == "" {
     []
   } else {
-    let trimmed = body.strip_prefix("{").unwrap_or(body).to_string() |> trim_spaces
-    let inner = trimmed.strip_suffix("}").unwrap_or(trimmed).to_string() |> trim_spaces
+    let trimmed = body.strip_prefix("{").unwrap_or(body).to_string()
+      |> trim_spaces
+    let inner = trimmed.strip_suffix("}").unwrap_or(trimmed).to_string()
+      |> trim_spaces
     let refs : Array[String] = []
     if inner == "" {
       return refs
@@ -3368,7 +1424,7 @@ fn terraform_provider_map_refs(value : String) -> Array[String] {
     for entry in split_top_level(inner, ',') {
       match segment_after(entry, "=") {
         Some(provider_ref) =>
-          append_unique_string(refs, trim_quotes(trim_spaces(provider_ref)))
+          @extract.append_unique_string(refs, trim_quotes(trim_spaces(provider_ref)))
         None => ()
       }
     }
@@ -3378,24 +1434,22 @@ fn terraform_provider_map_refs(value : String) -> Array[String] {
 
 ///|
 fn terraform_depends_on_values(clean : String) -> Array[String] {
-  segment_after(clean, "=")
-  .map(terraform_list_values)
-  .unwrap_or([])
+  segment_after(clean, "=").map(terraform_list_values).unwrap_or([])
 }
 
 ///|
 fn enrich_terraform_record(record : Json) -> Unit {
-  let kind = field_string(record, "kind")
-  let name = field_string(record, "name")
-  let signature = field_string(record, "signature")
+  let kind = @extract.field_string(record, "kind")
+  let name = @extract.field_string(record, "name")
+  let signature = @extract.field_string(record, "signature")
   if kind == "module" {
-    set_shape_string(record, "owner", name)
+    @extract.set_shape_string(record, "owner", name)
   }
   if kind == "type_constraint" {
     let ty = segment_after(signature, "=")
       .map(part => trim_spaces(part))
       .unwrap_or("")
-    set_shape_string_array(record, "returns", if ty == "" { [] } else { [ty] })
+    @extract.set_shape_string_array(record, "returns", if ty == "" { [] } else { [ty] })
   }
 }
 
@@ -3406,7 +1460,7 @@ fn find_declaration_index(
   start : Int,
 ) -> Int? {
   for i in start..<declarations.length() {
-    if field_string(declarations[i], "id") == id {
+    if @extract.field_string(declarations[i], "id") == id {
       return Some(i)
     }
   }
@@ -3500,10 +1554,11 @@ fn enrich_terraform_declarations(
   hcl_file : @hcl.HclFile,
   required_providers : Map[String, TerraformProviderInfo],
 ) -> Unit {
-  let required_decl_id = declaration_id(profile, path, "required_providers")
+  let required_decl_id = @extract.declaration_id(profile, path, "required_providers")
   let provider_decl_ids : Map[String, String] = {}
 
-  match find_declaration_index(declarations, required_decl_id, declaration_start) {
+  match
+    find_declaration_index(declarations, required_decl_id, declaration_start) {
     Some(idx) => {
       let providers : Array[TerraformProviderInfo] = []
       for name, info in required_providers {
@@ -3521,7 +1576,7 @@ fn enrich_terraform_declarations(
     if block.kind != "provider" {
       continue
     }
-    let decl_id = declaration_id(profile, path, block.name)
+    let decl_id = @extract.declaration_id(profile, path, block.name)
     provider_decl_ids[block.name] = decl_id
     match find_declaration_index(declarations, decl_id, declaration_start) {
       Some(idx) => {
@@ -3533,13 +1588,17 @@ fn enrich_terraform_declarations(
         )
         set_terraform_providers(declarations[idx], [info])
         if provider_alias != "" {
-          match ensure_language_specific_profile(declarations[idx], "terraform") {
-            Some(terraform) => terraform["providerRef"] = Json::string("\{block.name}.\{provider_alias}")
+          match
+            @extract.ensure_language_specific_profile(declarations[idx], "terraform") {
+            Some(terraform) =>
+              terraform["providerRef"] = Json::string(
+                "\{block.name}.\{provider_alias}",
+              )
             None => ()
           }
         }
         if required_providers.get(block.name) is Some(_) {
-          append_relation(declarations[idx], "provided_by", required_decl_id)
+          @extract.append_relation(declarations[idx], "provided_by", required_decl_id)
         }
       }
       None => ()
@@ -3551,10 +1610,10 @@ fn enrich_terraform_declarations(
     if block.kind != "variable" {
       continue
     }
-    let decl_id = declaration_id(profile, path, block.name)
+    let decl_id = @extract.declaration_id(profile, path, block.name)
     match find_declaration_index(declarations, decl_id, declaration_start) {
       Some(idx) =>
-        set_language_specific_bool(
+        @extract.set_language_specific_bool(
           declarations[idx],
           "terraform",
           "required",
@@ -3569,32 +1628,34 @@ fn enrich_terraform_declarations(
     if block.kind != "module" {
       continue
     }
-    let provider_refs = terraform_provider_map_refs(terraform_attr_value(block, "providers"))
+    let provider_refs = terraform_provider_map_refs(
+      terraform_attr_value(block, "providers"),
+    )
     if provider_refs.is_empty() {
       continue
     }
-    let decl_id = declaration_id(profile, path, block.name)
+    let decl_id = @extract.declaration_id(profile, path, block.name)
     match find_declaration_index(declarations, decl_id, declaration_start) {
       Some(idx) => {
         let providers : Array[TerraformProviderInfo] = []
         for j in 0..<provider_refs.length() {
           let provider_ref = provider_refs[j]
-          let (provider_name, provider_alias) = terraform_provider_ref_parts(provider_ref)
+          let (provider_name, provider_alias) = terraform_provider_ref_parts(
+            provider_ref,
+          )
           if provider_name == "" {
             continue
           }
           let info = terraform_provider_info(
-            provider_name,
-            provider_alias,
-            required_providers,
+            provider_name, provider_alias, required_providers,
           )
           providers.push(info)
-          let provider_decl_id = provider_decl_ids.get(provider_name).unwrap_or(
-            declaration_id(profile, path, provider_name),
-          )
-          append_relation(declarations[idx], "uses_provider", provider_decl_id)
+          let provider_decl_id = provider_decl_ids
+            .get(provider_name)
+            .unwrap_or(@extract.declaration_id(profile, path, provider_name))
+          @extract.append_relation(declarations[idx], "uses_provider", provider_decl_id)
           if j == 0 {
-            set_language_specific_string(
+            @extract.set_language_specific_string(
               declarations[idx],
               "terraform",
               "providerRef",
@@ -3613,7 +1674,7 @@ fn enrich_terraform_declarations(
     if block.kind != "resource" && block.kind != "data" {
       continue
     }
-    let decl_id = declaration_id(profile, path, block.name)
+    let decl_id = @extract.declaration_id(profile, path, block.name)
     let explicit_provider = terraform_provider_attr(block, "provider")
     let (provider_name, provider_alias) = if explicit_provider != "" {
       terraform_provider_ref_parts(explicit_provider)
@@ -3624,13 +1685,11 @@ fn enrich_terraform_declarations(
       continue
     }
     let info = terraform_provider_info(
-      provider_name,
-      provider_alias,
-      required_providers,
+      provider_name, provider_alias, required_providers,
     )
-    let provider_decl_id = provider_decl_ids.get(provider_name).unwrap_or(
-      declaration_id(profile, path, provider_name),
-    )
+    let provider_decl_id = provider_decl_ids
+      .get(provider_name)
+      .unwrap_or(@extract.declaration_id(profile, path, provider_name))
     match find_declaration_index(declarations, decl_id, declaration_start) {
       Some(idx) => {
         set_terraform_providers(declarations[idx], [info])
@@ -3639,13 +1698,13 @@ fn enrich_terraform_declarations(
         } else {
           "\{provider_name}.\{provider_alias}"
         }
-        set_language_specific_string(
+        @extract.set_language_specific_string(
           declarations[idx],
           "terraform",
           "providerRef",
           provider_ref,
         )
-        append_relation(declarations[idx], "uses_provider", provider_decl_id)
+        @extract.append_relation(declarations[idx], "uses_provider", provider_decl_id)
       }
       None => ()
     }
@@ -3677,7 +1736,7 @@ fn extract_terraform_file(
       block.name,
       block.signature,
     )
-    match last_record(declarations) {
+    match @extract.last_record(declarations) {
       Some(record) => enrich_terraform_record(record)
       None => ()
     }
@@ -3720,14 +1779,7 @@ fn extract_terraform_file(
     }
 
     scan_terraform_attributes(
-      declarations,
-      symbols,
-      profile,
-      server,
-      path,
-      line_no,
-      line,
-      active_block,
+      declarations, symbols, profile, server, path, line_no, line, active_block,
       declaration_start,
     )
   }
@@ -3872,7 +1924,7 @@ fn openapi_media_types_in_range(
       } else if indent == content_indent + 2 && line.has_suffix(":") {
         let media_type = openapi_line_key(line)
         if media_type.contains("/") {
-          append_unique_string(media_types, media_type)
+          @extract.append_unique_string(media_types, media_type)
         }
       }
     }
@@ -3922,7 +1974,10 @@ fn collect_openapi_component_response_media_types(
       in_responses = false
       continue
     }
-    if in_components && line != "" && indent <= components_indent && line != "components:" {
+    if in_components &&
+      line != "" &&
+      indent <= components_indent &&
+      line != "components:" {
       in_components = false
       in_responses = false
     }
@@ -3958,7 +2013,7 @@ fn openapi_status_codes_in_block(
       continue
     }
     if leading_spaces(raw_line) == start_indent + 2 && line.has_suffix(":") {
-      append_unique_string(status_codes, openapi_line_key(line))
+      @extract.append_unique_string(status_codes, openapi_line_key(line))
     }
   }
   status_codes
@@ -3982,9 +2037,13 @@ fn openapi_response_media_types_in_block(
     let indent = leading_spaces(raw_line)
     if indent == start_indent + 2 && line.has_suffix(":") {
       let status_end = openapi_block_end(lines, i, indent)
-      let status_media_types = openapi_media_types_in_range(lines, i + 1, status_end)
+      let status_media_types = openapi_media_types_in_range(
+        lines,
+        i + 1,
+        status_end,
+      )
       for media_type in status_media_types {
-        append_unique_string(media_types, media_type)
+        @extract.append_unique_string(media_types, media_type)
       }
       for j in (i + 1)..<status_end {
         let status_line = trim_spaces(lines[j].to_string())
@@ -3998,11 +2057,10 @@ fn openapi_response_media_types_in_block(
           continue
         }
         match component_response_media_types.get(response_name) {
-          Some(response_media_types) => {
+          Some(response_media_types) =>
             for media_type in response_media_types {
-              append_unique_string(media_types, media_type)
+              @extract.append_unique_string(media_types, media_type)
             }
-          }
           None => ()
         }
       }
@@ -4043,7 +2101,7 @@ fn openapi_member_refs_in_block(
   for i in (start_index + 1)..<end_index {
     let line = trim_spaces(lines[i].to_string())
     if line.contains("$ref:") {
-      append_unique_string(refs, normalize_reference_target(line))
+      @extract.append_unique_string(refs, normalize_reference_target(line))
     }
   }
   refs
@@ -4109,12 +2167,12 @@ fn openapi_string_map_json(mapping : Map[String, String]) -> Json {
 
 ///|
 fn enrich_openapi_record(record : Json) -> Unit {
-  let kind = field_string(record, "kind")
-  let name = field_string(record, "name")
+  let kind = @extract.field_string(record, "kind")
+  let name = @extract.field_string(record, "name")
   if kind == "operation" {
     match name.find(" ") {
       Some(idx) if idx > 0 =>
-        set_language_specific_string(
+        @extract.set_language_specific_string(
           record,
           "openapi",
           "httpMethod",
@@ -4124,10 +2182,10 @@ fn enrich_openapi_record(record : Json) -> Unit {
     }
   }
   if kind == "reference" {
-    set_language_specific_string(record, "openapi", "ref", name)
+    @extract.set_language_specific_string(record, "openapi", "ref", name)
   }
   if kind == "security_scheme" {
-    set_language_specific_string(record, "openapi", "securitySchemeName", name)
+    @extract.set_language_specific_string(record, "openapi", "securitySchemeName", name)
   }
 }
 
@@ -4141,7 +2199,9 @@ fn extract_openapi_file(
   lines : Array[String],
 ) -> Unit {
   let declaration_start = declarations.length()
-  let component_response_media_types = collect_openapi_component_response_media_types(lines)
+  let component_response_media_types = collect_openapi_component_response_media_types(
+    lines,
+  )
   let mut in_paths = false
   let mut in_webhooks = false
   let mut current_path = ""
@@ -4249,7 +2309,7 @@ fn extract_openapi_file(
         current_path,
         "path \{current_path}",
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4276,7 +2336,7 @@ fn extract_openapi_file(
           declarations, symbols, profile, server, "openapi", path, line_no, "operation",
           name, name,
         )
-        match last_record(declarations) {
+        match @extract.last_record(declarations) {
           Some(record) => enrich_openapi_record(record)
           None => ()
         }
@@ -4312,7 +2372,7 @@ fn extract_openapi_file(
           name,
           openapi_component_signature(current_component_section, name),
         )
-        match last_record(declarations) {
+        match @extract.last_record(declarations) {
           Some(record) => enrich_openapi_record(record)
           None => ()
         }
@@ -4453,7 +2513,7 @@ fn extract_openapi_file(
           scope,
           "parameters \{scope}",
         )
-        match last_record(declarations) {
+        match @extract.last_record(declarations) {
           Some(record) => enrich_openapi_record(record)
           None => ()
         }
@@ -4461,10 +2521,13 @@ fn extract_openapi_file(
         for j in (i + 1)..<block_end {
           let child_raw = lines[j].to_string()
           let child_line = trim_spaces(child_raw)
-          if leading_spaces(child_raw) != indent + 2 || !child_line.has_prefix("- name:") {
+          if leading_spaces(child_raw) != indent + 2 ||
+            !child_line.has_prefix("- name:") {
             continue
           }
-          let parameter_name = openapi_value_after_colon(child_line[1:].to_string())
+          let parameter_name = openapi_value_after_colon(
+            child_line[1:].to_string(),
+          )
           if parameter_name == "" {
             continue
           }
@@ -4480,7 +2543,7 @@ fn extract_openapi_file(
             parameter_name,
             "parameters \{parameter_name}",
           )
-          match last_record(declarations) {
+          match @extract.last_record(declarations) {
             Some(record) => enrich_openapi_record(record)
             None => ()
           }
@@ -4520,7 +2583,7 @@ fn extract_openapi_file(
             declaration_start,
             scope,
             "has_parameter",
-            declaration_id(profile, path, parameter_name),
+            @extract.declaration_id(profile, path, parameter_name),
           )
         }
       }
@@ -4541,7 +2604,7 @@ fn extract_openapi_file(
         current_operation,
         "requestBody \{current_operation}",
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4587,7 +2650,7 @@ fn extract_openapi_file(
         current_operation,
         "responses \{current_operation}",
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4604,10 +2667,7 @@ fn extract_openapi_file(
         )
       }
       let media_types = openapi_response_media_types_in_block(
-        lines,
-        i,
-        indent,
-        component_response_media_types,
+        lines, i, indent, component_response_media_types,
       )
       if !media_types.is_empty() {
         set_openapi_metadata(
@@ -4635,7 +2695,7 @@ fn extract_openapi_file(
         declarations, symbols, profile, server, "openapi", path, line_no, "allOf",
         name, line,
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4666,7 +2726,7 @@ fn extract_openapi_file(
         declarations, symbols, profile, server, "openapi", path, line_no, "oneOf",
         name, line,
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4697,7 +2757,7 @@ fn extract_openapi_file(
         declarations, symbols, profile, server, "openapi", path, line_no, "anyOf",
         name, line,
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4739,7 +2799,7 @@ fn extract_openapi_file(
         },
         line,
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4796,11 +2856,13 @@ fn extract_openapi_file(
         },
         line,
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
-      let callback_expression = openapi_callback_expression_in_block(lines, i, indent)
+      let callback_expression = openapi_callback_expression_in_block(
+        lines, i, indent,
+      )
       if callback_expression != "" {
         set_openapi_metadata(
           declarations,
@@ -4840,7 +2902,7 @@ fn extract_openapi_file(
         },
         line,
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4853,7 +2915,7 @@ fn extract_openapi_file(
           declarations, symbols, profile, server, "openapi", path, line_no, "reference",
           ref_target, line,
         )
-        match last_record(declarations) {
+        match @extract.last_record(declarations) {
           Some(record) => enrich_openapi_record(record)
           None => ()
         }
@@ -4883,7 +2945,7 @@ fn extract_openapi_file(
         name,
         "operation \{name}",
       )
-      match last_record(declarations) {
+      match @extract.last_record(declarations) {
         Some(record) => enrich_openapi_record(record)
         None => ()
       }
@@ -4958,38 +3020,6 @@ fn extract_policy_file(
 }
 
 ///|
-fn field_string(record : Json, key : String) -> String {
-  guard record is Object(object) else { return "" }
-  match object.get(key) {
-    Some(String(value)) => value
-    _ => ""
-  }
-}
-
-///|
-fn sort_and_dedup(records : Array[Json], key : String) -> Array[Json] {
-  records.sort_by((a, b) => field_string(a, key).compare(field_string(b, key)))
-  let deduped : Array[Json] = []
-  for i in 0..<records.length() {
-    let value = records[i]
-    if deduped.is_empty() ||
-      field_string(deduped[deduped.length() - 1], key) !=
-      field_string(value, key) {
-      deduped.push(value)
-    }
-  }
-  deduped
-}
-
-///|
-fn to_ndjson(records : Array[Json]) -> String {
-  if records.is_empty() {
-    return ""
-  }
-  records.map(record => record.stringify()).join("\n") + "\n"
-}
-
-///|
 fn collect_records(
   config : @config.Config,
   repo : String,
@@ -5013,7 +3043,7 @@ fn collect_records(
     let lines = content.split("\n").to_array().map(line => line.to_string())
     match config.profile {
       "go-module" =>
-        extract_go_file(
+        @extract_go.extract_file(
           declarations,
           symbols,
           config.profile,
@@ -5022,7 +3052,7 @@ fn collect_records(
           lines,
         )
       "rust-crate" =>
-        extract_rust_file(
+        @extract_rust.extract_file(
           declarations,
           symbols,
           config.profile,
@@ -5062,12 +3092,15 @@ fn collect_records(
   }
 
   if config.profile == "go-module" {
-    postprocess_go_declarations(declarations, config.profile)
+    @extract_go.postprocess_declarations(declarations, config.profile)
   } else if config.profile == "rust-crate" {
-    postprocess_rust_declarations(declarations, config.profile)
+    @extract_rust.postprocess_declarations(declarations, config.profile)
   }
 
-  Ok((sort_and_dedup(declarations, "id"), sort_and_dedup(symbols, "id")))
+  Ok((
+    @extract.sort_and_dedup(declarations, "id"),
+    @extract.sort_and_dedup(symbols, "id"),
+  ))
 }
 
 ///|
@@ -5136,7 +3169,12 @@ fn extract_lsp_baseline(
   let files_out = resolve_input_files(config, repo)
   guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
 
-  let (mode, server) = profile_mode(config.profile)
+  let (_, server) = profile_mode(config.profile)
+  let mode = match config.profile {
+    "go-module" => "lsp-assisted"
+    "rust-crate" => "lsp-assisted"
+    _ => "parser-first"
+  }
   let (server_version, probe_failed) = lsp_runtime_probe(config.profile, server)
   let force_lsp_hardfail = @sys.get_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
     is Some("true")
@@ -5150,25 +3188,144 @@ fn extract_lsp_baseline(
     )
   }
   let fallback = probe_failed
+  let inventory_out = if probe_failed {
+    Ok([])
+  } else {
+    collect_lsp_inventory(config, repo, files)
+  }
+  guard inventory_out is Ok(inventory_keys) else {
+    return Err(inventory_out.unwrap_err())
+  }
   let records_out = collect_records(config, repo, files, server)
   guard records_out is Ok((declarations, symbols)) else {
     return Err(records_out.unwrap_err())
   }
 
   ensure_non_empty(declarations, symbols, config.profile, server)
-  let final_declarations = sort_and_dedup(declarations, "id")
-  let final_symbols = sort_and_dedup(symbols, "id")
+  let final_declarations = @extract.sort_and_dedup(declarations, "id")
+  let final_symbols = @extract.sort_and_dedup(symbols, "id")
+  if !fallback {
+    let inventory_check = validate_backend_inventory(
+      config.profile,
+      "lsp",
+      inventory_keys,
+      final_declarations,
+    )
+    guard inventory_check is Ok(_) else {
+      return Err(inventory_check.unwrap_err())
+    }
+  }
 
   Ok({
-    declarations_text: to_ndjson(final_declarations),
-    symbols_text: to_ndjson(final_symbols),
+    declarations_text: @extract.to_ndjson(final_declarations),
+    symbols_text: @extract.to_ndjson(final_symbols),
     mode,
-    server,
-    version: "\{server_version} | baseline-v2",
     fallback,
     declaration_count: final_declarations.length(),
     symbol_count: final_symbols.length(),
     diagnostic_files: 0,
     commit: resolve_git_commit(repo),
   })
+}
+
+///|
+fn extract_canonical(
+  config : @config.Config,
+  repo : String,
+) -> Result[ExtractOutput, @cli.CliError] {
+  let files_out = resolve_input_files(config, repo)
+  guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
+
+  let (mode, server) = profile_mode(config.profile)
+  let records_out = collect_records(config, repo, files, server)
+  guard records_out is Ok((declarations, symbols)) else {
+    return Err(records_out.unwrap_err())
+  }
+
+  ensure_non_empty(declarations, symbols, config.profile, server)
+  let final_declarations = @extract.sort_and_dedup(declarations, "id")
+  let final_symbols = @extract.sort_and_dedup(symbols, "id")
+
+  Ok({
+    declarations_text: @extract.to_ndjson(final_declarations),
+    symbols_text: @extract.to_ndjson(final_symbols),
+    mode,
+    fallback: false,
+    declaration_count: final_declarations.length(),
+    symbol_count: final_symbols.length(),
+    diagnostic_files: 0,
+    commit: resolve_git_commit(repo),
+  })
+}
+
+///|
+fn validate_with_lsp(
+  config : @config.Config,
+) -> Result[Unit, @cli.CliError] {
+  let (_, server) = profile_mode(config.profile)
+  let (server_version, probe_failed) = lsp_runtime_probe(config.profile, server)
+  let force_lsp_hardfail = @sys.get_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+    is Some("true")
+  if probe_failed &&
+    (config.profile == "go-module" || config.profile == "rust-crate") &&
+    force_lsp_hardfail {
+    return Err(
+      extractor_error(
+        "LSP server '\{server}' is required for profile '\{config.profile}' but could not be started: \{server_version}",
+      ),
+    )
+  }
+  Ok(())
+}
+
+///|
+/// extract_native uses the in-repo MoonBit extractor (collect_records) directly,
+/// emitting native-assisted mode metadata without any external binary dependency.
+fn extract_native(
+  config : @config.Config,
+  repo : String,
+) -> Result[ExtractOutput, @cli.CliError] {
+  let files_out = resolve_input_files(config, repo)
+  guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
+  let (mode, server) = profile_mode_native(config.profile)
+  let records_out = collect_records(config, repo, files, server)
+  guard records_out is Ok((declarations, symbols)) else {
+    return Err(records_out.unwrap_err())
+  }
+  ensure_non_empty(declarations, symbols, config.profile, server)
+  let final_declarations = @extract.sort_and_dedup(declarations, "id")
+  let final_symbols = @extract.sort_and_dedup(symbols, "id")
+  Ok({
+    declarations_text: @extract.to_ndjson(final_declarations),
+    symbols_text: @extract.to_ndjson(final_symbols),
+    mode,
+    fallback: false,
+    declaration_count: final_declarations.length(),
+    symbol_count: final_symbols.length(),
+    diagnostic_files: 0,
+    commit: resolve_git_commit(repo),
+  })
+}
+
+///|
+/// extract_build is the shared extractor entry for build.
+/// S3 keeps backend selection internal and only returns canonical output metadata.
+fn extract_build(
+  config : @config.Config,
+  repo : String,
+) -> Result[ExtractOutput, @cli.CliError] {
+  let backend = resolve_backend_override()
+  let extract_out = match backend {
+    "native" => extract_native(config, repo)
+    "lsp" => extract_lsp_baseline(config, repo)
+    _ => extract_canonical(config, repo)
+  }
+  guard extract_out is Ok(extract) else {
+    return Err(extract_out.unwrap_err())
+  }
+  if backend == "canonical" && resolve_validation_mode(config) == "lsp" {
+    let validation_out = validate_with_lsp(config)
+    guard validation_out is Ok(_) else { return Err(validation_out.unwrap_err()) }
+  }
+  Ok(extract)
 }

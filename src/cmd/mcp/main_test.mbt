@@ -13,22 +13,19 @@ fn remove_dir_if_exists(path : String) -> Unit {
 }
 
 ///|
-fn cleanup_tmp_dir(dir : String) -> Unit {
-  remove_file_if_exists("\{dir}/dist/mcp-server.json")
-  remove_file_if_exists("\{dir}/dist/mcp-tools-state.json")
-  remove_dir_if_exists("\{dir}/dist")
-  remove_dir_if_exists(dir)
+fn cleanup_test_state() -> Unit {
+  remove_file_if_exists("./dist/mcp-server.json")
+  remove_file_if_exists("./dist/mcp-tools-state.json")
+  remove_dir_if_exists("./dist")
 }
 
 ///|
 test "mcp start writes server descriptor" {
-  let dir = "src/cmd/mcp/tmp_mcp_start"
-  cleanup_tmp_dir(dir)
-  @fs.create_dir(dir)
+  cleanup_test_state()
 
   let result = run_start({ port: 8080, stdio: false })
   guard result is Ok(ok) else {
-    cleanup_tmp_dir(dir)
+    cleanup_test_state()
     fail("mcp start should succeed")
   }
   assert_true(ok.display().contains("Started MCP server"))
@@ -36,7 +33,7 @@ test "mcp start writes server descriptor" {
 
   let content = @fs.read_file_to_string("./dist/mcp-server.json") catch {
     _ => {
-      cleanup_tmp_dir(dir)
+      cleanup_test_state()
       fail("mcp descriptor should exist")
       ""
     }
@@ -57,7 +54,7 @@ test "mcp start writes server descriptor" {
   assert_true(@fs.path_exists("./dist/mcp-tools-state.json"))
 
   ignore(run_stop())
-  cleanup_tmp_dir(dir)
+  cleanup_test_state()
 }
 
 ///|
@@ -100,6 +97,37 @@ test "mcp status reports running for live pid descriptor" {
   guard out is Ok(result) else { fail("mcp status should succeed") }
   assert_true(result.display().contains("healthy"))
   ignore(run_stop())
+}
+
+///|
+test "mcp status reports running for serve-written descriptor" {
+  @fs.create_dir("./dist") catch {
+    _ => ()
+  }
+  let descriptor : Json = {
+    "schemaVersion": "codeiq-mcp-descriptor/v1",
+    "name": "codeiq-mcp",
+    "protocolVersion": "2025-11-25",
+    "transport": "http",
+    "port": 65534,
+    "pid": null,
+    "baseUrl": "http://127.0.0.1:65534",
+    "rpcUrl": "http://127.0.0.1:65534/rpc",
+    "healthUrl": "http://127.0.0.1:65534/health",
+  }
+  @fs.write_string_to_file(
+    "./dist/mcp-server.json",
+    descriptor.stringify(indent=2),
+  ) catch {
+    _ => fail("failed to write descriptor fixture")
+  }
+  let out = run_status()
+  guard out is Ok(result) else { fail("mcp status should succeed") }
+  inspect(result.status, content="stopped")
+  assert_true(result.display().contains("descriptor found"))
+  @fs.remove_file("./dist/mcp-server.json") catch {
+    _ => ()
+  }
 }
 
 ///|

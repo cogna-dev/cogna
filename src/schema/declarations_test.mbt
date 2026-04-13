@@ -236,7 +236,9 @@ test "declaration schema accepts richer terraform contract metadata" {
   )
 
   guard validate_ciq_declaration_v1(record) is Ok(_) else {
-    fail("terraform richer contract metadata should satisfy ciq-declaration/v1 schema")
+    fail(
+      "terraform richer contract metadata should satisfy ciq-declaration/v1 schema",
+    )
   }
 }
 
@@ -285,7 +287,9 @@ test "declaration schema accepts terraform lifecycle metadata" {
   )
 
   guard validate_ciq_declaration_v1(record) is Ok(_) else {
-    fail("terraform lifecycle metadata should satisfy ciq-declaration/v1 schema")
+    fail(
+      "terraform lifecycle metadata should satisfy ciq-declaration/v1 schema",
+    )
   }
 }
 
@@ -334,7 +338,9 @@ test "declaration schema accepts richer openapi contract metadata" {
   )
 
   guard validate_ciq_declaration_v1(record) is Ok(_) else {
-    fail("openapi richer contract metadata should satisfy ciq-declaration/v1 schema")
+    fail(
+      "openapi richer contract metadata should satisfy ciq-declaration/v1 schema",
+    )
   }
 }
 
@@ -386,7 +392,9 @@ test "declaration schema accepts openapi discriminator and composition metadata"
   )
 
   guard validate_ciq_declaration_v1(record) is Ok(_) else {
-    fail("openapi discriminator and composition metadata should satisfy ciq-declaration/v1 schema")
+    fail(
+      "openapi discriminator and composition metadata should satisfy ciq-declaration/v1 schema",
+    )
   }
 }
 
@@ -435,7 +443,9 @@ test "declaration schema accepts richer language-specific semantics" {
   )
 
   guard validate_ciq_declaration_v1(record) is Ok(_) else {
-    fail("richer shape/language_specific payload should satisfy ciq-declaration/v1 schema")
+    fail(
+      "richer shape/language_specific payload should satisfy ciq-declaration/v1 schema",
+    )
   }
 }
 

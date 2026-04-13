@@ -1,5 +1,8 @@
 ///|
 fn cleanup_lsp_e2e(path : String) -> Unit {
+  @fs.remove_file("\{path}/codeiq.yml") catch {
+    _ => ()
+  }
   @fs.remove_file("\{path}/codeiq.yaml") catch {
     _ => ()
   }
@@ -19,6 +22,12 @@ fn cleanup_lsp_e2e(path : String) -> Unit {
     _ => ()
   }
   @fs.remove_file("\{path}/dist/symbols.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{path}/dist/software-components.ndjson") catch {
+    _ => ()
+  }
+  @fs.remove_file("\{path}/dist/sbom.spdx.json") catch {
     _ => ()
   }
   @fs.remove_file("\{path}/dist/metadata.json") catch {
@@ -91,7 +100,7 @@ fn read_text(path : String) -> String {
 }
 
 ///|
-test "e2e build lsp extractor writes baseline metadata and symbols" {
+test "e2e build extractor writes canonical metadata and symbols" {
   let path = "src/e2e/tmp_lsp_extractor_e2e"
   cleanup_lsp_e2e(path)
   write_openapi_repo(path)
@@ -109,9 +118,14 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   )
 
   let metadata = @fs.read_file_to_string("\{path}/dist/metadata.json")
-  assert_true(metadata.contains("\"role\": \"baseline\""))
+  assert_true(metadata.contains("\"role\": \"canonical\""))
+  assert_true(metadata.contains("\"backend\": \"canonical\""))
   assert_true(metadata.contains("\"mode\": \"parser-only\""))
-  assert_true(metadata.contains("\"version\": \"none | baseline-v2\""))
+  assert_true(metadata.contains("\"server\": \"canonical\""))
+  assert_true(metadata.contains("\"version\": \"canonical-v1\""))
+  assert_false(metadata.contains("\"requestedBackend\""))
+  assert_false(metadata.contains("\"effectiveBackend\""))
+  assert_false(metadata.contains("\"supportedBackends\""))
 
   let manifest = @fs.read_file_to_string("\{path}/dist/manifest.json")
   assert_true(manifest.contains("\"schemaVersion\": \"ciq-bundle/v1\""))
@@ -125,11 +139,23 @@ test "e2e build lsp extractor writes baseline metadata and symbols" {
   assert_true(declarations.contains("\"kind\":\"operation\""))
   assert_true(declarations.contains("\"kind\":\"path\""))
   assert_true(declarations.contains("\"name\":\"Payment.discriminator\""))
-  assert_true(declarations.contains("\"statusCodes\":[\"200\"]") || declarations.contains("\"statusCodes\": [\"200\"]"))
-  assert_true(declarations.contains("\"mediaTypes\":[\"application/json\"]") || declarations.contains("\"mediaTypes\": [\"application/json\"]"))
+  assert_true(
+    declarations.contains("\"statusCodes\":[\"200\"]") ||
+    declarations.contains("\"statusCodes\": [\"200\"]"),
+  )
+  assert_true(
+    declarations.contains("\"mediaTypes\":[\"application/json\"]") ||
+    declarations.contains("\"mediaTypes\": [\"application/json\"]"),
+  )
   assert_true(declarations.contains("callbackUrl"))
-  assert_true(declarations.contains("\"discriminatorProperty\":\"type\"") || declarations.contains("\"discriminatorProperty\": \"type\""))
-  assert_true(declarations.contains("\"securitySchemeType\":\"apiKey\"") || declarations.contains("\"securitySchemeType\": \"apiKey\""))
+  assert_true(
+    declarations.contains("\"discriminatorProperty\":\"type\"") ||
+    declarations.contains("\"discriminatorProperty\": \"type\""),
+  )
+  assert_true(
+    declarations.contains("\"securitySchemeType\":\"apiKey\"") ||
+    declarations.contains("\"securitySchemeType\": \"apiKey\""),
+  )
   assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
   assert_true(declarations.contains("\"shape\":{\"kind\":"))
   assert_true(declarations.contains("\"relations\":[{\"kind\":\"declared_in\""))
@@ -191,7 +217,12 @@ test "e2e go extractor includes richer relations" {
   }
 
   let metadata = @fs.read_file_to_string("\{path}/dist/metadata.json")
-  assert_true(metadata.contains("\"server\": \"gopls\""))
+  assert_true(metadata.contains("\"server\": \"canonical\""))
+  assert_true(metadata.contains("\"backend\": \"canonical\""))
+  assert_true(metadata.contains("\"role\": \"canonical\""))
+  assert_false(metadata.contains("\"requestedBackend\""))
+  assert_false(metadata.contains("\"effectiveBackend\""))
+  assert_false(metadata.contains("\"supportedBackends\""))
 
   let declarations = read_text("\{path}/dist/declarations.ndjson")
   assert_true(declarations.contains("\"kind\":\"function\""))
@@ -208,14 +239,28 @@ test "e2e go extractor includes richer relations" {
   assert_true(
     declarations.contains("\"kind\":\"has_parameter\"") ||
     declarations.contains("\"kind\":\"returns\"") ||
-      declarations.contains("\"kind\":\"references_type\""),
+    declarations.contains("\"kind\":\"references_type\""),
   )
   assert_true(declarations.contains("\"pointerReceiver\":true"))
   assert_true(declarations.contains("\"pointerReceiver\":false"))
-  assert_true(declarations.contains("\"methodSetTypes\":[\"Greeter\",\"*Greeter\",\"Box\",\"*Box\"]"))
-  assert_true(declarations.contains("\"methodSetTypes\":[\"*Greeter\",\"*Box\"]"))
-  assert_true(declarations.contains("\"kind\":\"has_member\",\"target\":\"decl:go-module:go-module::main.go::Greet\""))
-  assert_true(declarations.contains("\"kind\":\"has_member\",\"target\":\"decl:go-module:go-module::main.go::Label\""))
+  assert_true(
+    declarations.contains(
+      "\"methodSetTypes\":[\"Greeter\",\"*Greeter\",\"Box\",\"*Box\"]",
+    ),
+  )
+  assert_true(
+    declarations.contains("\"methodSetTypes\":[\"*Greeter\",\"*Box\"]"),
+  )
+  assert_true(
+    declarations.contains(
+      "\"kind\":\"has_member\",\"target\":\"decl:go-module:go-module::main.go::Greet\"",
+    ),
+  )
+  assert_true(
+    declarations.contains(
+      "\"kind\":\"has_member\",\"target\":\"decl:go-module:go-module::main.go::Label\"",
+    ),
+  )
 
   cleanup_lsp_e2e(path)
 }
@@ -287,14 +332,27 @@ test "e2e rust extractor carries doc comments" {
   assert_true(declarations.contains("Public module doc sample."))
   assert_true(declarations.contains("ApiItem doc comment.\\nDeprecated"))
   assert_true(declarations.contains("Constructor doc comment."))
-  assert_true(declarations.contains("\"name\":\"Borrowed<'a, const N: usize>\"") || declarations.contains("Borrowed<'a, const N: usize>"))
-  assert_true(declarations.contains("\"typeParams\":[\"'a\",\"const N: usize\"]"))
+  assert_true(
+    declarations.contains("\"name\":\"Borrowed<'a, const N: usize>\"") ||
+    declarations.contains("Borrowed<'a, const N: usize>"),
+  )
+  assert_true(
+    declarations.contains("\"typeParams\":[\"'a\",\"const N: usize\"]"),
+  )
   assert_true(declarations.contains("\"unsafe\":true"))
   assert_true(declarations.contains("\"externAbi\":\"C\""))
   assert_true(declarations.contains("\"traitTarget\":\"Service<T>\""))
   assert_true(declarations.contains("\"implTarget\":\"ApiItem<T>\""))
-  assert_true(declarations.contains("\"kind\":\"implements\",\"target\":\"type:rust-crate::Service<T>\""))
-  assert_true(declarations.contains("\"kind\":\"has_member\",\"target\":\"decl:rust-crate:rust-crate::lib.rs::new\""))
+  assert_true(
+    declarations.contains(
+      "\"kind\":\"implements\",\"target\":\"type:rust-crate::Service<T>\"",
+    ),
+  )
+  assert_true(
+    declarations.contains(
+      "\"kind\":\"has_member\",\"target\":\"decl:rust-crate:rust-crate::lib.rs::new\"",
+    ),
+  )
 
   cleanup_lsp_e2e(path)
 }

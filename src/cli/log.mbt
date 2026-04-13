@@ -1,7 +1,14 @@
 ///|
 pub(all) struct Logger {
   color : Bool
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for Logger with output(self, logger) {
+  logger.write_string("{color: ")
+  logger.write_object(self.color)
+  logger.write_char('}')
+}
 
 ///|
 const ANSI_RESET : String = "\u001b[0m"

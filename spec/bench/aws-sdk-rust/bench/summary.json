@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "ciq-bench/v1",
+  "fixture": "/tmp/aws-sdk-rust-s3-public/src/client.rs",
+  "parityPassed": true,
+  "sampling": {
+    "warmupRuns": 1,
+    "measureRuns": 9
+  },
+  "runs": [
+    {
+      "fixture": "/tmp/aws-sdk-rust-s3-public/src/client.rs",
+      "backend": "native",
+      "mode": "native-assisted",
+      "parity": true,
+      "metrics": {
+        "wallMs": 203,
+        "cpuMs": 161,
+        "peakRssMb": 47,
+        "bundleBytesRaw": 32048,
+        "bundleBytesGzip": 4590,
+        "declarations": 12,
+        "symbols": 12,
+        "bytesPerDeclaration": 2670,
+        "snapshotDiffCount": 0
+      },
+      "lsif": {
+        "supported": false,
+        "reason": "LSIF skipped for phase5 mini fixture",
+        "bytesRaw": 0,
+        "bytesGzip": 0
+      }
+    },
+    {
+      "fixture": "/tmp/aws-sdk-rust-s3-public/src/client.rs",
+      "backend": "lsp",
+      "mode": "lsp-assisted",
+      "parity": true,
+      "metrics": {
+        "wallMs": 276,
+        "cpuMs": 172,
+        "peakRssMb": 71,
+        "bundleBytesRaw": 32048,
+        "bundleBytesGzip": 4590,
+        "declarations": 12,
+        "symbols": 12,
+        "bytesPerDeclaration": 2670,
+        "snapshotDiffCount": 0
+      },
+      "lsif": {
+        "supported": false,
+        "reason": "LSIF skipped for phase5 mini fixture",
+        "bytesRaw": 0,
+        "bytesGzip": 0
+      }
+    }
+  ]
+}

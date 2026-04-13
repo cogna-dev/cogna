@@ -1,4 +1,61 @@
 ///|
+fn semantic_finding_schema() -> Json {
+  {
+    "type": "object",
+    "required": ["code"],
+    "properties": { "code": { "type": "string", "minLength": 1 } },
+    "additionalProperties": true,
+  }
+}
+
+///|
+fn semantic_diff_schema() -> Json {
+  {
+    "type": "object",
+    "properties": {
+      "findings": { "type": "array", "items": semantic_finding_schema() },
+      "changedFields": { "type": "array" },
+      "shapeDiff": { "type": "object" },
+      "languageSpecificDiff": { "type": "object" },
+    },
+    "additionalProperties": true,
+  }
+}
+
+///|
+pub fn codeiq_policy_rules_v1_schema() -> @json_schema.JsonSchema {
+  {
+    "type": "object",
+    "required": ["schemaVersion", "rules"],
+    "properties": {
+      "schemaVersion": { "type": "string", "const": "codeiq-policy-rules/v1" },
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id", "family", "defaultLevel", "summary", "docs", "entrypoint",
+          ],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "family": { "type": "string", "minLength": 1 },
+            "defaultLevel": {
+              "type": "string",
+              "enum": ["error", "warning", "note"],
+            },
+            "summary": { "type": "string", "minLength": 1 },
+            "docs": { "type": "string", "minLength": 1 },
+            "entrypoint": { "type": "string", "minLength": 1 },
+          },
+          "additionalProperties": false,
+        },
+      },
+    },
+    "additionalProperties": false,
+  }
+}
+
+///|
 pub fn ciq_bundle_v1_schema() -> @json_schema.JsonSchema {
   {
     "type": "object",
@@ -92,15 +149,14 @@ pub fn ciq_diff_v1_schema() -> @json_schema.JsonSchema {
             },
             "before": { "type": "string", "minLength": 1 },
             "after": { "type": "string", "minLength": 1 },
-             "beforeRecord": { "type": "object" },
-             "afterRecord": { "type": "object" },
-             "semanticCategory": { "type": "string", "minLength": 1 },
-             "semanticDiff": { "type": "object" },
-             "componentDiff": { "type": "object" },
-           },
-           "additionalProperties": true,
-         },
-       },
+            "beforeRecord": { "type": "object" },
+            "afterRecord": { "type": "object" },
+            "semanticDiff": semantic_diff_schema(),
+            "componentDiff": { "type": "object" },
+          },
+          "additionalProperties": false,
+        },
+      },
       "includeTestChanges": { "type": "boolean" },
       "testSummary": {
         "type": "object",
@@ -168,7 +224,7 @@ pub fn ciq_query_v1_schema() -> @json_schema.JsonSchema {
       "purl": { "type": "string", "minLength": 1 },
       "selector": {
         "type": "object",
-        "required": ["path", "kind"],
+        "required": ["path"],
         "properties": {
           "path": { "type": "string", "minLength": 1 },
           "kind": { "type": "string", "minLength": 1 },
@@ -364,13 +420,45 @@ pub fn codeiq_publish_receipt_v1_schema() -> @json_schema.JsonSchema {
       },
       "downloadUrl": { "type": "string", "minLength": 1 },
       "status": { "type": "string", "enum": ["published", "already-exists"] },
+      "dependencyCount": { "type": "integer" },
+      "dependencyReceipts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "schemaVersion", "publishId", "bundleId", "purl", "digest", "bundleType",
+            "downloadUrl", "status", "provenance",
+          ],
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "codeiq-publish-receipt/v1",
+            },
+            "publishId": { "type": "string", "minLength": 1 },
+            "bundleId": { "type": "string", "minLength": 1 },
+            "purl": { "type": "string", "minLength": 1 },
+            "digest": { "type": "string", "minLength": 1 },
+            "bundleType": {
+              "type": "string",
+              "enum": ["ciq-bundle", "ciq-opa-bundle"],
+            },
+            "downloadUrl": { "type": "string", "minLength": 1 },
+            "status": {
+              "type": "string",
+              "enum": ["published", "already-exists"],
+            },
+            "provenance": { "type": "object" },
+          },
+          "additionalProperties": true,
+        },
+      },
       "provenance": {
         "type": "object",
         "required": ["source", "digestVerified"],
         "properties": {
           "source": {
             "type": "string",
-            "enum": ["local-registry"],
+            "enum": ["local-registry", "remote-registry"],
           },
           "digestVerified": { "type": "boolean" },
           "etag": { "type": "string", "minLength": 1 },
@@ -549,6 +637,13 @@ pub fn validate_ciq_opa_bundle_v1(
   instance : Json,
 ) -> Result[Unit, @json_schema.SchemaError] {
   @json_schema.validate_json(ciq_opa_bundle_v1_schema(), instance)
+}
+
+///|
+pub fn validate_codeiq_policy_rules_v1(
+  instance : Json,
+) -> Result[Unit, @json_schema.SchemaError] {
+  @json_schema.validate_json(codeiq_policy_rules_v1_schema(), instance)
 }
 
 ///|

@@ -122,6 +122,25 @@ test "ciq-diff schema rejects malformed test changes" {
 }
 
 ///|
+test "ciq-query schema accepts selector kind omission" {
+  let query = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "ciq-query/v1",
+      #|  "purl": "pkg:openapi/acme/payment-api@2026.04.01",
+      #|  "selector": {
+      #|    "path": "openapi/payment.yaml"
+      #|  },
+      #|  "intent": "lookup"
+      #|}
+    ),
+  )
+  guard validate_ciq_query_v1(query) is Ok(_) else {
+    fail("ciq-query should allow selector kind omission")
+  }
+}
+
+///|
 test "ciq-result schema accepts richer declaration matches" {
   let result = must_parse_json_contract(
     (
@@ -234,7 +253,7 @@ test "ciq-diff schema accepts richer before and after record payloads" {
 }
 
 ///|
-test "ciq-diff schema accepts semanticCategory on change entries" {
+test "ciq-diff schema accepts semantic findings on change entries" {
   let diff = must_parse_json_contract(
     (
       #|{
@@ -248,7 +267,12 @@ test "ciq-diff schema accepts semanticCategory on change entries" {
       #|      "id": "decl:rust-crate:rust-crate::lib.rs::dangerous",
       #|      "path": "lib.rs",
       #|      "level": "breaking",
-      #|      "semanticCategory": "rust-became-unsafe",
+      #|      "semanticDiff": {
+      #|        "findings": [
+      #|          {"code": "rust-became-unsafe"},
+      #|          {"code": "rust-signature-changed"}
+      #|        ]
+      #|      },
       #|      "before": "pub fn dangerous() -> i32",
       #|      "after": "pub unsafe fn dangerous() -> i32",
       #|      "beforeRecord": {"id": "decl:rust-crate:rust-crate::lib.rs::dangerous"},
@@ -259,7 +283,11 @@ test "ciq-diff schema accepts semanticCategory on change entries" {
       #|      "id": "decl:rust-crate:rust-crate::lib.rs::old_fn",
       #|      "path": "lib.rs",
       #|      "level": "breaking",
-      #|      "semanticCategory": "removed-declaration",
+      #|      "semanticDiff": {
+      #|        "findings": [
+      #|          {"code": "removed-declaration"}
+      #|        ]
+      #|      },
       #|      "beforeRecord": {"id": "decl:rust-crate:rust-crate::lib.rs::old_fn"}
       #|    }
       #|  ]
@@ -267,8 +295,40 @@ test "ciq-diff schema accepts semanticCategory on change entries" {
     ),
   )
   guard validate_ciq_diff_v1(diff) is Ok(_) else {
-    fail("ciq-diff should accept semanticCategory on change entries")
+    fail("ciq-diff should accept semantic findings on change entries")
   }
+}
+
+///|
+test "ciq-diff schema rejects semanticCategory after cleanup" {
+  let diff = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "ciq-diff/v1",
+      #|  "basePurl": "pkg:cargo/example/demo@0.1.0",
+      #|  "targetPurl": "pkg:cargo/example/demo@0.2.0",
+      #|  "summary": {"added":0,"removed":0,"changed":1,"deprecated":0},
+      #|  "changes": [
+      #|    {
+      #|      "kind": "changed",
+      #|      "id": "decl:rust-crate:rust-crate::lib.rs::dangerous",
+      #|      "path": "lib.rs",
+      #|      "level": "breaking",
+      #|      "semanticCategory": "rust-became-unsafe",
+      #|      "before": "pub fn dangerous() -> i32",
+      #|      "after": "pub unsafe fn dangerous() -> i32"
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  let out = validate_ciq_diff_v1(diff)
+  guard out is Err(error) else {
+    fail("ciq-diff should reject semanticCategory after cleanup")
+  }
+  assert_true(
+    error.to_string().contains("additional property semanticCategory"),
+  )
 }
 
 ///|
@@ -286,7 +346,9 @@ test "ciq-diff schema accepts componentDiff on change entries" {
       #|      "id": "pkg:npm/react@19.0.0",
       #|      "path": "package.json",
       #|      "level": "warning",
-      #|      "semanticCategory": "component-version-upgrade",
+      #|      "semanticDiff": {
+      #|        "findings": []
+      #|      },
       #|      "componentDiff": {
       #|        "changedFields": ["version", "purl"],
       #|        "upgradeKind": "version-upgrade",
@@ -307,6 +369,29 @@ test "ciq-diff schema accepts componentDiff on change entries" {
   }
 }
 
+///|
+test "policy rules schema validates generated catalog shape" {
+  let rules = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-policy-rules/v1",
+      #|  "rules": [
+      #|    {
+      #|      "id": "compat.rust.signature-changed",
+      #|      "family": "rust",
+      #|      "defaultLevel": "warning",
+      #|      "summary": "Rust public signature changed.",
+      #|      "docs": "https://codeiq.xaclabs.dev/docs/policies/generated/rust/signature-changed",
+      #|      "entrypoint": "data.codeiq.compat.deny"
+      #|    }
+      #|  ]
+      #|}
+    ),
+  )
+  guard validate_codeiq_policy_rules_v1(rules) is Ok(_) else {
+    fail("policy rules catalog should satisfy codeiq-policy-rules/v1 schema")
+  }
+}
 
 ///|
 test "sarif minimal schema validates skeleton output" {
@@ -605,6 +690,48 @@ test "publish-receipt schema validates signature value" {
   )
   guard validate_codeiq_publish_receipt_v1(receipt) is Ok(_) else {
     fail("publish receipt should allow signature value")
+  }
+}
+
+///|
+test "publish-receipt schema validates dependency receipts summary" {
+  let receipt = must_parse_json_contract(
+    (
+      #|{
+      #|  "schemaVersion": "codeiq-publish-receipt/v1",
+      #|  "publishId": "pub_01JY4EXAMPLE",
+      #|  "bundleId": "bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      #|  "purl": "pkg:openapi/acme/payment-api@2026.03.01",
+      #|  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      #|  "bundleType": "ciq-bundle",
+      #|  "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ciq.tgz",
+      #|  "status": "published",
+      #|  "dependencyCount": 1,
+      #|  "dependencyReceipts": [
+      #|    {
+      #|      "schemaVersion": "codeiq-publish-receipt/v1",
+      #|      "publishId": "pub_dep_01JY4EXAMPLE",
+      #|      "bundleId": "bundle_sha256_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      #|      "purl": "pkg:npm/react@18.2.0",
+      #|      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      #|      "bundleType": "ciq-bundle",
+      #|      "downloadUrl": "local://.codeiq/cache/registry/bundles/bundle_sha256_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ciq.tgz",
+      #|      "status": "published",
+      #|      "provenance": {
+      #|        "source": "local-registry",
+      #|        "digestVerified": true
+      #|      }
+      #|    }
+      #|  ],
+      #|  "provenance": {
+      #|    "source": "local-registry",
+      #|    "digestVerified": true
+      #|  }
+      #|}
+    ),
+  )
+  guard validate_codeiq_publish_receipt_v1(receipt) is Ok(_) else {
+    fail("publish receipt should allow dependency receipt aggregation")
   }
 }
 

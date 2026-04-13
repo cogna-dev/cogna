@@ -1,13 +1,29 @@
 ///|
 pub(all) struct QueryParams {
   query_file : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for QueryParams with output(self, logger) {
+  logger.write_string("{query_file: ")
+  logger.write_object(self.query_file)
+  logger.write_char('}')
+}
 
 ///|
 pub(all) struct QueryResult {
   query_file : String
   summary : String
-} derive(Show, Eq)
+} derive(Eq)
+
+///|
+pub impl Show for QueryResult with output(self, logger) {
+  logger.write_string("{query_file: ")
+  logger.write_object(self.query_file)
+  logger.write_string(", summary: ")
+  logger.write_object(self.summary)
+  logger.write_char('}')
+}
 
 ///|
 pub impl @cli.Display for QueryResult with display(self : QueryResult) -> String {
@@ -132,11 +148,42 @@ fn selector_value(query : Json, field : String, fallback : String) -> String {
 }
 
 ///|
+fn selector_kind_hint(query : Json) -> String? {
+  guard query is Object(query_object) else { return None }
+  guard query_object.get("selector") is Some(Object(selector_object)) else {
+    return None
+  }
+  match selector_object.get("kind") {
+    Some(String(value)) if value != "" => Some(value)
+    _ => None
+  }
+}
+
+///|
 fn record_string(record : Json, field : String) -> String? {
   guard record is Object(object) else { return None }
   match object.get(field) {
     Some(String(value)) if value != "" => Some(value)
     _ => None
+  }
+}
+
+///|
+fn selector_match_rank(record : Json, selector_path : String) -> Int? {
+  let path = record_string(record, "path").unwrap_or("")
+  let canonical_name = record_string(record, "canonical_name").unwrap_or("")
+  let id = record_string(record, "id").unwrap_or("")
+  let signature = record_string(record, "signature").unwrap_or("")
+  if path == selector_path {
+    Some(0)
+  } else if canonical_name == selector_path {
+    Some(1)
+  } else if id.contains(selector_path) {
+    Some(2)
+  } else if signature.contains(selector_path) {
+    Some(3)
+  } else {
+    None
   }
 }
 
@@ -183,17 +230,8 @@ fn append_result_passthrough_fields(
   record_object : Map[String, Json],
 ) -> Unit {
   let fields = [
-    "path",
-    "name",
-    "canonical_name",
-    "language",
-    "baselineRole",
-    "source_refs",
-    "relations",
-    "visibility",
-    "docs",
-    "shape",
-    "language_specific",
+    "path", "name", "canonical_name", "language", "baselineRole", "source_refs",
+    "relations", "visibility", "docs", "shape", "language_specific",
   ]
   for i in 0..<fields.length() {
     append_record_field(target, record_object, fields[i])
@@ -279,7 +317,8 @@ fn all_bundle_records_with_cancel(
 fn record_matches_selector(
   record : Json,
   selector_path : String,
-  selector_kind : String,
+  selector_kind : String?,
+  expected_rank : Int,
 ) -> Json? {
   let path = match record_string(record, "path") {
     Some(value) => value
@@ -301,20 +340,28 @@ fn record_matches_selector(
   if id == "" || kind == "" || signature == "" {
     return None
   }
-  if kind != selector_kind {
+  match selector_kind {
+    Some(kind_hint) if kind != kind_hint => return None
+    _ => ()
+  }
+  guard selector_match_rank(record, selector_path) is Some(rank) else {
     return None
   }
-  if path != selector_path && !id.contains(selector_path) {
+  if rank != expected_rank {
     return None
   }
+
+  let location_path = if path == "" { selector_path } else { path }
 
   let match_record : Map[String, Json] = {
     "id": id,
     "kind": kind,
     "signature": signature,
-    "location": record_location(record, path),
+    "location": record_location(record, location_path),
   }
-  guard record is Object(record_object) else { return Some(Json::object(match_record)) }
+  guard record is Object(record_object) else {
+    return Some(Json::object(match_record))
+  }
   append_result_passthrough_fields(match_record, record_object)
   Some(Json::object(match_record))
 }
@@ -323,23 +370,26 @@ fn record_matches_selector(
 pub fn query_matches(
   repo : String,
   selector_path : String,
-  selector_kind : String,
+  selector_kind : String?,
 ) -> Array[Json] {
   let selected : Array[Json] = []
   let seen : Map[String, Bool] = {}
   let records = all_bundle_records(repo)
-  for i in 0..<records.length() {
-    let match_out = record_matches_selector(
-      records[i],
-      selector_path,
-      selector_kind,
-    )
-    guard match_out is Some(found) else { continue }
-    guard found is Object(found_object) else { continue }
-    guard found_object.get("id") is Some(String(id)) else { continue }
-    if !seen.contains(id) {
-      seen[id] = true
-      selected.push(found)
+  for rank in 0..<4 {
+    for i in 0..<records.length() {
+      let match_out = record_matches_selector(
+        records[i],
+        selector_path,
+        selector_kind,
+        rank,
+      )
+      guard match_out is Some(found) else { continue }
+      guard found is Object(found_object) else { continue }
+      guard found_object.get("id") is Some(String(id)) else { continue }
+      if !seen.contains(id) {
+        seen[id] = true
+        selected.push(found)
+      }
     }
   }
   selected
@@ -349,28 +399,31 @@ pub fn query_matches(
 pub fn query_matches_with_cancel(
   repo : String,
   selector_path : String,
-  selector_kind : String,
+  selector_kind : String?,
   cancelled : () -> Bool,
 ) -> Result[Array[Json], String] {
   let records_out = all_bundle_records_with_cancel(repo, cancelled)
   guard records_out is Ok(records) else { return Err(records_out.unwrap_err()) }
   let selected : Array[Json] = []
   let seen : Map[String, Bool] = {}
-  for i in 0..<records.length() {
-    if query_deadline_exceeded(cancelled) {
-      return Err("request cancelled")
-    }
-    let match_out = record_matches_selector(
-      records[i],
-      selector_path,
-      selector_kind,
-    )
-    guard match_out is Some(found) else { continue }
-    guard found is Object(found_object) else { continue }
-    guard found_object.get("id") is Some(String(id)) else { continue }
-    if !seen.contains(id) {
-      seen[id] = true
-      selected.push(found)
+  for rank in 0..<4 {
+    for i in 0..<records.length() {
+      if query_deadline_exceeded(cancelled) {
+        return Err("request cancelled")
+      }
+      let match_out = record_matches_selector(
+        records[i],
+        selector_path,
+        selector_kind,
+        rank,
+      )
+      guard match_out is Some(found) else { continue }
+      guard found is Object(found_object) else { continue }
+      guard found_object.get("id") is Some(String(id)) else { continue }
+      if !seen.contains(id) {
+        seen[id] = true
+        selected.push(found)
+      }
     }
   }
   Ok(selected)
@@ -382,7 +435,7 @@ fn parse_cursor(cursor : String?) -> Int {
     Some(value) if value.has_prefix("cursor:") => {
       let suffix = value.split(":").to_array()
       if suffix.length() == 2 {
-        let parsed = try? @strconv.parse_int(suffix[1])
+        let parsed = try? @string.parse_int(suffix[1])
         match parsed {
           Ok(number) if number >= 0 => number
           _ => 0
@@ -529,7 +582,7 @@ fn result_path(query_file : String) -> String {
 ///|
 fn ciq_result(query : Json, query_file : String) -> Json {
   let path = selector_value(query, "path", "unknown")
-  let kind = selector_value(query, "kind", "symbol")
+  let kind = selector_kind_hint(query)
   let query_repo_value = query_repo(query)
   let repo = if query_repo_value == "." {
     parent_dir(query_file)

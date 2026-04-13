@@ -1,0 +1,122 @@
+name: 'Setup CodeIQ'
+description: 'Install the CodeIQ CLI from this repository source and add it to PATH'
+author: 'yufeiminds'
+
+inputs:
+  working-directory:
+    description: 'Optional CodeIQ source root override. Defaults to the action repository root.'
+    required: false
+    default: ''
+  install-dir:
+    description: 'Optional directory to install the CLI into. Defaults to RUNNER_TEMP/codeiq/bin.'
+    required: false
+    default: ''
+  binary-name:
+    description: 'Final executable name exposed on PATH.'
+    required: false
+    default: 'codeiq'
+
+outputs:
+  codeiq-path:
+    description: 'The installed CodeIQ executable path'
+    value: ${{ steps.metadata.outputs.codeiq-path }}
+  codeiq-version:
+    description: 'The CodeIQ version from moon.mod.json'
+    value: ${{ steps.metadata.outputs.codeiq-version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install CodeIQ (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        source_root="${{ inputs.working-directory }}"
+        if [ -z "$source_root" ]; then
+          source_root="${{ github.action_path }}/../../.."
+        fi
+        install_dir="${{ inputs.install-dir }}"
+        if [ -z "$install_dir" ]; then
+          install_dir="${RUNNER_TEMP}/codeiq/bin"
+        fi
+        binary_name="${{ inputs.binary-name }}"
+        mkdir -p "$install_dir"
+        cd "$source_root"
+        moon install --bin "$install_dir" --path src/cmd/main
+        main_path="$install_dir/main"
+        if [ ! -x "$main_path" ]; then
+          echo "Expected MoonBit install to create $main_path" >&2
+          exit 1
+        fi
+        codeiq_path="$install_dir/$binary_name"
+        if [ "$binary_name" != "main" ]; then
+          ln -sf "$main_path" "$codeiq_path"
+        else
+          codeiq_path="$main_path"
+        fi
+        smoke_dir="${RUNNER_TEMP}/codeiq-smoke"
+        mkdir -p "$smoke_dir"
+        "$codeiq_path" init --output "$smoke_dir/codeiq.yml"
+        if [ ! -f "$smoke_dir/codeiq.yml" ]; then
+          echo "CodeIQ smoke verification failed: expected $smoke_dir/codeiq.yml" >&2
+          exit 1
+        fi
+        version="$(python3 -c 'import json; print(json.load(open("moon.mod.json", encoding="utf-8"))["version"])')"
+        printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
+        printf 'CODEIQ_PATH=%s\n' "$codeiq_path" >> "$GITHUB_ENV"
+        printf 'CODEIQ_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+
+    - name: Install CodeIQ (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $sourceRoot = "${{ inputs.working-directory }}"
+        if ([string]::IsNullOrWhiteSpace($sourceRoot)) {
+          $sourceRoot = Join-Path "${{ github.action_path }}" "..\..\.."
+        }
+        $installDir = "${{ inputs.install-dir }}"
+        if ([string]::IsNullOrWhiteSpace($installDir)) {
+          $installDir = Join-Path $env:RUNNER_TEMP "codeiq\bin"
+        }
+        $binaryName = "${{ inputs.binary-name }}"
+        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+        Push-Location $sourceRoot
+        moon install --bin "$installDir" --path src/cmd/main
+        $mainPath = Join-Path $installDir "main.exe"
+        if (-not (Test-Path $mainPath)) {
+          $mainPath = Join-Path $installDir "main"
+        }
+        if (-not (Test-Path $mainPath)) {
+          throw "Expected MoonBit install to create main(.exe) in $installDir"
+        }
+        $extension = [System.IO.Path]::GetExtension($mainPath)
+        if ($binaryName -eq "main") {
+          $codeiqPath = $mainPath
+        } else {
+          $codeiqPath = Join-Path $installDir ($binaryName + $extension)
+          Copy-Item $mainPath $codeiqPath -Force
+        }
+        $smokeDir = Join-Path $env:RUNNER_TEMP "codeiq-smoke"
+        New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+        & $codeiqPath init --output (Join-Path $smokeDir "codeiq.yml")
+        if (-not (Test-Path (Join-Path $smokeDir "codeiq.yml"))) {
+          throw "CodeIQ smoke verification failed: expected $(Join-Path $smokeDir 'codeiq.yml')"
+        }
+        $version = (Get-Content "moon.mod.json" -Raw | ConvertFrom-Json).version
+        Pop-Location
+        $installDir | Out-File -FilePath $env:GITHUB_PATH -Append
+        "CODEIQ_PATH=$codeiqPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "CODEIQ_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    - name: Export CodeIQ metadata
+      id: metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "codeiq-path=${CODEIQ_PATH}" >> "$GITHUB_OUTPUT"
+        echo "codeiq-version=${CODEIQ_VERSION}" >> "$GITHUB_OUTPUT"
+
+branding:
+  icon: 'terminal'
+  color: 'purple'
