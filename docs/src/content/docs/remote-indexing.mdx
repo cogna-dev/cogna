@@ -1,0 +1,86 @@
+---
+title: 远程索引
+description: 远程托管索引功能尚未支持。本页说明今天如何用本地 registry 和 MCP 替代，以及未来规划。
+order: 16
+---
+
+# 远程索引
+
+<span style="display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:6px;padding:4px 12px;font-size:0.9rem;font-weight:600;">⚠️ 尚未支持</span>
+
+CodeIQ 目前不提供云端托管的索引服务。所有的 build、index 和 query 操作都在本地完成。
+
+---
+
+## 未来规划
+
+我们计划支持以下远程索引能力：
+
+- **托管索引服务** — 把 build 的结果推送到云端，团队成员无需本地构建就能查询
+- **远端统一检索** — 在一个集中的地方搜索所有已发布的 bundle
+- **多版本历史** — 在线对比任意两个版本的 API 变化
+- **团队协作** — 多人共享同一套 registry，统一管理访问权限
+
+---
+
+## 今天怎么替代
+
+虽然远程索引还没上线，但你可以用以下方式在团队内部共享和检索 bundle。
+
+### 场景一：团队内部共享 bundle
+
+在你的机器或内网服务器上运行 registry server：
+
+```bash
+# 先构建 bundle
+cd ./sdk
+codeiq build
+
+# 发布到本地 registry
+codeiq publish
+
+# 启动 HTTP server，让团队其他人访问
+codeiq registry serve --port 8787
+```
+
+其他人通过 HTTP 下载：
+
+```bash
+curl "http://localhost:8787/api/v1/bundles/resolve?purl=pkg:golang/myorg/mylib@1.2.3"
+```
+
+### 场景二：让 AI 查询其他人已经构建的 bundle
+
+先把目标 bundle 下载到本机，再启动 MCP：
+
+```bash
+# 先从 registry 按 PURL 解析 bundle
+curl "http://localhost:8787/api/v1/bundles/resolve?purl=pkg:cargo/tokio@1.43.0"
+
+# 启动 MCP（会自动加载已物化的 bundle）
+codeiq mcp serve --port 3000
+```
+
+现在你的 AI 工具可以查询 `tokio@1.43.0` 的函数签名，就像查本地代码一样。
+
+### 场景三：CI 从统一位置拉取 bundle
+
+在 CI pipeline 中，从内网 registry 下载特定版本的 bundle：
+
+```bash
+# CI 脚本中
+curl -o policy.bundle.ciq.tgz \
+  "http://localhost:8787/api/v1/bundles/<bundleId>/download"
+
+# 把下载得到的 policy bundle 路径写入 codeiq.yml -> checks.policy，然后执行检查
+cd ./sdk
+codeiq check
+```
+
+---
+
+## 下一步
+
+- 了解本地 bundle 共享：[共享 Bundle](/docs/bundle-sharing)
+- 查看 Registry HTTP 接口：[MCP / Registry 参考](/docs/runtime-reference)
+- 了解当前完整支持范围：[支持范围](/docs/providers)

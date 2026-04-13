@@ -1,0 +1,42 @@
+---
+title: "compat.terraform.output-removed"
+description: "Terraform output was removed and downstream references can break."
+order: 999
+---
+
+# compat.terraform.output-removed
+
+## 摘要
+
+Terraform output was removed and downstream references can break.
+
+## 元数据
+
+| 字段 | 值 |
+|------|----|
+| `ruleId` | `compat.terraform.output-removed` |
+| `family` | `terraform` |
+| `defaultLevel` | `error` |
+| `entrypoint` | `data.codeiq.compat.deny` |
+| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/terraform/output-removed` |
+
+## 触发条件
+
+当 `semanticDiff.findings[]` 中出现 `terraform-output-removed` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+
+## SARIF 示例
+
+```json
+{
+  "ruleId": "compat.terraform.output-removed",
+  "level": "error",
+  "message": { "text": "Terraform output was removed and downstream references can break." },
+  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/terraform/output-removed"
+}
+```
+
+## 相关文档
+
+- [内置策略规则总览](/docs/policies)
+- [Terraform 生态说明](/docs/terraform)
+- [自定义 OPA 自动审查策略](/docs/policy)

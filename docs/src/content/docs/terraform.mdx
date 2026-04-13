@@ -1,0 +1,213 @@
+---
+title: Terraform
+description: 如何用 CodeIQ 检测 Terraform module 的契约变化，包括 variable、output、provider 等，避免模块升级破坏调用方。
+order: 22
+---
+
+# Terraform
+
+当你维护一个公共 Terraform module，并需要向团队内其他人发布新版本时，很容易出现这类问题：你修改了一个变量从可选变成了必填，或者删掉了某个 output，而调用方并不知道。CodeIQ 帮你把这些变化结构化，并在发版前给出清晰的兼容性报告。
+
+## CodeIQ 能检测哪些变化？
+
+对 `profile: terraform-module` 的仓库，CodeIQ 会提取以下契约信息：
+
+| 类别 | 说明 |
+|------|------|
+| `variable` | 模块输入变量的声明、类型、default 状态 |
+| `output` | 模块输出值的声明 |
+| `module` | 子模块引用 |
+| `provider` | provider 依赖声明 |
+| `lifecycle` / `meta-argument` | 生命周期与 meta-argument 配置 |
+
+以下是当前内置 policy 覆盖的高价值 breaking change 类型：
+
+| rule id | 含义 |
+|---------|------|
+| `compat.terraform.input-became-required` | variable 从 optional（有 default）变成 required（无 default） |
+| `compat.terraform.output-removed` | 某个 output 被删除 |
+| `compat.terraform.provider-ref-changed` | provider 引用变化 |
+| `compat.terraform.lifecycle-changed` | lifecycle 配置发生变化 |
+| `compat.terraform.meta-argument-changed` | meta-argument 配置发生变化 |
+| `compat.terraform.input-type-changed` | variable 的类型声明变化 |
+| `compat.terraform.output-type-changed` | output 的类型声明变化 |
+
+---
+
+## 示例：variable 从 optional 变为 required
+
+### 修改前
+
+```hcl
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.micro"
+}
+```
+
+### 修改后
+
+```hcl
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  # default 被删除，现在变成必填
+}
+```
+
+### 运行检查
+
+```bash
+cd ./module
+codeiq build
+codeiq diff
+codeiq check
+```
+
+### diff.json 中会出现（节选）
+
+```json
+{
+  "changes": [
+    {
+      "kind": "changed",
+      "level": "error",
+      "path": "variable.instance_type",
+      "semanticDiff": {
+        "findings": [
+          {
+            "ruleId": "compat.terraform.input-became-required",
+            "level": "error",
+            "message": "variable 'instance_type' lost its default value and is now required"
+          }
+        ]
+      },
+      "beforeRecord": {
+        "uri": "main.tf",
+        "startLine": 1
+      },
+      "afterRecord": {
+        "uri": "main.tf",
+        "startLine": 1
+      }
+    }
+  ]
+}
+```
+
+### check.sarif.json 中会出现（节选）
+
+```json
+{
+  "runs": [{
+    "results": [
+      {
+        "ruleId": "compat.terraform.input-became-required",
+        "level": "error",
+        "message": {
+          "text": "variable 'instance_type' lost its default value and is now required"
+        },
+        "locations": [{
+          "physicalLocation": {
+            "artifactLocation": { "uri": "main.tf" },
+            "region": { "startLine": 1 }
+          }
+        }]
+      }
+    ]
+  }]
+}
+```
+
+---
+
+## 示例：output 被删除
+
+### 修改前
+
+```hcl
+output "instance_id" {
+  description = "The ID of the EC2 instance"
+  value       = aws_instance.main.id
+}
+```
+
+### 修改后
+
+```hcl
+# output "instance_id" 被删除
+```
+
+### diff.json 中会出现（节选）
+
+```json
+{
+  "changes": [
+    {
+      "kind": "removed",
+      "level": "error",
+      "path": "output.instance_id",
+      "semanticDiff": {
+        "findings": [
+          {
+            "ruleId": "compat.terraform.output-removed",
+            "level": "error",
+            "message": "output 'instance_id' was removed"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+---
+
+## 完整工作流
+
+```bash
+# 1. 初始化配置（首次使用）
+codeiq init
+# 选择 profile: terraform-module，填写模块的 PURL，例如：
+# purl: pkg:terraform/myorg/vpc-module@1.1.0
+
+# 2. 构建 bundle
+cd ./module
+codeiq build
+
+# 3. 对比基线与当前版本的变化
+codeiq diff
+
+# 4. 执行兼容性检查，生成 SARIF
+codeiq check
+
+# 5. 查看结果
+cat ./dist/diff.json
+cat ./dist/check.sarif.json
+```
+
+---
+
+## 配合 AI 助手查询模块契约
+
+如果你想让 AI 帮你理解某个 variable 或 output 的当前定义，可以先构建 bundle，再启动本地 MCP：
+
+```bash
+cd ./module
+codeiq build
+codeiq mcp serve --port 3000
+```
+
+然后在你的 AI 工具中依次调用：
+
+1. `codeiq.query.outlines` — 列出模块的所有 variable、output 和 provider
+2. `codeiq.query.symbol` — 精确查询某个 variable 的类型、是否必填和说明
+
+---
+
+## 下一步
+
+- 分析变更详情：[分析变更](/docs/analyze-changes)
+- 定制 policy 规则：[定制 OPA 自动审查策略](/docs/policy)
+- 查看 SARIF 报告：[启用 SARIF 集成](/docs/sarif)

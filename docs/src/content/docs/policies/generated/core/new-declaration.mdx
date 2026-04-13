@@ -1,0 +1,42 @@
+---
+title: "compat.core.new-declaration"
+description: "Public declaration was added."
+order: 999
+---
+
+# compat.core.new-declaration
+
+## 摘要
+
+Public declaration was added.
+
+## 元数据
+
+| 字段 | 值 |
+|------|----|
+| `ruleId` | `compat.core.new-declaration` |
+| `family` | `core` |
+| `defaultLevel` | `note` |
+| `entrypoint` | `data.codeiq.compat.deny` |
+| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/core/new-declaration` |
+
+## 触发条件
+
+当 `semanticDiff.findings[]` 中出现 `new-declaration` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+
+## SARIF 示例
+
+```json
+{
+  "ruleId": "compat.core.new-declaration",
+  "level": "note",
+  "message": { "text": "Public declaration was added." },
+  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/core/new-declaration"
+}
+```
+
+## 相关文档
+
+- [内置策略规则总览](/docs/policies)
+- [变更分析 生态说明](/docs/analyze-changes)
+- [自定义 OPA 自动审查策略](/docs/policy)

@@ -1,0 +1,42 @@
+---
+title: "compat.openapi.response-schema-narrowed"
+description: "OpenAPI response schema narrowed and clients may fail to parse it."
+order: 999
+---
+
+# compat.openapi.response-schema-narrowed
+
+## 摘要
+
+OpenAPI response schema narrowed and clients may fail to parse it.
+
+## 元数据
+
+| 字段 | 值 |
+|------|----|
+| `ruleId` | `compat.openapi.response-schema-narrowed` |
+| `family` | `openapi` |
+| `defaultLevel` | `error` |
+| `entrypoint` | `data.codeiq.compat.deny` |
+| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/openapi/response-schema-narrowed` |
+
+## 触发条件
+
+当 `semanticDiff.findings[]` 中出现 `openapi-response-schema-narrowed` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+
+## SARIF 示例
+
+```json
+{
+  "ruleId": "compat.openapi.response-schema-narrowed",
+  "level": "error",
+  "message": { "text": "OpenAPI response schema narrowed and clients may fail to parse it." },
+  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/openapi/response-schema-narrowed"
+}
+```
+
+## 相关文档
+
+- [内置策略规则总览](/docs/policies)
+- [OpenAPI 生态说明](/docs/openapi)
+- [自定义 OPA 自动审查策略](/docs/policy)

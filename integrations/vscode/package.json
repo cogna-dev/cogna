@@ -1,0 +1,80 @@
+{
+  "name": "codeiq",
+  "displayName": "CodeIQ",
+  "publisher": "yufeiminds",
+  "description": "Run CodeIQ analysis, surface SARIF diagnostics, and open policy documentation from VSCode.",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:codeiq.runAnalysis",
+    "onCommand:codeiq.refreshDiagnostics",
+    "onCommand:codeiq.openRuleDocumentation",
+    "workspaceContains:codeiq.yml",
+    "workspaceContains:codeiq.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeiq.runAnalysis",
+        "title": "CodeIQ: Run Analysis"
+      },
+      {
+        "command": "codeiq.refreshDiagnostics",
+        "title": "CodeIQ: Refresh Diagnostics"
+      },
+      {
+        "command": "codeiq.openRuleDocumentation",
+        "title": "CodeIQ: Open Rule Documentation"
+      }
+    ],
+    "configuration": {
+      "title": "CodeIQ",
+      "properties": {
+        "codeiq.cliPath": {
+          "type": "string",
+          "default": "codeiq",
+          "description": "Path to the CodeIQ CLI executable. Relative paths resolve from the workspace root."
+        },
+        "codeiq.workingDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Workspace-relative or absolute directory where CodeIQ commands should run. Defaults to the first workspace folder."
+        },
+        "codeiq.runOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run CodeIQ analysis after saving a file in the active workspace."
+        },
+        "codeiq.autoOpenPolicyDocs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically open the first matching policy documentation link after a successful analysis refresh."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test:unit": "npm run compile && node --test out/test/unit/*.test.js",
+    "test:extension": "npm run compile && node ./out/test/runTest.js",
+    "test": "npm run test:unit && npm run test:extension"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.18",
+    "@types/vscode": "^1.96.0",
+    "@vscode/test-electron": "^2.5.2",
+    "glob": "^11.0.3",
+    "mocha": "^11.7.1",
+    "typescript": "^5.8.3",
+    "vscode": "^1.1.37"
+  }
+}

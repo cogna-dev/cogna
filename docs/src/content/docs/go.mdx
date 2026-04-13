@@ -1,0 +1,202 @@
+---
+title: Go
+description: 如何用 CodeIQ 追踪 Go module 的公开 API 变化，以及什么样的代码改动会触发什么检查结果。
+order: 20
+---
+
+# Go
+
+CodeIQ 能帮你追踪 Go module 的公开 API 变化：导出函数签名、接口变化、方法集、receiver 类型等。当你在发布新版本之前，CodeIQ 告诉你哪些变化会影响调用方。
+
+## 配置
+
+在你的 Go module 根目录创建 `codeiq.yml`：
+
+```yaml
+schemaVersion: ciq-config/v2
+profile: go-module
+purl: pkg:golang/github.com/your-org/your-sdk@1.2.0
+source:
+  repo: https://github.com/your-org/your-sdk
+  ref: main
+inputs:
+  include:
+    - "**/*.go"
+checks:
+  format: sarif
+```
+
+## 能检测哪些变化？
+
+### 1. 函数签名变化（`go-signature-changed`）
+
+**代码变化：**
+
+```go
+// 之前（v1.1.0）
+func (c *Client) Send(ctx context.Context, req *Request) (*Response, error)
+
+// 之后（v1.2.0）
+func (c *Client) Send(ctx context.Context, req *Request, opts ...Option) (*Response, error)
+```
+
+**CodeIQ diff 输出：**
+
+```json
+{
+  "id": "github.com/your-org/your-sdk.Client.Send",
+  "kind": "changed",
+  "level": "warning",
+  "path": "client/client.go",
+  "semanticDiff": {
+    "findings": [{ "code": "go-signature-changed" }]
+  },
+  "beforeRecord": { "uri": "client/client.go", "startLine": 42 },
+  "afterRecord":  { "uri": "client/client.go", "startLine": 44 }
+}
+```
+
+**SARIF 检查结果：**
+
+```json
+{
+  "ruleId": "compat.go.signature-changed",
+  "level": "warning",
+  "message": { "text": "Go public signature changed." },
+  "locations": [{
+    "physicalLocation": {
+      "artifactLocation": { "uri": "client/client.go" },
+      "region": { "startLine": 42 }
+    }
+  }]
+}
+```
+
+---
+
+### 2. 方法集收缩（`go-method-set-shrunk`）
+
+**代码变化：**
+
+```go
+// 之前：接口有两个方法
+type Store interface {
+    Get(key string) ([]byte, error)
+    Set(key string, value []byte) error
+    Delete(key string) error  // ← 这个方法被删除了
+}
+
+// 之后：接口少了一个方法
+type Store interface {
+    Get(key string) ([]byte, error)
+    Set(key string, value []byte) error
+}
+```
+
+**diff 输出（`level: error`）：**
+
+```json
+{
+  "id": "github.com/your-org/your-sdk.Store",
+  "kind": "changed",
+  "level": "error",
+  "semanticDiff": {
+    "findings": [{ "code": "go-method-set-shrunk" }]
+  }
+}
+```
+
+接口方法集收缩意味着原来能实现这个接口的类型，现在可能反而"多实现了"——这不是 breaking change，但接口的消费方如果依赖 `Delete` 方法，就会编译失败。
+
+---
+
+### 3. Receiver 类型变化（`go-receiver-changed`）
+
+**代码变化：**
+
+```go
+// 之前：value receiver
+func (c Client) String() string { ... }
+
+// 之后：pointer receiver
+func (c *Client) String() string { ... }
+```
+
+**diff 输出：**
+
+```json
+{
+  "id": "github.com/your-org/your-sdk.Client.String",
+  "semanticDiff": {
+    "findings": [
+      { "code": "go-receiver-changed" },
+      { "code": "go-pointer-receiver-changed" }
+    ]
+  }
+}
+```
+
+从 value receiver 改成 pointer receiver 会影响 `Client` 实现的接口集——如果某个接口方法用 pointer receiver，那么 `Client`（而非 `*Client`）就不再满足该接口了。
+
+---
+
+### 4. 导出声明被删除（`removed-declaration`）
+
+**代码变化：**
+
+```go
+// 之前存在的函数
+func NewClientV1(addr string) *Client { ... }
+
+// 这个函数在新版本中被删除
+```
+
+**diff 输出（`level: error`）：**
+
+```json
+{
+  "id": "github.com/your-org/your-sdk.NewClientV1",
+  "kind": "removed",
+  "level": "error",
+  "semanticDiff": {
+    "findings": [{ "code": "removed-declaration" }]
+  }
+}
+```
+
+---
+
+## 典型工作流
+
+```bash
+# 1. 构建当前版本
+cd ./sdk
+codeiq build
+
+# 2. 准备 dist/base 与 dist/target 后对比
+codeiq diff
+
+# 3. 检查结果
+codeiq check
+```
+
+完成后查看 `dist/check.sarif.json`，优先处理 `level: error` 的结果。
+
+## 完整内置检查规则
+
+| 规则 ID | 默认级别 | 触发时机 |
+|---------|---------|---------|
+| `compat.go.pointer-receiver-changed` | error | pointer receiver 兼容性变化 |
+| `compat.go.receiver-changed` | error | receiver 类型改变 |
+| `compat.go.method-set-shrunk` | error | 方法集收缩 |
+| `compat.go.method-set-expanded` | warning | 方法集扩展（需要评估） |
+| `compat.go.signature-changed` | warning | public 函数签名变化 |
+| `compat.core.removed-declaration` | error | 导出声明被删除 |
+| `compat.core.new-declaration` | note | 新增导出声明 |
+| `compat.core.deprecated-declaration` | note | 声明被标记 deprecated |
+
+## 注意事项
+
+- CodeIQ 只关注**导出的（exported）**声明，小写开头的 unexported 符号不会出现在 diff 里
+- 如果你只修改了函数体，没有改签名，diff 结果通常为空
+- `method-set-expanded`（新增方法）是 `warning` 而不是 `error`，因为在某些情况下这会影响接口满足关系

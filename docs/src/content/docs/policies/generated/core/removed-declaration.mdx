@@ -1,0 +1,42 @@
+---
+title: "compat.core.removed-declaration"
+description: "Public declaration was removed and callers will break."
+order: 999
+---
+
+# compat.core.removed-declaration
+
+## 摘要
+
+Public declaration was removed and callers will break.
+
+## 元数据
+
+| 字段 | 值 |
+|------|----|
+| `ruleId` | `compat.core.removed-declaration` |
+| `family` | `core` |
+| `defaultLevel` | `error` |
+| `entrypoint` | `data.codeiq.compat.deny` |
+| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration` |
+
+## 触发条件
+
+当 `semanticDiff.findings[]` 中出现 `removed-declaration` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+
+## SARIF 示例
+
+```json
+{
+  "ruleId": "compat.core.removed-declaration",
+  "level": "error",
+  "message": { "text": "Public declaration was removed and callers will break." },
+  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration"
+}
+```
+
+## 相关文档
+
+- [内置策略规则总览](/docs/policies)
+- [变更分析 生态说明](/docs/analyze-changes)
+- [自定义 OPA 自动审查策略](/docs/policy)

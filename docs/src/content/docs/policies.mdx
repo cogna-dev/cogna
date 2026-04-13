@@ -1,0 +1,60 @@
+---
+title: "内置策略规则"
+description: "CodeIQ 内置 compatibility policy 的规则目录与 canonical helpUri 入口。"
+order: 25
+---
+
+# 内置策略规则
+
+这组页面由仓库内置 policy 文档生成脚本从内置 policy catalog 自动生成，是 GitHub Code Scanning、SARIF viewer 与未来 VSCode 插件使用的 canonical `helpUri` 文档源。
+
+- 规则总数：`29`
+- 规则家族：`6`
+- 入口：`data.codeiq.compat.deny`
+
+## core
+
+- [compat.core.removed-declaration](/docs/policies/generated/core/removed-declaration) — Public declaration was removed and callers will break.
+- [compat.core.new-declaration](/docs/policies/generated/core/new-declaration) — Public declaration was added.
+- [compat.core.deprecated-declaration](/docs/policies/generated/core/deprecated-declaration) — Public declaration became deprecated.
+
+## go
+
+- [compat.go.pointer-receiver-changed](/docs/policies/generated/go/pointer-receiver-changed) — Go pointer receiver compatibility changed.
+- [compat.go.receiver-changed](/docs/policies/generated/go/receiver-changed) — Go receiver type changed.
+- [compat.go.method-set-shrunk](/docs/policies/generated/go/method-set-shrunk) — Go method set shrank.
+- [compat.go.method-set-expanded](/docs/policies/generated/go/method-set-expanded) — Go method set expanded and needs review.
+- [compat.go.signature-changed](/docs/policies/generated/go/signature-changed) — Go public signature changed.
+
+## rust
+
+- [compat.rust.became-unsafe](/docs/policies/generated/rust/became-unsafe) — Rust public item became unsafe.
+- [compat.rust.extern-abi-added](/docs/policies/generated/rust/extern-abi-added) — Rust extern ABI was added.
+- [compat.rust.extern-abi-changed](/docs/policies/generated/rust/extern-abi-changed) — Rust extern ABI changed.
+- [compat.rust.where-clause-changed](/docs/policies/generated/rust/where-clause-changed) — Rust where-clause changed.
+- [compat.rust.signature-changed](/docs/policies/generated/rust/signature-changed) — Rust public signature changed.
+
+## terraform
+
+- [compat.terraform.provider-ref-changed](/docs/policies/generated/terraform/provider-ref-changed) — Terraform provider reference changed.
+- [compat.terraform.prevent-destroy-added](/docs/policies/generated/terraform/prevent-destroy-added) — Terraform prevent_destroy was added.
+- [compat.terraform.create-before-destroy-added](/docs/policies/generated/terraform/create-before-destroy-added) — Terraform create_before_destroy was added.
+- [compat.terraform.ignore-changes-expanded](/docs/policies/generated/terraform/ignore-changes-expanded) — Terraform ignore_changes expanded.
+- [compat.terraform.lifecycle-changed](/docs/policies/generated/terraform/lifecycle-changed) — Terraform lifecycle metadata changed.
+- [compat.terraform.input-became-required](/docs/policies/generated/terraform/input-became-required) — Terraform input became required and callers must update configuration.
+- [compat.terraform.output-removed](/docs/policies/generated/terraform/output-removed) — Terraform output was removed and downstream references can break.
+
+## openapi
+
+- [compat.openapi.http-method-changed](/docs/policies/generated/openapi/http-method-changed) — OpenAPI HTTP method changed.
+- [compat.openapi.became-required](/docs/policies/generated/openapi/became-required) — OpenAPI field or parameter became required.
+- [compat.openapi.status-codes-added](/docs/policies/generated/openapi/status-codes-added) — OpenAPI status codes were added.
+- [compat.openapi.media-types-added](/docs/policies/generated/openapi/media-types-added) — OpenAPI media types were added.
+- [compat.openapi.operation-changed](/docs/policies/generated/openapi/operation-changed) — OpenAPI operation changed.
+- [compat.openapi.response-status-removed](/docs/policies/generated/openapi/response-status-removed) — OpenAPI response status code was removed.
+- [compat.openapi.response-schema-narrowed](/docs/policies/generated/openapi/response-schema-narrowed) — OpenAPI response schema narrowed and clients may fail to parse it.
+
+## component
+
+- [compat.component.version-upgrade](/docs/policies/generated/component/version-upgrade) — Software component version changed.
+- [compat.component.metadata-changed](/docs/policies/generated/component/metadata-changed) — Software component metadata changed.

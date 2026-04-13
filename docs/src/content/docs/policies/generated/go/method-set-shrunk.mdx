@@ -1,0 +1,42 @@
+---
+title: "compat.go.method-set-shrunk"
+description: "Go method set shrank."
+order: 999
+---
+
+# compat.go.method-set-shrunk
+
+## 摘要
+
+Go method set shrank.
+
+## 元数据
+
+| 字段 | 值 |
+|------|----|
+| `ruleId` | `compat.go.method-set-shrunk` |
+| `family` | `go` |
+| `defaultLevel` | `error` |
+| `entrypoint` | `data.codeiq.compat.deny` |
+| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/go/method-set-shrunk` |
+
+## 触发条件
+
+当 `semanticDiff.findings[]` 中出现 `go-method-set-shrunk` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+
+## SARIF 示例
+
+```json
+{
+  "ruleId": "compat.go.method-set-shrunk",
+  "level": "error",
+  "message": { "text": "Go method set shrank." },
+  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/go/method-set-shrunk"
+}
+```
+
+## 相关文档
+
+- [内置策略规则总览](/docs/policies)
+- [Go 生态说明](/docs/go)
+- [自定义 OPA 自动审查策略](/docs/policy)
