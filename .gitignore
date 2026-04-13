@@ -7,6 +7,7 @@ dist/
 trace.json
 .codeiq/
 .claude/settings*
+.sisyphus/
 src/cmd/**/tmp_*/
 src/cmd/registry/tmp_sig_consts/
 src/cmd/registry/tmp_registry_sigcheck/

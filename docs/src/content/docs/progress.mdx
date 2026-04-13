@@ -1,50 +1,123 @@
 ---
-title: 当前状态
-description: 解释今天的 CodeIQ 可以做什么、适合什么边界，以及当前 active stage 对用户意味着什么。
+title: 开发进度
+description: CodeIQ 当前真实能力、当前 cleanup 阶段，以及计划与代码之间的 gap 对账。
 order: 12
 ---
 
-# 当前状态
+# 开发进度
 
-这一页属于 #strong[Explanation]：它解释当前产品状态，而不是记录内部计划细节。
+> 最后更新时间：2026-04-13（Asia/Shanghai，design spec truth-sync 进行中）
+>
+> 本页是唯一的 progress source of truth。`/contrib/progress` 仅保留兼容入口，不再维护独立事实。
 
-> 最后更新时间：2026-03-27（Asia/Shanghai）
+## 当前产品状态
 
-## 当前适合做什么？
+CodeIQ 当前仍以 **local-only / config-driven** 方式工作：围绕 `codeiq.yml`、本地 bundle、本地 registry store、MCP 与 SARIF 输出形成单机闭环。A003 的 benchmark / parity 与 boundary cleanup 已完成，当前主线工作已切到：#strong[implementation-grounded spec / docs truth-sync]。目标是把 proposal、progress 与真实代码对齐，避免继续用未来态描述已经落地或尚未落地的能力。
 
-- 本机 build / diff / check / query
-- 本机共享 bundle
-- 本机 AI / Agent 查询
+| 能力 | 当前状态 |
+|------|----------|
+| 构建代码仓库 / API 规格 bundle | ✅ 已支持 |
+| 版本对比与结构化 diff | ✅ 已支持（Go / Rust / Terraform / OpenAPI） |
+| policy 检查与 SARIF 输出 | ✅ 已支持 |
+| CLI / MCP 查询 bundle 内容 | ✅ 已支持 |
+| native-vs-lsp parity | ✅ 已支持（同一 canonical 输出上零差异） |
+| 真实 benchmark reporting | ✅ 已支持（wall/cpu/RSS 均为 Python + `psutil` 实测） |
+| boundary cleanup | ✅ 已完成 |
 
-## 当前 active stage：A002-2 内置 OPA 规则集
+## 当前命令面（真实代码）
 
-当前正在推进的不是新的 hosted 平台，而是：#strong[把已经存在的本地 OPA runtime 升级为更完整的 built-in OPA rules baseline]。
+- `codeiq init`
+- `codeiq build`
+- `codeiq diff`
+- `codeiq check`
+- `codeiq query <query-file>`
+- `codeiq publish`
+- `codeiq registry serve|status`
+- `codeiq mcp serve|status`
 
-这对用户意味着：
+## 当前 cleanup 计划对账总览
 
-- `check` 仍然是本地执行的 `opa eval --bundle ...`；
-- 当前 policy 的 authoring 形式仍然是本地 Rego 文件，经 `build` 打包成 OPA bundle；
-- `CIQ Diff` 的下一步重点不再是只给一个 primary category，而是提供统一的 `semanticDiff.findings[]`，让一个 change 可以同时携带多个 semantic facts；
-- 用户现在仍然应该显式传入本地 policy bundle，文档和 CLI 也都按这个现实来写。
+| 计划项 | 计划目标 | 当前代码 / 证据 | 状态 | 仍有 gap |
+|--------|----------|------------------|------|----------|
+| C0 | truth reset | `spec/plan.typ` 已改为 `lib = reusable only` 的 cleanup-first 计划；本页已切到 boundary cleanup 主线 | ✅ 已完成 | 后续只需继续让 active stage 与实际迁移同步 |
+| C1 | repo-noise cleanup | 已清掉当前分支中仍被追踪且命中 `.gitignore` 规则的顶层 `pkg.generated.mbti`；其余 `examples/*/snapshots/codeiq/*` 当前仍以 fixture 形态存在，需与后续 fixture policy 一并收口 | ✅ 已完成 | 后续只需在更大清理阶段继续统一 fixture / generated policy |
+| C2 | `sbom -> src/sbom` | `src/lib/sbom/**` 已迁到 `src/sbom/**`，并拆出 `src/sbom/snapshot`、`npm`、`cargo`、`go`；`src/cmd/build` 已改用 `@sbom` + `@sbom_snapshot` | ✅ 已完成 | 后续只需随更大阶段继续维护 README / warning / generated artifact 收口 |
+| C3 | `policy_catalog -> src/policy` | `src/lib/policy_catalog/**` 已迁到 `src/policy/**`，且 `build` / `check` / `scripts/gendoc` 已改用新包路径 | ✅ 已完成 | 后续只需随 README / docs 统一收口 |
+| C4 | `extract -> src/extractors` | `src/lib/extract/**` 已迁到 `src/extractors/**`；`src/cmd/build` 已改用新包路径，且纯转发 wrapper 已直接改为调用 `@extract` / `@extract_go` / `@extract_rust` | ✅ 已完成 | 后续只需继续按更大阶段处理 Terraform/OpenAPI 与 runtime wrapper 收口 |
+| C5 | runtime wrapper 删除 | `src/registry/runtime/`、`src/cmd/mcp/runtime/`、`src/cmd/*/shell/` 与 `src/e2e/shell/` 现已各自内联 `moonbitlang/async` 相关实现；`src/lib/server-runtime/` 与 `src/lib/shell/` 已删除 | ✅ 已完成 | 后续只需在日常维护中继续守住 parity 与 zero-warning baseline |
+| C6 | 删除 `src/native` | `extract_native()` 已收口为直接调用 in-repo MoonBit extractor（`collect_records()`）；`src/native/` 已删除；bench/e2e 的 `CODEIQ_NATIVE_*` override 路径已全部移除 | ✅ 已完成 | 后续只需继续保持 native author path 与 parity 验证稳定 |
+| C7 | README / warning / 待提交整理 | `src/` 与 `src/lib/` 的独立顶层 package README 已补齐；mixed-target warning 已通过 target-specific package、`supported_targets = "native"` 与安全 stub 引用收口；`src/cmd/**/tmp_*` 写路径已全部迁到 `/tmp/codeiq-*`；旧 tracked generated artifacts 已清除 | ✅ 已完成 | — |
 
-## 已完成的基础能力（summary-only）
+## 已完成摘要（summary-only）
 
-- R11：共享本地存储与 SBOM foundation 已完成；
-- R12：Go / Rust / Terraform / OpenAPI richer declaration facts 已完成；
-- R13：`semanticDiff` / `componentDiff` 与最小 SARIF runtime 已完成，接下来由 A002 继续把 semantic match contract 统一化。
+- A003 已从旧 helper-binary / dual-snapshot 叙事收口为 single canonical output；
+- `src/e2e/bench.py` 已成为真实 benchmark harness，wall / CPU / RSS 均来自 Python + `psutil` 的子进程树实测；
+- `spec/A003-benchmark-report.typ` 已改为 `native vs lsp` 的真实时间 / CPU / 内存 / diff 对照；
+- Go native helper 已为 `--files` 场景加入 selected-file AST fast path，phase-5 benchmark 中 native 已反超 lsp；
+- `src/lib/parsec`、`hcl`、`mcp-sdk`、`registry` 已补齐 `README.mbt.md`，`src/lib/` 的复用库边界说明比之前完整；
+- `src/` 下遗留的 `derive(Show)` deprecated syntax 已全部收口为显式 `Show` impl，并补齐了 command / policy / sbom / e2e helper 等本轮触达包的调试输出；
+- runtime wrapper cleanup 已进一步完成：`src/lib/shell/` 与 `src/lib/server-runtime/` 已删除，相关 feature slice 直接改用 `moonbitlang/async`、`moonbitlang/async/process`、`moonbitlang/async/http` 与 `moonbitlang/async/socket`；
+- 仓库卫生清理已继续推进：已删除 tracked `src/**/pkg.generated.mbti`、`src/native/rust/target/**`、`src/native/go/go` 与 `src/cmd/registry/tmp_*`；当前 native 语义已完全收口到 in-repo MoonBit extractor，`src/native/` 目录本身也已删除。
+- C6 / C7 已完成：`extract_native()` 已重写为直接调用 in-repo MoonBit extractor（`collect_records()`），不再依赖任何外部 helper binary；native-only e2e 已拆到 `src/e2e/native/` 与 `src/e2e/review/native/`；此前的 `warn-list: "-29"` stopgap 已收口，`moon check --target wasm` / `moon check --target native`、`moon test --target wasm` / `moon test --target native`、`moon build --target native`、`pnpm build` 与 Typst compile 已全部通过。
+- `src/lib/hcl` 已从手写按行扫描 parser 收口为基于 `src/lib/parsec` 的 line-combinator + stack assembler 实现；`parse_hcl_file(lines)` 与 `HclFile` / `HclBlock` / `HclAttr` public API 保持不变，`moon check src/lib/hcl`、`moon test src/lib/hcl` 与 `moon test src/cmd/build` 已通过。
+- `spec/design.typ` 已补充为当前实现导向的设计说明草案：收口了当前 CLI surface、`codeiq.yml` / `ciq-config/v2`、SPDX-first bundle 产物、`ciq-opa-bundle/v1`、registry `bundleId` / `downloadUrl` / `ETag` 语义，以及 MCP `serve|status` / `/rpc` / `/health` / tool surface 等真实 contract。
 
-## 下一步（summary-only）
+## 当前 active stage
 
-- 在 built-in rule catalog 稳定后，再继续推进 richer OPA input；
-- richer input ready 后，再继续推进 Terraform / OpenAPI deeper breaking-change rules。
+当前 active stage 是 #strong[`design spec truth-sync`]。C0–C7 cleanup 阶段已全部收口，当前重点改为让 `spec/` 与 docs 对齐真实实现。
 
-## 当前不适合做什么？
+### 当前阶段目标
 
-- hosted registry
-- distributed sync
-- multi-node HA
-- trust verifier / KMS
+补齐一份以实现为准的设计文档，并把 progress 中的阶段叙事切到同一套现实基线。
 
-## 如果你需要更详细的内部进展
+### 当前阶段执行清单
 
-请改看贡献者文档：[/contrib/progress](/contrib/progress)
+- [x] 已重新核对 `spec/proposal.typ` 与当前 `src/` 实现之间的主要偏差，确认需要以真实命令面、真实 bundle/schema/registry/MCP contract 重写设计说明；
+- [x] 已新增 `spec/design.typ`，收口当前 package boundary、CLI / config / bundle / diff / check / query / registry / MCP / PURL reality；
+- [x] 已把本页 active stage 切到 design spec truth-sync，并把已完成 cleanup 阶段保持为 summary-only；
+- [ ] 继续按 reviewer 反馈迭代 `spec/design.typ` 文案，但不得把尚未实现的能力写成既成事实。
+
+## 其他阶段（summary-only）
+
+| 阶段 | 目标 | 进入前提 |
+|------|------|----------|
+| C0 | truth reset | ✅ 已完成 |
+| C1 | repo-noise cleanup | ✅ 已完成 |
+| C2 | `sbom -> src/sbom` | ✅ 已完成 |
+| C3 | `policy_catalog -> src/policy` | ✅ 已完成 |
+| C4 | `extract -> src/extractors` | ✅ 已完成 |
+| C5 | runtime wrapper 删除 | ✅ 已完成 |
+| C6 | 删除 `src/native` | ✅ 已完成 |
+| C7 | README / warning / 待提交整理 | ✅ 已完成 |
+
+## 需要注意的当前 reality
+
+- `policy_catalog` 当前只服务本仓库的 build/check 与 docs 生成脚本，不适合作为 `src/lib/` 包继续存在；
+- `policy_catalog` 与 `extract` 的迁移已经完成，业务域包已按 `src/policy/` 与 `src/extractors/` 顶层建模；
+- `extract` 已迁到 `src/extractors/`，并已从 `src/cmd/build/moon.pkg` 切换到新包路径；
+- `src/cmd/build/extractor.mbt` 中一批纯转发 wrapper 已移除，当前保留的主要是 orchestration、Terraform/OpenAPI 逻辑与 backend probe；
+- 当前分支里已确认并删除一批 tracked repo-noise：`src/**/pkg.generated.mbti`、`src/native/rust/target/**`、`src/native/go/go` 与 `src/cmd/registry/tmp_*`；`examples/*/snapshots/codeiq/*` 仍按 fixture / baseline 处理，当前不应盲删；
+- `src/sbom/` 迁移已经完成，`snapshot` 现在明确承担 dependency bundle 所需的文件清单与内容摘要；
+- `src/lib/` 当前真正更像 reusable library 的是 `parsec`、`hcl`、`json-schema`、`mcp-sdk` 这类包；
+- `src/lib/parsec`、`hcl`、`mcp-sdk`、`registry` 现已补齐 `README.mbt.md`，README 内容统一改为 package scope、共享能力与最小 `mbt check` 示例；
+- `src/lib/hcl` 当前已改为用 `src/lib/parsec` 对单行 HCL statement 做组合子识别，再复用宽松 stack 组装保持既有 Terraform block / immediate attr 语义；
+- `src/` 下原有 `derive(Show)` deprecated warning 已全部清掉；此前 mixed-target 包上的 `warn-list: "-29"` stopgap 也已收口：当前策略是按需要拆 target-specific package、对 truly native-only 包使用 `supported_targets = "native"`，并在 wasm/js stub 中保留安全的 import liveness；
+- `moon test src/lib/hcl src/lib/mcp-sdk src/lib/registry`、`moon test src/lib/mcp-sdk --target native` 已通过，说明 README + 手动 `Show` impl 收口未破坏行为；
+- `src/registry/runtime/` 现已成为 registry vertical 的局部 transport adapter，并直接内联 `moonbitlang/async` HTTP/socket 实现；
+- `src/cmd/mcp/runtime/` 与 `src/cmd/mcp/shell/` 现已成为 MCP vertical 的局部 transport / process adapter：MCP command 与 core 直接基于 `moonbitlang/async` 实现，不再依赖 `@server_runtime` / `@shell`；
+- `src/cmd/registry/shell/` 现已吸收 registry command 的健康轮询 sleep，并直接使用 `moonbitlang/async.sleep`；`cmd/registry` 不再直接依赖 `@shell`；
+- `src/cmd/check/shell/` 现已吸收 `opa eval` 的 shell 执行，并直接使用 `moonbitlang/async/process`；`cmd/check` 不再直接依赖 `@shell`；
+- C5 已完成：`cmd/build`、`cmd/check`、`scripts/benchmark`、`cmd/mcp`、`cmd/registry` 与 `src/e2e` 的局部 runtime/shell adapter 现已直接基于 `moonbitlang/async` 实现；`src/lib/shell/` 与 `src/lib/server-runtime/` 均已删除；
+- C6 已完成：`src/native/` 已删除，`extract_native()` 现在直接调用 in-repo MoonBit extractor（`collect_records()`），不再有任何外部 binary 依赖；bench / e2e parity 仍然通过，因为 native 与 canonical 路径均调用同一 `collect_records()` 实现；`bench_wbtest.mbt` 已移除 `CODEIQ_NATIVE_*` override 逻辑；
+- `examples/*/snapshots/codeiq/*` 当前是 snapshot test baseline，而不是本轮 C1 可盲删的 repo-noise；是否继续保留这组 fixture 需要与更大的 baseline policy 一并决定。
+- `moon check src/cmd/build`、`moon test src/cmd/build`、`moon test src/extractors`、`moon test src/e2e/extractor_parity_test.mbt`、`moon test src/e2e/lsp_extractor_test.mbt` 已通过；
+- `moon check src/registry`、`moon check src/lib/registry`、`moon check src/cmd/registry`、`moon check src/e2e`、`moon check src/e2e/native`、`moon test src/cmd/registry --target wasm`、`moon test --target native` 已通过，说明当前 registry runtime slice 与 native-only e2e split 后行为保持稳定；
+- `moon check src/cmd/mcp/runtime`、`moon check src/cmd/mcp/shell`、`moon check src/cmd/mcp/core`、`moon check src/cmd/mcp`、`moon test src/cmd/mcp --target native`、`moon test src/cmd/mcp/core/smoke_test.mbt --target native` 已通过，说明 MCP runtime + shell slice 行为保持稳定；
+- `moon check src/cmd/registry/shell`、`moon check src/cmd/registry`、`moon test src/cmd/registry --target wasm` 已通过，说明 registry shell slice 行为保持稳定；
+- `moon check src/cmd/check/shell`、`moon check src/cmd/check`、`moon test src/cmd/check` 已通过，说明 check shell slice 行为保持稳定；
+- `moon check src/cmd/build/shell`、`moon check src/cmd/build`、`moon test src/cmd/build` 已通过，说明 build shell slice 行为保持稳定；
+- `moon check src/e2e/shell`、`moon check src/e2e`、`moon check src/e2e/native`、`moon check src/e2e/review/native`、`moon test --target wasm`、`moon test --target native` 已通过，说明 portable / native-only e2e package split 后行为保持稳定；
+- `moon check src/scripts/benchmark/shell`、`moon check src/scripts/benchmark`、`moon test src/scripts/benchmark --target native` 已通过，说明 benchmark script shell slice 行为保持稳定；
+- `scripts/benchmark` 的 wbtest 已移除 `configure_native_engine_override` / `clear_native_engine_override`；benchmark harness 不再有 helper binary probe 路径；`moon check --target native` 0 error，`moon test src/cmd/build` 22/22 通过（C6 验证）；
+- `moon check src/policy src/sbom src/cmd/build src/cmd/check src/cmd/query src/cmd/publish src/cmd/init src/scripts/bundle src/cmd/diff src/scripts/benchmark src/cmd/mcp src/cmd/mcp/core src/cmd/registry src/cmd/main src/e2e src/e2e/native src/e2e/review src/e2e/review/native` 已通过；
+- `moon test --target wasm`、`moon test --target native`、`moon build --target native`、`pnpm build` 与 `typst compile spec/plan.typ` / `typst compile spec/A003-native-extractor.typ` 已通过，说明本轮 generated cleanup、warning 收口与 docs/spec 同步未破坏行为。
