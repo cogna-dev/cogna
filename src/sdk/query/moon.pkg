@@ -1,0 +1,34 @@
+import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/x/fs" @fs,
+  "yufeiminds/codeiq/schema" @schema,
+}
+
+options(
+  link: {
+    "js": {
+      "exports": [
+        "validate_query_shape",
+        "validate_result_shape",
+        "query_value",
+        "query_repo",
+        "read_ndjson",
+        "parent_dir",
+        "selector_value",
+        "selector_kind_hint",
+        "read_repo_records",
+        "all_bundle_records",
+        "all_bundle_records_with_cancel",
+        "query_matches",
+        "query_matches_with_cancel",
+        "query_outlines",
+        "query_outlines_with_cancel",
+        "build_ciq_result",
+        "run_query_json",
+      ],
+      "format": "esm",
+    },
+  },
+)
