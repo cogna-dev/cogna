@@ -110,15 +110,15 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
 
   const installDir = path.join(workspaceDir, ".codeiq-bin")
   await fs.mkdir(installDir, { recursive: true })
-  await run("moon", ["install", "--bin", installDir, "--path", "src/cmd/main"], repoRoot)
+  if (process.platform === "win32") {
+    await run("pwsh", ["-File", "integrations/cli/install.ps1", "-InstallDir", installDir, "-BinaryName", "codeiq"], repoRoot)
+  } else {
+    await run("bash", ["integrations/cli/install.sh", installDir, "codeiq"], repoRoot)
+  }
   const mainPath = path.join(installDir, process.platform === "win32" ? "main.exe" : "main")
   const codeiqPath = path.join(installDir, process.platform === "win32" ? "codeiq.exe" : "codeiq")
-  try {
-    await fs.rm(codeiqPath, { force: true })
-  } catch {
-    // ignore
-  }
-  await fs.copyFile(mainPath, codeiqPath)
+  await fs.access(mainPath)
+  await fs.access(codeiqPath)
 
   await run(codeiqPath, ["build"], workspaceDir)
   const baseDir = path.join(distDir, "base")

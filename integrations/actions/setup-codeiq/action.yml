@@ -43,16 +43,14 @@ runs:
         binary_name="${{ inputs.binary-name }}"
         mkdir -p "$install_dir"
         cd "$source_root"
-        moon install --bin "$install_dir" --path src/cmd/main
+        bash integrations/cli/install.sh "$install_dir" "$binary_name"
         main_path="$install_dir/main"
         if [ ! -x "$main_path" ]; then
           echo "Expected MoonBit install to create $main_path" >&2
           exit 1
         fi
         codeiq_path="$install_dir/$binary_name"
-        if [ "$binary_name" != "main" ]; then
-          ln -sf "$main_path" "$codeiq_path"
-        else
+        if [ "$binary_name" = "main" ]; then
           codeiq_path="$main_path"
         fi
         smoke_dir="${RUNNER_TEMP}/codeiq-smoke"
@@ -82,7 +80,7 @@ runs:
         $binaryName = "${{ inputs.binary-name }}"
         New-Item -ItemType Directory -Force -Path $installDir | Out-Null
         Push-Location $sourceRoot
-        moon install --bin "$installDir" --path src/cmd/main
+        & pwsh -File "integrations/cli/install.ps1" -InstallDir "$installDir" -BinaryName "$binaryName"
         $mainPath = Join-Path $installDir "main.exe"
         if (-not (Test-Path $mainPath)) {
           $mainPath = Join-Path $installDir "main"
@@ -90,12 +88,11 @@ runs:
         if (-not (Test-Path $mainPath)) {
           throw "Expected MoonBit install to create main(.exe) in $installDir"
         }
-        $extension = [System.IO.Path]::GetExtension($mainPath)
         if ($binaryName -eq "main") {
           $codeiqPath = $mainPath
         } else {
+          $extension = [System.IO.Path]::GetExtension($mainPath)
           $codeiqPath = Join-Path $installDir ($binaryName + $extension)
-          Copy-Item $mainPath $codeiqPath -Force
         }
         $smokeDir = Join-Path $env:RUNNER_TEMP "codeiq-smoke"
         New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null

@@ -20,14 +20,17 @@ format-check:
 
 install: build
   mkdir -p "${CODEIQ_INSTALL_DIR:-${HOME}/.moon/bin}"
-  moon install --bin "${CODEIQ_INSTALL_DIR:-${HOME}/.moon/bin}" --path src/cmd/main
-  ln -sf "${CODEIQ_INSTALL_DIR:-${HOME}/.moon/bin}/main" "${CODEIQ_INSTALL_DIR:-${HOME}/.moon/bin}/codeiq"
+  bash integrations/cli/install.sh "${CODEIQ_INSTALL_DIR:-${HOME}/.moon/bin}" codeiq
 
 run:
-  moon run src/cmd/main
+  bash integrations/cli/run.sh
 
 e2e:
   moon test src/e2e
+
+proto-gen:
+  go build -o tools/protoc-gen-codeiq/protoc-gen-codeiq ./tools/protoc-gen-codeiq
+  buf generate --template buf.gen.yaml
 
 ci: lint format-check test build
 
