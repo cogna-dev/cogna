@@ -81,7 +81,7 @@ store 目录优先级：
 如果你要把 registry 作为容器运行，推荐方式是：
 
 ```bash
-docker build -f Dockerfile.registry -t codeiq-registry:local .
+docker build -f integrations/deployments/docker/Dockerfile -t codeiq-registry:local .
 
 docker run --rm \
   -p 8787:8787 \

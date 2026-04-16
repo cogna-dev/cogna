@@ -68,7 +68,7 @@ CODEIQ_REGISTRY_STORE_DIR=/data/registry codeiq registry serve --port 8787
 P6 完成后，registry server 可以直接以容器方式交付：
 
 ```bash
-docker build -f Dockerfile.registry -t codeiq-registry:local .
+docker build -f integrations/deployments/docker/Dockerfile -t codeiq-registry:local .
 
 docker run --rm \
   -p 8787:8787 \
