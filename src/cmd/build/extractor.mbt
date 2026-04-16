@@ -429,18 +429,6 @@ fn resolve_validation_mode(config : @config.Config) -> String {
 }
 
 ///|
-fn profile_mode_native(profile : String) -> (String, String) {
-  match profile {
-    "go-module" => ("native-assisted", "gopls")
-    "rust-crate" => ("native-assisted", "rust-analyzer")
-    "terraform-module" => ("parser-first", "hcl-parser")
-    "openapi-spec" => ("parser-only", "none")
-    "policy-bundle" => ("policy-bundle", "opa")
-    _ => ("parser-only", "none")
-  }
-}
-
-///|
 fn shell_escape(value : String) -> String {
   let escaped = value.replace_all(old="'", new="'\"'\"'")
   "'\{escaped}'"
@@ -3233,28 +3221,19 @@ fn extract_canonical(
   config : @config.Config,
   repo : String,
 ) -> Result[ExtractOutput, @cli.CliError] {
-  let files_out = resolve_input_files(config, repo)
-  guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
-
-  let (mode, server) = profile_mode(config.profile)
-  let records_out = collect_records(config, repo, files, server)
-  guard records_out is Ok((declarations, symbols)) else {
-    return Err(records_out.unwrap_err())
+  let out = @sdk_index.build_local_index_canonical(config, repo)
+  guard out is Ok(sdk_out) else {
+    return Err(extractor_error(out.unwrap_err()))
   }
-
-  ensure_non_empty(declarations, symbols, config.profile, server)
-  let final_declarations = @extract.sort_and_dedup(declarations, "id")
-  let final_symbols = @extract.sort_and_dedup(symbols, "id")
-
   Ok({
-    declarations_text: @extract.to_ndjson(final_declarations),
-    symbols_text: @extract.to_ndjson(final_symbols),
-    mode,
-    fallback: false,
-    declaration_count: final_declarations.length(),
-    symbol_count: final_symbols.length(),
-    diagnostic_files: 0,
-    commit: resolve_git_commit(repo),
+    declarations_text: sdk_out.declarations_text,
+    symbols_text: sdk_out.symbols_text,
+    mode: sdk_out.mode,
+    fallback: sdk_out.fallback,
+    declaration_count: sdk_out.declaration_count,
+    symbol_count: sdk_out.symbol_count,
+    diagnostic_files: sdk_out.diagnostic_files,
+    commit: sdk_out.commit,
   })
 }
 
@@ -3279,31 +3258,25 @@ fn validate_with_lsp(
 }
 
 ///|
-/// extract_native uses the in-repo MoonBit extractor (collect_records) directly,
+/// extract_native uses the in-repo MoonBit extractor (sdk/index) directly,
 /// emitting native-assisted mode metadata without any external binary dependency.
 fn extract_native(
   config : @config.Config,
   repo : String,
 ) -> Result[ExtractOutput, @cli.CliError] {
-  let files_out = resolve_input_files(config, repo)
-  guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
-  let (mode, server) = profile_mode_native(config.profile)
-  let records_out = collect_records(config, repo, files, server)
-  guard records_out is Ok((declarations, symbols)) else {
-    return Err(records_out.unwrap_err())
+  let out = @sdk_index.build_local_index_native(config, repo)
+  guard out is Ok(sdk_out) else {
+    return Err(extractor_error(out.unwrap_err()))
   }
-  ensure_non_empty(declarations, symbols, config.profile, server)
-  let final_declarations = @extract.sort_and_dedup(declarations, "id")
-  let final_symbols = @extract.sort_and_dedup(symbols, "id")
   Ok({
-    declarations_text: @extract.to_ndjson(final_declarations),
-    symbols_text: @extract.to_ndjson(final_symbols),
-    mode,
-    fallback: false,
-    declaration_count: final_declarations.length(),
-    symbol_count: final_symbols.length(),
-    diagnostic_files: 0,
-    commit: resolve_git_commit(repo),
+    declarations_text: sdk_out.declarations_text,
+    symbols_text: sdk_out.symbols_text,
+    mode: sdk_out.mode,
+    fallback: sdk_out.fallback,
+    declaration_count: sdk_out.declaration_count,
+    symbol_count: sdk_out.symbol_count,
+    diagnostic_files: sdk_out.diagnostic_files,
+    commit: sdk_out.commit,
   })
 }
 

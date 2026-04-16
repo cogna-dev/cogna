@@ -127,9 +127,9 @@ fn shell_quote(value : String) -> String {
 
 ///|
 fn spawn_registry_server(port : Int) -> Int {
-  let manifest_path = "/Users/yufei/workspace/github/yufeiminds/codeiq/moon.mod.json"
+  let run_script = "/Users/yufei/workspace/github/yufeiminds/codeiq/integrations/cli/run.sh"
   let target_dir = native_registry_target_dir(port)
-  let command = "moon run --target native --frozen --target-dir \{shell_quote(target_dir)} --manifest-path \{shell_quote(manifest_path)} src/cmd/main -- registry serve --port \{port}"
+  let command = "bash \{shell_quote(run_script)} --target native --frozen --target-dir \{shell_quote(target_dir)} -- registry serve --port \{port}"
   let pid_out = @e2e_shell.spawn_detached(command)
   guard pid_out is Ok(pid) else { abort("failed to spawn registry server") }
   pid
@@ -142,11 +142,11 @@ fn wait_for_health(
   sleep_ms? : Int = 100,
 ) -> Bool {
   for _ in 0..<attempts {
-    let request_out = @registry_runtime.http_request(
+    let request_out = @e2e_shell.http_request(
       "GET",
       url,
       {},
-      @registry_runtime.HttpBody::Empty,
+      @e2e_shell.HttpBody::Empty,
     )
     match request_out {
       Ok(result) => if result.status == 200 { return true }

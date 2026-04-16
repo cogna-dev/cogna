@@ -8,8 +8,4 @@ import {
   "yufeiminds/codeiq/cmd/query" @query_cmd,
 } for "test"
 
-options(
-  targets: {
-    "main_test.mbt": [ "native", "wasm" ],
-  },
-)
+supported_targets = "native"

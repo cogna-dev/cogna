@@ -1,7 +1,12 @@
 ///|
+fn detached_shell_command(command : String) -> String {
+  "exec </dev/null >/dev/null 2>&1; ".add(command)
+}
+
+///|
 pub fn run_command_capture(command : String) -> (Int, String, String) {
   let result : Ref[(Int, String, String)?] = Ref::new(None)
-  @async.run_async_main(() => {
+  @mbasync.run_async_main(() => {
     let value = try {
       let (exit_code, stdout_data, stderr_data) = @aprocess.collect_output(
         "sh",
@@ -24,8 +29,10 @@ pub fn run_command_capture(command : String) -> (Int, String, String) {
 ///|
 pub fn spawn_detached(command : String) -> Result[Int, String] {
   let result : Ref[Result[Int, String]?] = Ref::new(None)
-  @async.run_async_main(() => {
-    let value = Ok(@aprocess.spawn_orphan("sh", ["-c", command])) catch {
+  @mbasync.run_async_main(() => {
+    let value = Ok(
+      @aprocess.spawn_orphan("sh", ["-c", detached_shell_command(command)]),
+    ) catch {
       err => Err(err.to_string())
     }
     result.val = Some(value)
@@ -41,7 +48,8 @@ pub fn is_alive(pid : Int) -> Bool {
   if pid <= 0 {
     return false
   }
-  let command = "kill -0 \{pid} >/dev/null 2>&1 && ps -o stat= -p \{pid} 2>/dev/null | grep -qv '^Z'"
+  let command =
+    "kill -0 \{pid} >/dev/null 2>&1 && ps -o stat= -p \{pid} 2>/dev/null | grep -qv '^Z'"
   let (exit_code, _, _) = run_command_capture(command)
   exit_code == 0
 }
@@ -73,5 +81,5 @@ pub fn sleep_ms(ms : Int) -> Unit {
   if ms <= 0 {
     return
   }
-  @async.run_async_main(() => @async.sleep(ms))
+  @mbasync.run_async_main(() => @mbasync.sleep(ms))
 }

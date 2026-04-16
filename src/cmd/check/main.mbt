@@ -434,7 +434,7 @@ fn evaluate_policy_with_opa(
     return Err(bundle_path_out.unwrap_err())
   }
   let command = "opa eval --bundle \{shell_escape(bundle_path)} --input \{shell_escape(temp_input)} --format json data.codeiq.compat.deny"
-  let (exit_code, stdout, stderr) = @check_shell.run_command_capture(command)
+  let (exit_code, stdout, stderr) = @host_async.run_command_capture(command)
   @fs.remove_file(temp_input) catch {
     _ => ()
   }

@@ -6,7 +6,7 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
-  "yufeiminds/codeiq/cmd/check/shell" @check_shell,
+  "yufeiminds/codeiq/async" @host_async,
   "yufeiminds/codeiq/policy" @policy_catalog,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/config" @config,
@@ -16,3 +16,5 @@ import {
 import {
   "yufeiminds/codeiq/cmd/build" @build_cmd,
 } for "test"
+
+supported_targets = "native"

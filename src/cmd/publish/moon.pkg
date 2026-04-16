@@ -10,6 +10,4 @@ import {
   "yufeiminds/codeiq/schema" @schema,
 }
 
-options(
-  targets: { "main_test.mbt": [ "wasm" ] },
-)
+supported_targets = "native"

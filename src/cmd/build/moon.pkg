@@ -6,7 +6,7 @@ import {
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cmd/build/shell" @build_shell,
+  "yufeiminds/codeiq/async" @build_shell,
   "yufeiminds/codeiq/extractors" @extract,
   "yufeiminds/codeiq/extractors/go" @extract_go,
   "yufeiminds/codeiq/extractors/rust" @extract_rust,
@@ -17,10 +17,13 @@ import {
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/schema" @schema,
+  "yufeiminds/codeiq/sdk/index" @sdk_index,
 }
 
 import {
-  "yufeiminds/codeiq/cmd/build/shell" @build_shell,
+  "yufeiminds/codeiq/async" @build_shell,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/json" @json,
 } for "test"
+
+supported_targets = "native"

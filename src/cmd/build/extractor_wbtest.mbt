@@ -54,9 +54,4 @@ test "native metadata normalization masks mode while preserving backend and serv
   assert_true(normalized.contains("\"mode\": \"<normalized>\""))
 }
 
-///|
-test "profile_mode_native emits native-assisted mode for go-module" {
-  let (mode, server) = profile_mode_native("go-module")
-  inspect(mode, content="native-assisted")
-  inspect(server, content="gopls")
-}
+
