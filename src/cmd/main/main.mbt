@@ -87,6 +87,40 @@ fn normalize_cli_args(argv : Array[String]) -> Array[String] {
 }
 
 ///|
+fn grouped_help() -> String {
+  (
+    #|CodeIQ declaration-aware CLI
+    #|
+    #|Usage: codeiq <command> [options]
+    #|
+    #|Core
+    #|  init                Initialize codeiq.yml
+    #|  build               Build CIQ bundle
+    #|  diff                Compute CIQ diff
+    #|  check               Run policy checks
+    #|  query <query-file>  Query CIQ bundle
+    #|
+    #|Remote
+    #|  publish             Publish CIQ bundle
+    #|  registry serve      Run local registry HTTP server
+    #|  registry status     Show registry server status
+    #|
+    #|AI
+    #|  mcp serve           Run MCP agent foreground loop
+    #|  mcp status          Show MCP agent status
+  )
+}
+
+///|
+fn usage_error(message? : String = "") -> @cli.CliError {
+  if message == "" {
+    @cli.usage_error(grouped_help())
+  } else {
+    @cli.usage_error("\{message}\n\n\{grouped_help()}")
+  }
+}
+
+///|
 fn parse_invocation(
   argv : Array[String],
 ) -> @cli.CliResult[CliInvocation, @cli.CliError] {
@@ -157,7 +191,7 @@ fn parse_invocation(
   )
   let parse_result = try? @argparse.parse(command, argv~)
   guard parse_result is Ok(matches) else {
-    return Err(@cli.usage_error(command.render_help()))
+    return Err(usage_error())
   }
   match matches.subcommand {
     Some(("init", init_matches)) => {
@@ -198,12 +232,12 @@ fn parse_invocation(
           let port_values = serve_matches.values["port"]
           let parsed_port = try? @string.parse_int(port_values[0])
           guard parsed_port is Ok(port) else {
-            return Err(@cli.usage_error("--port must be an integer"))
+            return Err(usage_error(message="--port must be an integer"))
           }
           Ok(RegistryServe(@registry_cmd.RegistryServeParams::{ port, }))
         }
         Some(("status", _)) => Ok(RegistryStatus)
-        _ => Err(@cli.usage_error(command.render_help()))
+        _ => Err(usage_error())
       }
     Some(("mcp", mcp_matches)) =>
       match mcp_matches.subcommand {
@@ -211,14 +245,14 @@ fn parse_invocation(
           let port_values = serve_matches.values["port"]
           let parsed_port = try? @string.parse_int(port_values[0])
           guard parsed_port is Ok(port) else {
-            return Err(@cli.usage_error("--port must be an integer"))
+            return Err(usage_error(message="--port must be an integer"))
           }
           Ok(McpServe(@mcp_core.McpServeParams::{ port, }))
         }
         Some(("status", _)) => Ok(McpStatus)
-        _ => Err(@cli.usage_error(command.render_help()))
+        _ => Err(usage_error())
       }
-    _ => Err(@cli.usage_error(command.render_help()))
+    _ => Err(usage_error())
   }
 }
 
