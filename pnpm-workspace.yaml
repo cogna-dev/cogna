@@ -1,0 +1,10 @@
+packages:
+  - 'docs'
+  - 'integrations/*'
+  - 'integrations/*/*'
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - sharp
+  - msw
+  - electron-winstaller
