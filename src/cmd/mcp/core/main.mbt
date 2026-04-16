@@ -312,7 +312,7 @@ fn run_outlines_tool_with_context(
   }
   let cursor = @mcp_sdk.get_optional_string(args, "cursor")
   let repo = query_repo_by_purl(purl)
-  let outlines_out = @query_cmd.query_outlines_with_cancel(
+  let outlines_out = @sdk_query.query_outlines_with_cancel(
     repo, purl, limit, cursor, cancelled,
   )
   guard outlines_out is Ok((outlines, next_cursor_str)) else {
@@ -335,10 +335,11 @@ fn run_outlines_tool_with_context(
       Json::number(value.to_int().to_double(), repr="\{value.to_int()}")
     None => Json::null()
   }
+  let outline_label = if outlines.length() == 1 { "outline" } else { "outlines" }
 
   Ok(
     @mcp_sdk.call_result(
-      "Returned \{outlines.length()} outline(s) for \{purl}",
+      "Returned \{outlines.length()} \{outline_label} for \{purl}",
       {
         "purl": purl,
         "limit": limit,
@@ -382,7 +383,7 @@ fn run_symbol_tool_with_context(
   }
 
   let repo = query_repo_by_purl(purl)
-  let matches_out = @query_cmd.query_matches_with_cancel(
+  let matches_out = @sdk_query.query_matches_with_cancel(
     repo, selector, kind, cancelled,
   )
   guard matches_out is Ok(matches) else { return Err(matches_out.unwrap_err()) }
@@ -436,16 +437,23 @@ fn handle_tool_call(
   guard parsed_out is Ok((name, args)) else {
     return Err(parsed_out.unwrap_err())
   }
+  let error_code_for_message = (message : String) => {
+    if message.has_prefix("missing required") {
+      -32602
+    } else {
+      -32603
+    }
+  }
   match name {
     "codeiq.query.outlines" =>
       match run_outlines_tool_with_context(args, context, cancelled) {
         Ok(result) => Ok(result)
-        Err(message) => Err((-32603, message))
+        Err(message) => Err((error_code_for_message(message), message))
       }
     "codeiq.query.symbol" =>
       match run_symbol_tool_with_context(args, context, cancelled) {
         Ok(result) => Ok(result)
-        Err(message) => Err((-32603, message))
+        Err(message) => Err((error_code_for_message(message), message))
       }
     "codeiq.runtime.context" =>
       match run_runtime_context_tool() {
@@ -527,27 +535,27 @@ pub fn handle_http_request(
   path : String,
   headers : Map[String, String],
   body : Bytes,
-) -> Result[@mcp_runtime.HttpResponse, String] {
+) -> Result[@host_async.HttpResponse, String] {
   ignore(headers)
   match path {
     "/health" =>
       if http_method == "GET" {
         Ok(
-          @mcp_runtime.json_response(200, {
+          @host_async.json_response(200, {
             "status": "ok",
             "name": "codeiq-mcp",
             "protocolVersion": "2025-11-25",
           }),
         )
       } else {
-        Ok(@mcp_runtime.text_response(405, "method not allowed"))
+        Ok(@host_async.text_response(405, "method not allowed"))
       }
     "/rpc" =>
       if http_method == "POST" {
         let request_out = parse_http_request(body)
         guard request_out is Ok(request) else {
           return Ok(
-            @mcp_runtime.json_response(
+            @host_async.json_response(
               400,
               @mcp_sdk.error_response(
                 Json::null(),
@@ -557,11 +565,11 @@ pub fn handle_http_request(
             ),
           )
         }
-        Ok(@mcp_runtime.json_response(200, handle_request(request)))
+        Ok(@host_async.json_response(200, handle_request(request)))
       } else {
-        Ok(@mcp_runtime.text_response(405, "method not allowed"))
+        Ok(@host_async.text_response(405, "method not allowed"))
       }
-    _ => Ok(@mcp_runtime.text_response(404, "not found"))
+    _ => Ok(@host_async.text_response(404, "not found"))
   }
 }
 
@@ -581,7 +589,7 @@ pub fn run_serve(
   guard descriptor_out is Ok(_) else {
     return Err(descriptor_out.unwrap_err())
   }
-  let serve_out = @mcp_runtime.serve_http(params.port, handle_http_request)
+  let serve_out = @host_async.serve_http(params.port, handle_http_request)
   guard serve_out is Ok(_) else {
     cleanup_descriptor(descriptor)
     return Err(mcp_error(serve_out.unwrap_err()))

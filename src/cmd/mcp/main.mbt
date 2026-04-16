@@ -154,9 +154,9 @@ fn shell_quote(value : String) -> String {
 
 ///|
 fn native_serve_command(port : Int) -> String {
-  let manifest_path = "\{project_root_path()}/moon.mod.json"
+  let run_script = "\{project_root_path()}/integrations/cli/run.sh"
   let target_dir = native_target_dir(port)
-  "moon run --target native --frozen --target-dir \{shell_quote(target_dir)} --manifest-path \{shell_quote(manifest_path)} src/cmd/main -- mcp serve --port \{port}"
+  "bash \{shell_quote(run_script)} --target native --frozen --target-dir \{shell_quote(target_dir)} -- mcp serve --port \{port}"
 }
 
 ///|
@@ -252,17 +252,17 @@ fn wait_for_health(
   sleep_ms? : Int = 100,
 ) -> Bool {
   for _ in 0..<attempts {
-    let request_out = @mcp_runtime.http_request(
+    let request_out = @host_async.http_request(
       "GET",
       url,
       {},
-      @mcp_runtime.HttpBody::Empty,
+      @host_async.HttpBody::Empty,
     )
     match request_out {
       Ok(result) => if result.status == 200 { return true }
       Err(_) => ()
     }
-    @mcp_shell.sleep_ms(sleep_ms)
+    @host_async.sleep_ms(sleep_ms)
   }
   false
 }
@@ -279,10 +279,10 @@ fn write_runtime_state_with_pid(
 ///|
 fn wait_for_process_stop(pid : Int) -> Bool {
   for _ in 0..<20 {
-    if !@mcp_shell.is_alive(pid) {
+    if !@host_async.is_alive(pid) {
       return true
     }
-    @mcp_shell.sleep_ms(100)
+    @host_async.sleep_ms(100)
   }
   false
 }
@@ -290,7 +290,7 @@ fn wait_for_process_stop(pid : Int) -> Bool {
 ///|
 fn spawn_detached_server_process(port : Int) -> Result[Int, @cli.CliError] {
   let command = native_serve_command(port)
-  let spawn_out = @mcp_shell.spawn_detached(command)
+  let spawn_out = @host_async.spawn_detached(command)
   guard spawn_out is Ok(pid) else {
     return Err(mcp_error(spawn_out.unwrap_err()))
   }
@@ -304,20 +304,20 @@ fn wait_for_server_health(port : Int, pid : Int) -> Bool {
     if wait_for_health(health_url, attempts=1, sleep_ms=0) {
       return true
     }
-    if !@mcp_shell.is_alive(pid) {
+    if !@host_async.is_alive(pid) {
       return false
     }
-    @mcp_shell.sleep_ms(100)
+    @host_async.sleep_ms(100)
   }
   false
 }
 
 ///|
 fn stop_process_if_alive(pid : Int) -> Unit {
-  if @mcp_shell.is_alive(pid) {
-    ignore(@mcp_shell.terminate(pid))
+  if @host_async.is_alive(pid) {
+    ignore(@host_async.terminate(pid))
     if !wait_for_process_stop(pid) {
-      ignore(@mcp_shell.force_kill(pid))
+      ignore(@host_async.force_kill(pid))
       ignore(wait_for_process_stop(pid))
     }
   }
@@ -369,7 +369,7 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
     )
     match descriptor_pid(descriptor.info) {
       Some(pid) =>
-        if @mcp_shell.is_alive(pid) && healthy {
+        if @host_async.is_alive(pid) && healthy {
           Ok({
             status: "running",
             summary: "MCP server healthy at \{health_url} with live pid \{pid}",

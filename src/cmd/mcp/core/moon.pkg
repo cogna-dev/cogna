@@ -1,7 +1,6 @@
 import {
   "yufeiminds/codeiq/scripts/bundle" @bundle,
-  "yufeiminds/codeiq/cmd/mcp/runtime" @mcp_runtime,
-  "yufeiminds/codeiq/cmd/query" @query_cmd,
+  "yufeiminds/codeiq/async" @host_async,
   "yufeiminds/codeiq/cmd/registry" @registry_cmd,
   "yufeiminds/codeiq/lib/mcp-sdk" @mcp_sdk,
   "moonbitlang/core/env" @env,
@@ -9,11 +8,7 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/cli" @cli,
+  "yufeiminds/codeiq/sdk/query" @sdk_query,
 }
 
-options(
-  targets: {
-    "main_test.mbt": [ "llvm" ],
-    "smoke_test.mbt": [ "native", "llvm" ],
-  },
-)
+supported_targets = "native"

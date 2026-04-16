@@ -371,7 +371,7 @@ test "mcp tools call outlines accepts limit and cursor" {
     ),
   )
   let response = handle_request(request).stringify(indent=2)
-  assert_true(response.contains("\"Returned 1 outline\""))
+  assert_true(response.contains("Returned 1 outline"))
   assert_true(response.contains("\"limit\": 1"))
 
   @fs.remove_file("./dist/declarations.ndjson") catch {
