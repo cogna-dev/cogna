@@ -1,0 +1,16 @@
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  - local: tools/protoc-gen-codeiq/protoc-gen-codeiq
+    out: .
+    opt:
+      - target=moonbit
+    include_imports: false
+    include_wkt: false
+  - local: tools/protoc-gen-codeiq/protoc-gen-codeiq
+    out: .
+    opt:
+      - target=node-ts
+    include_imports: false
+    include_wkt: false

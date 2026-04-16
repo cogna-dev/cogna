@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package xaclabs.codeiq.v1;
+
+import "xaclabs/codeiq/v1/bundle.proto";
+
+enum SeverityLevel {
+  SEVERITY_LEVEL_UNSPECIFIED = 0;
+  SEVERITY_LEVEL_NOTE = 1;
+  SEVERITY_LEVEL_WARNING = 2;
+  SEVERITY_LEVEL_ERROR = 3;
+  SEVERITY_LEVEL_BREAKING = 4;
+}
+
+enum DiffChangeKind {
+  DIFF_CHANGE_KIND_UNSPECIFIED = 0;
+  DIFF_CHANGE_KIND_ADDED = 1;
+  DIFF_CHANGE_KIND_REMOVED = 2;
+  DIFF_CHANGE_KIND_CHANGED = 3;
+  DIFF_CHANGE_KIND_DEPRECATED = 4;
+}
+
+enum TestChangeKind {
+  TEST_CHANGE_KIND_UNSPECIFIED = 0;
+  TEST_CHANGE_KIND_ADDED = 1;
+  TEST_CHANGE_KIND_MODIFIED = 2;
+  TEST_CHANGE_KIND_REMOVED = 3;
+}
+
+message SemanticFinding {
+  // Stable finding code used by policy and reporting layers.
+  string code = 1;
+  string message = 2;
+}
+
+message SemanticDiff {
+  // Canonical finding list emitted by the diff engine.
+  repeated SemanticFinding findings = 1;
+  repeated string changed_fields = 2;
+  // Declaration shape before the change when the shape changed.
+  DeclarationShape before_shape = 3;
+  // Declaration shape after the change when the shape changed.
+  DeclarationShape after_shape = 4;
+  // Language-specific payload before the change when it changed.
+  LanguageSpecific before_language_specific = 5;
+  // Language-specific payload after the change when it changed.
+  LanguageSpecific after_language_specific = 6;
+}
+
+message ComponentDiff {
+  repeated string changed_fields = 1;
+  // Normalized upgrade category, for example version-upgrade.
+  string upgrade_kind = 2;
+  string before_version = 3;
+  string after_version = 4;
+  string before_purl = 5;
+  string after_purl = 6;
+}
+
+message DiffBundleRef {
+  string purl = 1;
+  Profile profile = 2;
+  VersionRef version = 3;
+  // Registry-facing bundle identifier when available.
+  string bundle_id = 4;
+  string digest = 5;
+  string archive_path = 6;
+  string download_url = 7;
+  string etag = 8;
+}
+
+message DiffChange {
+  DiffChangeKind kind = 1;
+  string id = 2;
+  string path = 3;
+  // Compatibility impact level attached to this change.
+  SeverityLevel level = 4;
+  string before = 5;
+  string after = 6;
+  // Semantic diff payload for declaration changes.
+  SemanticDiff semantic_diff = 7;
+  // Component-specific diff payload for software component changes.
+  ComponentDiff component_diff = 8;
+  // Typed base-side record payload when available.
+  oneof before_record {
+    Declaration before_declaration = 20;
+    Symbol before_symbol = 21;
+    SoftwareComponent before_software_component = 22;
+  }
+  // Typed target-side record payload when available.
+  oneof after_record {
+    Declaration after_declaration = 30;
+    Symbol after_symbol = 31;
+    SoftwareComponent after_software_component = 32;
+  }
+}
+
+message DiffSummary {
+  int32 added = 1;
+  int32 removed = 2;
+  int32 changed = 3;
+  int32 deprecated = 4;
+}
+
+message TestTracking {
+  string traceability_key = 1;
+  repeated string external_ids = 2;
+}
+
+message TestChange {
+  TestChangeKind kind = 1;
+  // Language the test belongs to, using the current JSON diff vocabulary.
+  string language = 2;
+  string id = 3;
+  string path = 4;
+  string signature = 5;
+  SourceLocation location = 6;
+  // External traceability metadata when available.
+  TestTracking tracking = 7;
+}
+
+message TestChangeSummary {
+  int32 added = 1;
+  int32 modified = 2;
+  int32 removed = 3;
+}
+
+message Diff {
+  // Diff schema version, aligned with the current ciq-diff/v1 JSON contract.
+  string schema_version = 1;
+  string base_purl = 2;
+  string target_purl = 3;
+  // Optional explicit comparison anchor, usually a commit hash.
+  string since = 4;
+  DiffSummary summary = 5;
+  repeated DiffChange changes = 6;
+  // Whether test-change analysis was enabled for this diff.
+  bool include_test_changes = 7;
+  TestChangeSummary test_summary = 8;
+  repeated TestChange test_changes = 9;
+  // Optional locator for the base bundle involved in the comparison.
+  DiffBundleRef base_bundle = 10;
+  // Optional locator for the target bundle involved in the comparison.
+  DiffBundleRef target_bundle = 11;
+}
+
+message DiffInput {
+  string path = 1;
+  VersionRef base_version = 2;
+  VersionRef target_version = 3;
+  // Whether to include test-change analysis in the diff output.
+  bool include_test_changes = 4;
+}
+
+message DiffOutput {
+  bool success = 1;
+  Diff diff = 2;
+  DiffBundleRef base_bundle = 3;
+  DiffBundleRef target_bundle = 4;
+  // Error envelope populated when diff computation fails.
+  ErrorResponse error = 10;
+}

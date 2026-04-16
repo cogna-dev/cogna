@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package xaclabs.codeiq.v1;
+
+import "xaclabs/codeiq/v1/bundle.proto";
+
+message BuildInput {
+  string path = 1;
+}
+
+message LogEntry {
+  string level = 1;
+  string message = 2;
+}
+
+message BuildBundleRef {
+  string purl = 1;
+  Profile profile = 2;
+  VersionRef version = 3;
+  // Registry-facing bundle identifier when the bundle has been published or resolved.
+  string bundle_id = 4;
+  // Content digest when the bundle archive has been materialized.
+  string digest = 5;
+  // Local archive path for the generated bundle file.
+  string archive_path = 6;
+  // Download URL when the bundle has also been exposed by a registry.
+  string download_url = 7;
+  // ETag value when the bundle has also been exposed by a registry.
+  string etag = 8;
+}
+
+message BuildSummary {
+  string output_path = 1;
+  string manifest_path = 2;
+  string bundle_path = 3;
+  int32 declaration_count = 4;
+  int32 symbol_count = 5;
+  int32 software_component_count = 6;
+  string metadata_path = 7;
+  string checksums_path = 8;
+}
+
+message BuildOutput {
+  bool success = 1;
+  // Reference to the built bundle without embedding the full bundle payload.
+  BuildBundleRef bundle = 2;
+  BuildSummary summary = 3;
+  repeated LogEntry logs = 4;
+  // Error envelope populated when the build fails.
+  ErrorResponse error = 10;
+}
