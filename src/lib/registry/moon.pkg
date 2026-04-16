@@ -5,8 +5,10 @@ import {
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
+  "yufeiminds/codeiq/async" @host_async,
   "yufeiminds/codeiq/config" @config,
   "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/registry/runtime" @registry_runtime,
   "yufeiminds/codeiq/schema" @schema,
 }
+
+supported_targets = "native"

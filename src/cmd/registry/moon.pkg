@@ -2,11 +2,10 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "yufeiminds/codeiq/scripts/bundle" @bundle,
-  "yufeiminds/codeiq/cmd/registry/shell" @registry_shell,
+  "yufeiminds/codeiq/async" @host_async,
   "yufeiminds/codeiq/lib/registry" @registry_lib,
   "yufeiminds/codeiq/cli" @cli,
   "yufeiminds/codeiq/registry" @registry_impl,
-  "yufeiminds/codeiq/registry/runtime" @registry_runtime,
 }
 
 import {
@@ -18,10 +17,4 @@ import {
   "shu-kitamura/sha256" @sha256,
 } for "test"
 
-options(
-  targets: {
-    "download_bundle_test.mbt": [ "native", "wasm" ],
-    "helpers_test.mbt": [ "native", "wasm" ],
-    "main_test.mbt": [ "wasm" ],
-  },
-)
+supported_targets = "native"

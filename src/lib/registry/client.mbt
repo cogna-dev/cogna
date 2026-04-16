@@ -717,9 +717,9 @@ fn json_request(
   http_method : String,
   url : String,
   headers : Map[String, String],
-  body : @registry_runtime.HttpBody,
-) -> Result[@registry_runtime.HttpResult, @cli.CliError] {
-  let request_out = @registry_runtime.http_request(
+  body : @host_async.HttpBody,
+) -> Result[@host_async.HttpResult, @cli.CliError] {
+  let request_out = @host_async.http_request(
     http_method, url, headers, body,
   )
   guard request_out is Ok(result) else {
@@ -837,13 +837,13 @@ fn maybe_cache_bundle_download(
         "GET",
         download_url,
         headers,
-        @registry_runtime.HttpBody::Empty,
+        @host_async.HttpBody::Empty,
       )
     guard request_out is Ok(result) else {
       return Err(request_out.unwrap_err())
     }
     if result.status != 200 {
-      let text = @registry_runtime.text_body(result).unwrap_or("")
+      let text = @host_async.text_body(result).unwrap_or("")
       return Err(
         registry_error(
           "remote bundle download failed with http status \{result.status} for \{download_url}: \{text.trim().to_string()}",
@@ -968,20 +968,20 @@ pub fn upload_remote(
         "POST",
         endpoint,
         headers,
-        @registry_runtime.HttpBody::Json(upload_request),
+        @host_async.HttpBody::Json(upload_request),
       )
       guard request_out is Ok(result) else {
         return Err(request_out.unwrap_err())
       }
       if result.status != 200 && result.status != 201 {
-        let message = @registry_runtime.text_body(result).unwrap_or("")
+        let message = @host_async.text_body(result).unwrap_or("")
         return Err(
           registry_error(
             "remote registry upload failed with http status \{result.status}: \{message.trim().to_string()}",
           ),
         )
       }
-      let json_out = @registry_runtime.json_body(result)
+      let json_out = @host_async.json_body(result)
       guard json_out is Ok(value) else {
         return Err(registry_error(json_out.unwrap_err()))
       }
@@ -1060,7 +1060,7 @@ pub fn download_remote_by_purl(purl : String) -> Result[Json, @cli.CliError] {
         "GET",
         endpoint,
         request_headers(if_none_match=resolved_if_none_match_header(purl)),
-        @registry_runtime.HttpBody::Empty,
+        @host_async.HttpBody::Empty,
       )
       guard request_out is Ok(result) else {
         return Err(request_out.unwrap_err())
@@ -1081,14 +1081,14 @@ pub fn download_remote_by_purl(purl : String) -> Result[Json, @cli.CliError] {
         Ok(not_modified)
       } else {
         if result.status != 200 {
-          let message = @registry_runtime.text_body(result).unwrap_or("")
+          let message = @host_async.text_body(result).unwrap_or("")
           return Err(
             registry_error(
               "remote registry download failed with http status \{result.status}: \{message.trim().to_string()}",
             ),
           )
         }
-        let parsed_out = @registry_runtime.json_body(result)
+        let parsed_out = @host_async.json_body(result)
         guard parsed_out is Ok(parsed) else {
           return Err(registry_error(parsed_out.unwrap_err()))
         }

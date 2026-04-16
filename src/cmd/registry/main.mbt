@@ -372,17 +372,17 @@ fn wait_for_health(
   sleep_ms? : Int = 100,
 ) -> Bool {
   for _ in 0..<attempts {
-    let request_out = @registry_runtime.http_request(
+    let request_out = @host_async.http_request(
       "GET",
       url,
       {},
-      @registry_runtime.HttpBody::Empty,
+      @host_async.HttpBody::Empty,
     )
     match request_out {
       Ok(result) => if result.status == 200 { return true }
       Err(_) => ()
     }
-    @registry_shell.sleep_ms(sleep_ms)
+    @host_async.sleep_ms(sleep_ms)
   }
   false
 }

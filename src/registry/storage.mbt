@@ -398,7 +398,7 @@ pub fn registry_bundle_detail_response(
 ///|
 pub fn registry_bundle_download_http(
   bundle_id : String,
-) -> Result[@registry_runtime.HttpResponse, @cli.CliError] {
+) -> Result[@host_async.HttpResponse, @cli.CliError] {
   let path_out = bundle_path_for_bundle_id(bundle_id)
   guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
   let bytes = @fs.read_file_to_bytes(path) catch {
@@ -415,7 +415,7 @@ pub fn registry_bundle_download_http(
     "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
   ).unwrap_or("\"\{bundle_id}\"")
   headers["ETag"] = etag
-  Ok(@registry_runtime.binary_response(200, bytes, headers~))
+  Ok(@host_async.binary_response(200, bytes, headers~))
 }
 
 ///|
