@@ -1,0 +1,4 @@
+import {
+  "cogna-dev/cogna/extractors/go" @go,
+  "cogna-dev/cogna/extractors/rust" @rust,
+} for "test"

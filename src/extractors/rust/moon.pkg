@@ -1,4 +1,3 @@
 import {
-  "yufeiminds/codeiq/extractors" @extract,
-  "yufeiminds/codeiq/lib/parsec" @parsec,
+  "cogna-dev/cogna/core/extract" @extract,
 }

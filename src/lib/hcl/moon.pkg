@@ -1,3 +1,0 @@
-import {
-  "yufeiminds/codeiq/lib/parsec" @parsec,
-}

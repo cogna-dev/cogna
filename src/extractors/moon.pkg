@@ -1,8 +1,0 @@
-import {
-  "yufeiminds/codeiq/lib/parsec" @parsec,
-}
-
-import {
-  "yufeiminds/codeiq/extractors/go" @go,
-  "yufeiminds/codeiq/extractors/rust" @rust,
-} for "test"

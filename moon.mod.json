@@ -1,18 +1,23 @@
 {
-  "name": "yufeiminds/codeiq",
+  "name": "cogna-dev/cogna",
   "version": "0.1.0",
   "deps": {
+    "cogna-dev/x": "0.1.2",
+    "cogna-dev/mapi": "0.1.1",
     "moonbitlang/x": "0.4.41",
     "shu-kitamura/sha256": "0.1.1",
     "gmlewis/flate": "0.36.3",
     "gmlewis/gzip": "0.34.3",
     "gmlewis/io": "0.23.3",
-    "moonbitlang/async": "0.16.8"
+    "moonbitlang/async": "0.16.8",
+    "cogna-dev/parkit": "0.1.1",
+    "cogna-dev/sbom": "0.1.0",
+    "cogna-dev/mcp-sdk": "0.1.0"
   },
   "readme": "README.md",
-  "repository": "https://github.com/yufeiminds/codeiq",
+  "repository": "https://github.com/cogna-dev/cogna",
   "license": "Apache-2.0",
   "keywords": [],
-  "description": "CodeIQ",
+  "description": "Cogna",
   "source": "src"
 }

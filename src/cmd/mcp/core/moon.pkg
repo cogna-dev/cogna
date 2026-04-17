@@ -1,14 +1,12 @@
 import {
-  "yufeiminds/codeiq/scripts/bundle" @bundle,
-  "yufeiminds/codeiq/async" @host_async,
-  "yufeiminds/codeiq/cmd/registry" @registry_cmd,
-  "yufeiminds/codeiq/lib/mcp-sdk" @mcp_sdk,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "cogna-dev/cogna/core/bundle" @bundle,
+  "cogna-dev/mcp-sdk/mcp/server" @mcp_server,
+  "cogna-dev/mcp-sdk/mcp/types" @mcp_types,
+  "moonbitlang/async" @mbasync,
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/sdk/query" @sdk_query,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/core/api" @query_core,
 }
 
 supported_targets = "native"

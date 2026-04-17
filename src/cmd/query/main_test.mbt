@@ -28,7 +28,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 
 ///|
 fn tmp_query_repo(name : String) -> String {
-  "/tmp/codeiq-query-\{name}"
+  "/tmp/cogna-query-\{name}"
 }
 
 ///|
@@ -61,7 +61,7 @@ test "query generates ciq result from query file" {
 
   inspect(
     result.display(),
-    content="Generated CIQ result at /tmp/codeiq-query-repo/query.result.json",
+    content="Generated CIQ result at /tmp/cogna-query-repo/query.result.json",
   )
 
   let result_json = @fs.read_file_to_string("\{repo}/query.result.json") catch {

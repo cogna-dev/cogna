@@ -1,31 +1,34 @@
 ///|
 fn type_name(signature : String, prefix : String) -> String {
   let body = signature.strip_prefix(prefix).unwrap_or(signature).to_string()
-    |> @parsec.trim_spaces
+    |> @extract.trim_spaces
   let base = match body.find("<") {
     Some(idx) => body[0:idx].to_string()
-    None => @parsec.token_before(body, " ")
+    None => @extract.token_before(body, " ")
   }
-  @parsec.trim_spaces(base)
+  @extract.trim_spaces(base)
 }
 
 ///|
 fn where_clause(signature : String) -> String {
   match signature.find(" where ") {
-    Some(idx) => signature[idx + 7:].to_string() |> @parsec.trim_spaces |> @parsec.strip_braces
+    Some(idx) =>
+      signature[idx + 7:].to_string()
+      |> @extract.trim_spaces
+      |> @extract.strip_braces
     None => ""
   }
 }
 
 ///|
 fn strip_leading_generics(value : String) -> String {
-  let trimmed = @parsec.trim_spaces(value)
+  let trimmed = @extract.trim_spaces(value)
   if !trimmed.has_prefix("<") {
     return trimmed
   }
-  match @parsec.matching_delimiter_index(trimmed, 0, '<', '>') {
+  match @extract.matching_delimiter_index(trimmed, 0, '<', '>') {
     Some(close_idx) if close_idx + 1 < trimmed.length() =>
-      @parsec.trim_spaces(trimmed[close_idx + 1:].to_string())
+      @extract.trim_spaces(trimmed[close_idx + 1:].to_string())
     Some(_) => ""
     None => trimmed
   }
@@ -33,7 +36,7 @@ fn strip_leading_generics(value : String) -> String {
 
 ///|
 pub fn decl_name(text : String) -> String {
-  let trimmed = @parsec.trim_spaces(text)
+  let trimmed = @extract.trim_spaces(text)
   if trimmed == "" {
     return ""
   }
@@ -41,7 +44,7 @@ pub fn decl_name(text : String) -> String {
   while end < trimmed.length() {
     let c = trimmed.code_unit_at(end)
     if c == '<' {
-      match @parsec.matching_delimiter_index(trimmed, end, '<', '>') {
+      match @extract.matching_delimiter_index(trimmed, end, '<', '>') {
         Some(close_idx) => {
           end = close_idx + 1
           continue
@@ -49,36 +52,42 @@ pub fn decl_name(text : String) -> String {
         None => break
       }
     }
-    if c == ' ' || c == '\t' || c == '{' || c == '(' || c == '=' || c == ':' || c == ';' {
+    if c == ' ' ||
+      c == '\t' ||
+      c == '{' ||
+      c == '(' ||
+      c == '=' ||
+      c == ':' ||
+      c == ';' {
       break
     }
     end += 1
   }
-  @parsec.trim_spaces(trimmed[0:end].to_string())
+  @extract.trim_spaces(trimmed[0:end].to_string())
 }
 
 ///|
 pub fn strip_decl_modifiers(value : String) -> String {
-  let mut out = @parsec.trim_spaces(value)
+  let mut out = @extract.trim_spaces(value)
   let mut changed = true
   while changed {
     changed = false
     if out.has_prefix("unsafe ") {
-      out = @parsec.trim_spaces(out[7:].to_string())
+      out = @extract.trim_spaces(out[7:].to_string())
       changed = true
       continue
     }
     if out.has_prefix("async ") {
-      out = @parsec.trim_spaces(out[6:].to_string())
+      out = @extract.trim_spaces(out[6:].to_string())
       changed = true
       continue
     }
     if out.has_prefix("extern ") {
-      let rest = @parsec.trim_spaces(out[7:].to_string())
+      let rest = @extract.trim_spaces(out[7:].to_string())
       if rest.has_prefix("\"") {
         match rest[1:].find("\"") {
           Some(close_idx) => {
-            out = @parsec.trim_spaces(rest[close_idx + 2:].to_string())
+            out = @extract.trim_spaces(rest[close_idx + 2:].to_string())
             changed = true
             continue
           }
@@ -106,10 +115,13 @@ fn signature_type_params(signature : String) -> Array[String] {
       if open_idx > equals_idx || open_idx > paren_idx {
         return []
       }
-      match @parsec.matching_delimiter_index(signature, open_idx, '<', '>') {
+      match @extract.matching_delimiter_index(signature, open_idx, '<', '>') {
         Some(close_idx) if close_idx > open_idx + 1 =>
-          @parsec.split_top_level(signature[open_idx + 1:close_idx].to_string(), ',')
-          |> @parsec.unique_trimmed_strings
+          @extract.split_top_level(
+            signature[open_idx + 1:close_idx].to_string(),
+            ',',
+          )
+          |> @extract.unique_trimmed_strings
         _ => []
       }
     }
@@ -122,15 +134,17 @@ fn multiline_clause(lines : Array[String], start_idx : Int) -> String {
   let parts : Array[String] = []
   let mut saw_where = false
   for i in (start_idx + 1)..<lines.length() {
-    let clean = @parsec.trim_spaces(@parsec.line_before_comment(lines[i].to_string()))
+    let clean = @extract.trim_spaces(
+      @extract.line_before_comment(lines[i].to_string()),
+    )
     if clean == "" {
       continue
     }
     if clean.has_prefix("where") {
       saw_where = true
       let clause = clean.strip_prefix("where").unwrap_or(clean).to_string()
-        |> @parsec.trim_spaces
-        |> @parsec.strip_braces
+        |> @extract.trim_spaces
+        |> @extract.strip_braces
       if clause != "" {
         parts.push(clause)
       }
@@ -142,7 +156,7 @@ fn multiline_clause(lines : Array[String], start_idx : Int) -> String {
     if !saw_where {
       break
     }
-    let clause = @parsec.strip_braces(clean)
+    let clause = @extract.strip_braces(clean)
     if clause != "" {
       parts.push(clause)
     }
@@ -160,12 +174,12 @@ fn multiline_clause(lines : Array[String], start_idx : Int) -> String {
 ///|
 pub fn impl_targets(signature : String) -> (String, String) {
   let trimmed = signature.strip_prefix("impl").unwrap_or(signature).to_string()
-    |> @parsec.trim_spaces
-  let normalized = @parsec.strip_braces(trimmed)
+    |> @extract.trim_spaces
+  let normalized = @extract.strip_braces(trimmed)
   match normalized.find(" for ") {
     Some(idx) => {
-      let trait_target = normalized[0:idx].to_string() |> @parsec.trim_spaces
-      let impl_target = normalized[idx + 5:].to_string() |> @parsec.trim_spaces
+      let trait_target = normalized[0:idx].to_string() |> @extract.trim_spaces
+      let impl_target = normalized[idx + 5:].to_string() |> @extract.trim_spaces
       (trait_target, impl_target)
     }
     None => ("", normalized)
@@ -174,17 +188,17 @@ pub fn impl_targets(signature : String) -> (String, String) {
 
 ///|
 fn is_unsafe(signature : String) -> Bool {
-  let clean = @parsec.trim_spaces(@parsec.line_before_comment(signature))
+  let clean = @extract.trim_spaces(@extract.line_before_comment(signature))
   clean.has_prefix("unsafe ") || clean.contains(" unsafe ")
 }
 
 ///|
 fn extern_abi(signature : String) -> String {
-  let clean = @parsec.trim_spaces(@parsec.line_before_comment(signature))
+  let clean = @extract.trim_spaces(@extract.line_before_comment(signature))
   if !clean.contains("extern") {
     return ""
   }
-  let quoted = @parsec.quoted_parts(clean)
+  let quoted = @extract.quoted_parts(clean)
   if !quoted.is_empty() {
     return quoted[0]
   }
@@ -196,15 +210,17 @@ fn extern_abi(signature : String) -> String {
 
 ///|
 pub fn normalize_owner_key(value : String) -> String {
-  let trimmed = @parsec.line_before_comment(value) |> @parsec.trim_spaces |> @parsec.strip_braces
+  let trimmed = @extract.line_before_comment(value)
+    |> @extract.trim_spaces
+    |> @extract.strip_braces
   if trimmed == "" {
     return ""
   }
   let without_where = match trimmed.find(" where ") {
-    Some(idx) => trimmed[0:idx].to_string() |> @parsec.trim_spaces
+    Some(idx) => trimmed[0:idx].to_string() |> @extract.trim_spaces
     None => trimmed
   }
-  strip_leading_generics(without_where) |> @parsec.trim_spaces
+  strip_leading_generics(without_where) |> @extract.trim_spaces
 }
 
 ///|
@@ -221,7 +237,9 @@ fn record_type_params(record : Json) -> Array[String] {
     kind == "function" {
     return signature_type_params(signature)
   }
-  if kind == "associated_type" || kind == "associated_const" || kind == "associated_fn" {
+  if kind == "associated_type" ||
+    kind == "associated_const" ||
+    kind == "associated_fn" {
     match name.find("<") {
       Some(_) => {
         let owner = match name.find("::") {
@@ -230,12 +248,13 @@ fn record_type_params(record : Json) -> Array[String] {
         }
         return match owner.find("<") {
           Some(open_idx) =>
-            match @parsec.matching_delimiter_index(owner, open_idx, '<', '>') {
+            match @extract.matching_delimiter_index(owner, open_idx, '<', '>') {
               Some(close_idx) if close_idx > open_idx + 1 =>
-                @parsec.split_top_level(owner[open_idx + 1:close_idx].to_string(), ',').map(part => {
-                  @parsec.first_token(part)
-                })
-                |> @parsec.unique_trimmed_strings
+                @extract.split_top_level(
+                  owner[open_idx + 1:close_idx].to_string(),
+                  ',',
+                ).map(part => @extract.first_token(part))
+                |> @extract.unique_trimmed_strings
               _ => []
             }
           None => []
@@ -246,12 +265,13 @@ fn record_type_params(record : Json) -> Array[String] {
   }
   match name.find("<") {
     Some(open_idx) =>
-      match @parsec.matching_delimiter_index(name, open_idx, '<', '>') {
+      match @extract.matching_delimiter_index(name, open_idx, '<', '>') {
         Some(close_idx) if close_idx > open_idx + 1 =>
-          @parsec.split_top_level(name[open_idx + 1:close_idx].to_string(), ',').map(part => {
-            @parsec.first_token(part)
-          })
-          |> @parsec.unique_trimmed_strings
+          @extract.split_top_level(
+            name[open_idx + 1:close_idx].to_string(),
+            ',',
+          ).map(part => @extract.first_token(part))
+          |> @extract.unique_trimmed_strings
         _ => []
       }
     None => []
@@ -265,12 +285,24 @@ pub fn enrich_record(record : Json) -> Unit {
   let signature = @extract.field_string(record, "signature")
   let type_params = record_type_params(record)
   @extract.set_shape_string_array(record, "type_params", type_params)
-  @extract.set_language_specific_string_array(record, "rust", "typeParams", type_params)
-  @extract.set_language_specific_string(record, "rust", "whereClause", where_clause(signature))
+  @extract.set_language_specific_string_array(
+    record, "rust", "typeParams", type_params,
+  )
+  @extract.set_language_specific_string(
+    record,
+    "rust",
+    "whereClause",
+    where_clause(signature),
+  )
   if is_unsafe(signature) {
     @extract.set_language_specific_bool(record, "rust", "unsafe", true)
   }
-  @extract.set_language_specific_string(record, "rust", "externAbi", extern_abi(signature))
+  @extract.set_language_specific_string(
+    record,
+    "rust",
+    "externAbi",
+    extern_abi(signature),
+  )
   if kind == "struct" {
     let owner = type_name(signature, "pub struct ")
     @extract.set_shape_string(record, "owner", owner)
@@ -281,10 +313,16 @@ pub fn enrich_record(record : Json) -> Unit {
     @extract.set_language_specific_string(record, "rust", "owner", owner)
   } else if kind == "impl" {
     let (trait_target, impl_target) = impl_targets(signature)
-    @extract.set_language_specific_string(record, "rust", "traitTarget", trait_target)
-    @extract.set_language_specific_string(record, "rust", "implTarget", impl_target)
+    @extract.set_language_specific_string(
+      record, "rust", "traitTarget", trait_target,
+    )
+    @extract.set_language_specific_string(
+      record, "rust", "implTarget", impl_target,
+    )
     @extract.set_shape_string(record, "owner", impl_target)
-  } else if kind == "associated_type" || kind == "associated_const" || kind == "associated_fn" {
+  } else if kind == "associated_type" ||
+    kind == "associated_const" ||
+    kind == "associated_fn" {
     let owner = match name.find("::") {
       Some(idx) if idx > 0 => name[0:idx].to_string()
       _ => ""
@@ -293,13 +331,19 @@ pub fn enrich_record(record : Json) -> Unit {
     @extract.set_language_specific_string(record, "rust", "owner", owner)
     @extract.set_language_specific_bool(record, "rust", "associated", true)
     if owner != "" {
-      @extract.set_language_specific_string(record, "rust", "traitTarget", owner)
+      @extract.set_language_specific_string(
+        record, "rust", "traitTarget", owner,
+      )
     }
   }
 }
 
 ///|
-pub fn set_multiline_clause(record : Json, lines : Array[String], line_no : Int) -> Unit {
+pub fn set_multiline_clause(
+  record : Json,
+  lines : Array[String],
+  line_no : Int,
+) -> Unit {
   if where_clause(@extract.field_string(record, "signature")) != "" {
     return
   }
@@ -312,7 +356,11 @@ pub fn set_multiline_clause(record : Json, lines : Array[String], line_no : Int)
 }
 
 ///|
-fn append_type_relation(relations : Array[Json], profile : String, value : String) -> Unit {
+fn append_type_relation(
+  relations : Array[Json],
+  profile : String,
+  value : String,
+) -> Unit {
   let normalized = normalize_owner_key(value)
   if normalized == "" {
     return
@@ -334,30 +382,60 @@ fn rewrite_relations(record : Json, profile : String) -> Unit {
     ])
     let param_types = @extract.signature_param_types(signature)
     for i in 0..<param_types.length() {
-      let ty = @parsec.trim_spaces(param_types[i])
+      let ty = @extract.trim_spaces(param_types[i])
       if ty == "" {
         continue
       }
-      @extract.push_unique_relation(relations, "has_parameter", "type:\{profile}::\{ty}")
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
+      @extract.push_unique_relation(
+        relations,
+        "has_parameter",
+        "type:\{profile}::\{ty}",
+      )
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{ty}",
+      )
     }
     let return_types = @extract.signature_return_types(signature)
     for i in 0..<return_types.length() {
-      let ty = @parsec.trim_spaces(return_types[i])
+      let ty = @extract.trim_spaces(return_types[i])
       if ty == "" {
         continue
       }
-      @extract.push_unique_relation(relations, "returns", "type:\{profile}::\{ty}")
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
+      @extract.push_unique_relation(
+        relations,
+        "returns",
+        "type:\{profile}::\{ty}",
+      )
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{ty}",
+      )
     }
-    append_type_relation(relations, profile, @extract.language_specific_profile_string(record, "rust", "owner"))
-    append_type_relation(relations, profile, @extract.language_specific_profile_string(record, "rust", "traitTarget"))
-    append_type_relation(relations, profile, @extract.language_specific_profile_string(record, "rust", "implTarget"))
+    append_type_relation(
+      relations,
+      profile,
+      @extract.language_specific_profile_string(record, "rust", "owner"),
+    )
+    append_type_relation(
+      relations,
+      profile,
+      @extract.language_specific_profile_string(record, "rust", "traitTarget"),
+    )
+    append_type_relation(
+      relations,
+      profile,
+      @extract.language_specific_profile_string(record, "rust", "implTarget"),
+    )
     @extract.set_record_relations(record, relations)
     return
   }
   if kind == "impl" {
-    let relations = @extract.filter_record_relations(record, ["implements", "references_type"])
+    let relations = @extract.filter_record_relations(record, [
+      "implements", "references_type",
+    ])
     let trait_target = normalize_owner_key(
       @extract.language_specific_profile_string(record, "rust", "traitTarget"),
     )
@@ -365,34 +443,70 @@ fn rewrite_relations(record : Json, profile : String) -> Unit {
       @extract.language_specific_profile_string(record, "rust", "implTarget"),
     )
     if trait_target != "" {
-      @extract.push_unique_relation(relations, "implements", "type:\{profile}::\{trait_target}")
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{trait_target}")
+      @extract.push_unique_relation(
+        relations,
+        "implements",
+        "type:\{profile}::\{trait_target}",
+      )
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{trait_target}",
+      )
     }
     if impl_target != "" {
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{impl_target}")
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{impl_target}",
+      )
     }
     @extract.set_record_relations(record, relations)
     return
   }
-  if kind == "associated_type" || kind == "associated_const" || kind == "const" || kind == "type_alias" {
+  if kind == "associated_type" ||
+    kind == "associated_const" ||
+    kind == "const" ||
+    kind == "type_alias" {
     let relations = @extract.filter_record_relations(record, ["references_type"])
-    append_type_relation(relations, profile, @extract.language_specific_profile_string(record, "rust", "owner"))
-    append_type_relation(relations, profile, @extract.language_specific_profile_string(record, "rust", "traitTarget"))
-    append_type_relation(relations, profile, @extract.language_specific_profile_string(record, "rust", "implTarget"))
+    append_type_relation(
+      relations,
+      profile,
+      @extract.language_specific_profile_string(record, "rust", "owner"),
+    )
+    append_type_relation(
+      relations,
+      profile,
+      @extract.language_specific_profile_string(record, "rust", "traitTarget"),
+    )
+    append_type_relation(
+      relations,
+      profile,
+      @extract.language_specific_profile_string(record, "rust", "implTarget"),
+    )
     @extract.set_record_relations(record, relations)
   }
 }
 
 ///|
-pub fn postprocess_declarations(declarations : Array[Json], profile : String) -> Unit {
+pub fn postprocess_declarations(
+  declarations : Array[Json],
+  profile : String,
+) -> Unit {
   let type_ids : Map[String, String] = {}
   for i in 0..<declarations.length() {
     if @extract.field_string(declarations[i], "language") != "rust" {
       continue
     }
     let kind = @extract.field_string(declarations[i], "kind")
-    if kind == "struct" || kind == "enum" || kind == "union" || kind == "trait" || kind == "type_alias" {
-      let name = normalize_owner_key(@extract.field_string(declarations[i], "name"))
+    if kind == "struct" ||
+      kind == "enum" ||
+      kind == "union" ||
+      kind == "trait" ||
+      kind == "type_alias" {
+      let name = normalize_owner_key(
+        @extract.field_string(declarations[i], "name"),
+      )
       let id = @extract.field_string(declarations[i], "id")
       if name != "" && id != "" {
         type_ids[name] = id
@@ -414,7 +528,11 @@ pub fn postprocess_declarations(declarations : Array[Json], profile : String) ->
     let kind = @extract.field_string(declarations[i], "kind")
     let id = @extract.field_string(declarations[i], "id")
     let owner = normalize_owner_key(
-      @extract.language_specific_profile_string(declarations[i], "rust", "owner"),
+      @extract.language_specific_profile_string(
+        declarations[i],
+        "rust",
+        "owner",
+      ),
     )
     if (
         kind == "associated_type" ||
@@ -423,24 +541,30 @@ pub fn postprocess_declarations(declarations : Array[Json], profile : String) ->
         kind == "function" ||
         kind == "const" ||
         kind == "type_alias"
-      ) && owner != "" {
+      ) &&
+      owner != "" {
       match type_ids.get(owner) {
         Some(owner_id) =>
           @extract.append_relation_to_record_by_id(
-            declarations,
-            owner_id,
-            "has_member",
-            id,
+            declarations, owner_id, "has_member", id,
           )
         None => ()
       }
     }
     if kind == "impl" {
       let trait_target = normalize_owner_key(
-        @extract.language_specific_profile_string(declarations[i], "rust", "traitTarget"),
+        @extract.language_specific_profile_string(
+          declarations[i],
+          "rust",
+          "traitTarget",
+        ),
       )
       let impl_target = normalize_owner_key(
-        @extract.language_specific_profile_string(declarations[i], "rust", "implTarget"),
+        @extract.language_specific_profile_string(
+          declarations[i],
+          "rust",
+          "implTarget",
+        ),
       )
       if trait_target != "" && impl_target != "" {
         match type_ids.get(impl_target) {
@@ -476,24 +600,20 @@ fn push_record(
   }
   declarations.push(
     @extract.make_declaration(
-      profile,
-      server,
-      "rust",
-      path,
-      line_no,
-      kind,
-      name,
-      signature,
-      docs,
+      profile, server, "rust", path, line_no, kind, name, signature, docs,
     ),
   )
   guard @extract.last_record(declarations) is Some(record) else {
-    symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, signature))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, kind, name, signature),
+    )
     return
   }
   @extract.enrich_shape_metadata(record)
   enrich_record(record)
-  symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, signature))
+  symbols.push(
+    @extract.make_symbol(profile, path, line_no, kind, name, signature),
+  )
 }
 
 ///|
@@ -509,15 +629,7 @@ fn push_simple_record(
   signature : String,
 ) -> Unit {
   push_record(
-    declarations,
-    symbols,
-    profile,
-    server,
-    path,
-    line_no,
-    kind,
-    name,
-    signature,
+    declarations, symbols, profile, server, path, line_no, kind, name, signature,
     "",
   )
 }
@@ -536,7 +648,7 @@ fn extract_record(
   active_impl_target : String,
   active_impl_trait : String,
 ) -> Unit {
-  let clean = @parsec.line_before_comment(line) |> @parsec.trim_spaces
+  let clean = @extract.line_before_comment(line) |> @extract.trim_spaces
   if clean == "" {
     return
   }
@@ -563,7 +675,7 @@ fn extract_record(
 
   let kind_source = strip_decl_modifiers(normalized)
   let (kind, name) = if kind_source.has_prefix("fn ") {
-    ("function", @parsec.token_before(kind_source[3:].to_string(), "("))
+    ("function", @extract.token_before(kind_source[3:].to_string(), "("))
   } else if kind_source.has_prefix("struct ") {
     ("struct", decl_name(kind_source[7:].to_string()))
   } else if kind_source.has_prefix("enum ") {
@@ -575,15 +687,15 @@ fn extract_record(
   } else if kind_source.has_prefix("type ") {
     ("type_alias", decl_name(kind_source[5:].to_string()))
   } else if kind_source.has_prefix("const ") {
-    ("const", @parsec.token_before(kind_source[6:].to_string(), ":"))
+    ("const", @extract.token_before(kind_source[6:].to_string(), ":"))
   } else if kind_source.has_prefix("static ") {
-    ("static", @parsec.token_before(kind_source[7:].to_string(), ":"))
+    ("static", @extract.token_before(kind_source[7:].to_string(), ":"))
   } else if kind_source.has_prefix("mod ") {
-    ("module", @parsec.token_before(kind_source[4:].to_string(), "{"))
+    ("module", @extract.token_before(kind_source[4:].to_string(), "{"))
   } else if kind_source.has_prefix("use ") {
-    ("use", @parsec.strip_braces(kind_source[4:].to_string()))
+    ("use", @extract.strip_braces(kind_source[4:].to_string()))
   } else if kind_source.has_prefix("macro ") {
-    ("macro", @parsec.token_before(kind_source[6:].to_string(), "{"))
+    ("macro", @extract.token_before(kind_source[6:].to_string(), "{"))
   } else {
     ("", "")
   }
@@ -594,15 +706,7 @@ fn extract_record(
 
   let signature = if vis == "public" { clean } else { "\{clean} // \{vis}" }
   push_record(
-    declarations,
-    symbols,
-    profile,
-    server,
-    path,
-    line_no,
-    kind,
-    name,
-    signature,
+    declarations, symbols, profile, server, path, line_no, kind, name, signature,
     docs,
   )
   guard @extract.last_record(declarations) is Some(record) else { return }
@@ -610,10 +714,16 @@ fn extract_record(
   if active_impl_target != "" &&
     (kind == "function" || kind == "const" || kind == "type_alias") {
     @extract.set_shape_string(record, "owner", active_impl_target)
-    @extract.set_language_specific_string(record, "rust", "owner", active_impl_target)
-    @extract.set_language_specific_string(record, "rust", "implTarget", active_impl_target)
+    @extract.set_language_specific_string(
+      record, "rust", "owner", active_impl_target,
+    )
+    @extract.set_language_specific_string(
+      record, "rust", "implTarget", active_impl_target,
+    )
     if active_impl_trait != "" {
-      @extract.set_language_specific_string(record, "rust", "traitTarget", active_impl_trait)
+      @extract.set_language_specific_string(
+        record, "rust", "traitTarget", active_impl_trait,
+      )
     }
   }
 }
@@ -642,11 +752,16 @@ pub fn extract_file(
 
   for i in 0..<lines.length() {
     let line_no = i + 1
-    let line = @parsec.trim_spaces(lines[i].to_string())
+    let line = @extract.trim_spaces(lines[i].to_string())
 
     if line.has_prefix("///") {
-      let piece = line.strip_prefix("///").unwrap_or(line).to_string() |> @parsec.trim_spaces
-      pending_doc = if pending_doc == "" { piece } else { "\{pending_doc}\n\{piece}" }
+      let piece = line.strip_prefix("///").unwrap_or(line).to_string()
+        |> @extract.trim_spaces
+      pending_doc = if pending_doc == "" {
+        piece
+      } else {
+        "\{pending_doc}\n\{piece}"
+      }
       pending_doc_line = line_no
       continue
     }
@@ -665,10 +780,14 @@ pub fn extract_file(
       continue
     }
 
-    let clean = @parsec.line_before_comment(line) |> @parsec.trim_spaces
+    let clean = @extract.line_before_comment(line) |> @extract.trim_spaces
     if pending_macro_export && clean.has_prefix("macro_rules!") {
-      let macro_name = @parsec.token_before(clean[12:].to_string(), "{")
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no { pending_doc } else { "" }
+      let macro_name = @extract.token_before(clean[12:].to_string(), "{")
+      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
+        pending_doc
+      } else {
+        ""
+      }
       let docs_with_attrs = if pending_deprecated == "" {
         docs
       } else if docs == "" {
@@ -677,16 +796,8 @@ pub fn extract_file(
         "\{docs}\n\{pending_deprecated}"
       }
       push_record(
-        declarations,
-        symbols,
-        profile,
-        server,
-        path,
-        line_no,
-        "macro",
-        macro_name,
-        clean,
-        docs_with_attrs,
+        declarations, symbols, profile, server, path, line_no, "macro", macro_name,
+        clean, docs_with_attrs,
       )
       pending_doc = ""
       pending_doc_line = 0
@@ -695,8 +806,15 @@ pub fn extract_file(
       continue
     }
 
-    if active_trait != "" && !clean.has_prefix("#") && clean != "{" && clean != "}" {
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no { pending_doc } else { "" }
+    if active_trait != "" &&
+      !clean.has_prefix("#") &&
+      clean != "{" &&
+      clean != "}" {
+      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
+        pending_doc
+      } else {
+        ""
+      }
       let docs_with_attrs = if pending_deprecated == "" {
         docs
       } else if docs == "" {
@@ -705,7 +823,7 @@ pub fn extract_file(
         "\{docs}\n\{pending_deprecated}"
       }
       if clean.has_prefix("type ") {
-        let name = @parsec.token_before(clean[5:].to_string(), ":")
+        let name = @extract.token_before(clean[5:].to_string(), ":")
         push_record(
           declarations,
           symbols,
@@ -719,7 +837,7 @@ pub fn extract_file(
           docs_with_attrs,
         )
       } else if clean.has_prefix("const ") {
-        let name = @parsec.token_before(clean[6:].to_string(), ":")
+        let name = @extract.token_before(clean[6:].to_string(), ":")
         push_record(
           declarations,
           symbols,
@@ -733,7 +851,7 @@ pub fn extract_file(
           docs_with_attrs,
         )
       } else if clean.has_prefix("fn ") {
-        let name = @parsec.token_before(clean[3:].to_string(), "(")
+        let name = @extract.token_before(clean[3:].to_string(), "(")
         push_record(
           declarations,
           symbols,
@@ -755,18 +873,10 @@ pub fn extract_file(
     let impl_source = strip_decl_modifiers(clean)
     if impl_source.has_prefix("impl ") || impl_source.has_prefix("impl<") {
       let name = clean.strip_prefix("impl").unwrap_or(clean).to_string()
-        |> @parsec.trim_spaces
-        |> @parsec.strip_braces
+        |> @extract.trim_spaces
+        |> @extract.strip_braces
       push_simple_record(
-        declarations,
-        symbols,
-        profile,
-        server,
-        path,
-        line_no,
-        "impl",
-        name,
-        clean,
+        declarations, symbols, profile, server, path, line_no, "impl", name, clean,
       )
       let (impl_trait, impl_target) = impl_targets(impl_source)
       pending_impl_trait = normalize_owner_key(impl_trait)
@@ -820,7 +930,11 @@ pub fn extract_file(
       active_trait_depth = 0
     }
 
-    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no { pending_doc } else { "" }
+    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
+      pending_doc
+    } else {
+      ""
+    }
     let docs_with_attrs = if pending_deprecated == "" {
       docs
     } else if docs == "" {
@@ -829,17 +943,8 @@ pub fn extract_file(
       "\{docs}\n\{pending_deprecated}"
     }
     extract_record(
-      declarations,
-      symbols,
-      profile,
-      server,
-      path,
-      lines,
-      line_no,
-      line,
-      docs_with_attrs,
-      active_impl_target,
-      active_impl_trait,
+      declarations, symbols, profile, server, path, lines, line_no, line, docs_with_attrs,
+      active_impl_target, active_impl_trait,
     )
 
     for c in clean {

@@ -1,10 +1,6 @@
 ///|
 fn validation_decl(path : String, kind : String, name : String) -> Json {
-  {
-    "path": path,
-    "kind": kind,
-    "name": name,
-  }
+  { "path": path, "kind": kind, "name": name }
 }
 
 ///|
@@ -53,5 +49,3 @@ test "native metadata normalization masks mode while preserving backend and serv
   assert_true(normalized.contains("\"server\": \"gopls\""))
   assert_true(normalized.contains("\"mode\": \"<normalized>\""))
 }
-
-

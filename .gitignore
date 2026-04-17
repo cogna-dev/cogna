@@ -6,6 +6,7 @@ _build/
 dist/
 trace.json
 .codeiq/
+.cogna/
 .claude/settings*
 .sisyphus/
 src/cmd/**/tmp_*/

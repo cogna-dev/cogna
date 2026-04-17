@@ -69,16 +69,6 @@ fn write_bytes(path : String, content : Bytes) -> Result[Unit, @cli.CliError] {
 }
 
 ///|
-fn declaration_schema_json() -> Json {
-  {
-    "version": "ciq-declarations/v1",
-    "format": "ndjson",
-    "model": "signature + shape + language_specific tagged union",
-    "schema": @schema.ciq_declaration_v1_schema(),
-  }
-}
-
-///|
 fn artifact_with_sha(
   path : String,
   compression : String,
@@ -89,12 +79,12 @@ fn artifact_with_sha(
 
 ///|
 fn runtime_signature_from_env() -> Json {
-  let status = match @sys.get_env_var("CODEIQ_SIGNATURE_STATUS") {
+  let status = match @sys.get_env_var("COGNA_SIGNATURE_STATUS") {
     Some("verified") => "verified"
     Some("untrusted") => "untrusted"
     _ => "unsigned"
   }
-  let signature_value = match @sys.get_env_var("CODEIQ_SIGNATURE_VALUE") {
+  let signature_value = match @sys.get_env_var("COGNA_SIGNATURE_VALUE") {
     Some(raw) => {
       let trimmed = raw.trim().to_string()
       if trimmed == "" {
@@ -109,7 +99,7 @@ fn runtime_signature_from_env() -> Json {
     "status": Json::string(status),
     "algorithm": Json::string("sha256"),
   }
-  match @sys.get_env_var("CODEIQ_SIGNATURE_KEY_ID") {
+  match @sys.get_env_var("COGNA_SIGNATURE_KEY_ID") {
     Some(value) if value.trim().to_string() != "" =>
       signature["keyId"] = Json::string(value.trim().to_string())
     _ => ()
@@ -169,7 +159,7 @@ fn manifest_json(
         "commit": commit,
       },
       "opa": {
-        "entrypoint": "codeiq/compat/deny",
+        "entrypoint": "cogna/compat/deny",
         "format": "opa-bundle.tar.gz",
       },
       "provenance": {
@@ -183,7 +173,6 @@ fn manifest_json(
       "schemaVersion": "ciq-bundle/v1",
       "purl": config.purl,
       "profile": config.profile,
-      "declarationSchema": declaration_schema_json(),
       "source": {
         "repo": config.source.repo,
         "ref": config.source.source_ref,
@@ -450,12 +439,9 @@ fn dependency_bundle_dir(dist_dir : String) -> String {
 }
 
 ///|
-fn dependency_bundle_key(component : @sbom.SoftwareComponent) -> String {
-  let source = match component.purl {
-    Some(purl) => purl
-    None => component.id
-  }
-  source
+fn dependency_bundle_key(pkg : @sbom_types.Package) -> String {
+  pkg
+  .to_purl()
   .replace_all(old="/", new="_")
   .replace_all(old=":", new="_")
   .replace_all(old="@", new="_")
@@ -492,7 +478,11 @@ fn ensure_nested_dir(path : String) -> Result[Unit, @cli.CliError] {
       continue
     }
     current = if current == "" || current == "/" {
-      if current == "/" { "/\{segment}" } else { segment }
+      if current == "/" {
+        "/\{segment}"
+      } else {
+        segment
+      }
     } else {
       "\{current}/\{segment}"
     }
@@ -518,7 +508,7 @@ fn dependency_files_json(
   }
   (
     {
-      "schemaVersion": "codeiq-package-files/v1",
+      "schemaVersion": "cogna-package-files/v1",
       "root": root_path,
       "files": Json::array(file_records),
     } : Json).stringify(indent=2)
@@ -526,7 +516,8 @@ fn dependency_files_json(
 
 ///|
 fn dependency_metadata_json(
-  component : @sbom.SoftwareComponent,
+  pkg : @sbom_types.Package,
+  evidence_path : String,
   content_digest : String,
 ) -> String {
   (
@@ -534,17 +525,11 @@ fn dependency_metadata_json(
       "schemaVersion": "ciq-metadata/v1",
       "profile": "dependency-bundle",
       "package": {
-        "id": component.id,
-        "name": component.name,
-        "version": match component.version {
-          Some(value) => Json::string(value)
-          None => Json::null()
-        },
-        "purl": match component.purl {
-          Some(value) => Json::string(value)
-          None => Json::null()
-        },
-        "evidencePath": component.evidence_path,
+        "id": pkg.id(),
+        "name": pkg.name,
+        "version": Json::string(pkg.version()),
+        "purl": Json::string(pkg.to_purl()),
+        "evidencePath": evidence_path,
         "contentDigest": content_digest,
       },
     } : Json).stringify(indent=2)
@@ -552,23 +537,15 @@ fn dependency_metadata_json(
 
 ///|
 fn dependency_manifest_json(
-  component : @sbom.SoftwareComponent,
+  pkg : @sbom_types.Package,
   files_sha : String,
   metadata_sha : String,
   content_digest : String,
 ) -> Json {
   {
     "schemaVersion": "ciq-bundle/v1",
-    "purl": match component.purl {
-      Some(value) => value
-      None => component.id
-    },
+    "purl": pkg.to_purl(),
     "profile": "openapi-spec",
-    "declarationSchema": {
-      "version": "ciq-declarations/v1",
-      "format": "ndjson",
-      "model": "dependency-files-only",
-    },
     "source": {
       "repo": "local-package-cache",
       "ref": "installed",
@@ -631,36 +608,31 @@ fn gzip_payload(payload : Bytes) -> Result[Bytes, @cli.CliError] {
 ///|
 fn write_dependency_bundle(
   dist_dir : String,
-  component : @sbom.SoftwareComponent,
+  pkg : @sbom_types.Package,
+  evidence_path : String,
 ) -> Result[Unit, @cli.CliError] {
   let root_path = @sbom_snapshot.resolve_root_path(
     bundle_parent_dir(dist_dir),
-    component.evidence_path,
+    evidence_path,
   )
   let snapshot_out = @sbom_snapshot.snapshot_files(root_path)
   guard snapshot_out is Ok(files) else {
     return Err(build_error(snapshot_out.unwrap_err()))
   }
   let content_digest = @sbom_snapshot.snapshot_digest(files)
-  let bundle_dir = "\{dependency_bundle_dir(dist_dir)}/\{dependency_bundle_key(component)}"
+  let bundle_dir = "\{dependency_bundle_dir(dist_dir)}/\{dependency_bundle_key(pkg)}"
   let dir_out = ensure_nested_dir(bundle_dir)
   guard dir_out is Ok(_) else { return Err(dir_out.unwrap_err()) }
 
-  let files_text = dependency_files_json(component.evidence_path, files)
-  let metadata_text = dependency_metadata_json(component, content_digest)
+  let files_text = dependency_files_json(evidence_path, files)
+  let metadata_text = dependency_metadata_json(
+    pkg, evidence_path, content_digest,
+  )
   let files_sha = sha256_hex(utf8_bytes(files_text))
   let metadata_sha = sha256_hex(utf8_bytes(metadata_text))
   let manifest_object = dependency_manifest_json(
-    component, files_sha, metadata_sha, content_digest,
+    pkg, files_sha, metadata_sha, content_digest,
   )
-  let manifest_valid = @schema.validate_ciq_bundle_v1(manifest_object)
-  guard manifest_valid is Ok(_) else {
-    return Err(
-      build_error(
-        "dependency manifest does not satisfy ciq-bundle/v1 schema: \{manifest_valid.unwrap_err().to_string()}",
-      ),
-    )
-  }
   let manifest_text = manifest_object.stringify(indent=2)
   let manifest_sha = sha256_hex(utf8_bytes(manifest_text))
   let checksums = dependency_checksums_text(
@@ -690,20 +662,58 @@ fn write_dependency_bundle(
 fn write_dependency_bundles(
   config : @config.Config,
   dist_dir : String,
-  components : Array[@sbom.SoftwareComponent],
+  components : Array[BuildSoftwareComponent],
 ) -> Result[Unit, @cli.CliError] {
   if !config.sbom.dependency_bundles {
     return Ok(())
   }
   for i in 0..<components.length() {
     let component = components[i]
-    if component.scope != "dependency" {
+    guard component.pkg is Some(pkg) else { continue }
+    if component.hashes.is_empty() {
       continue
     }
-    let out = write_dependency_bundle(dist_dir, component)
+    if component.scope == "source-file" || component.scope == "local" {
+      continue
+    }
+    if pkg.group == @sbom_types.DependencyGroup::Dev ||
+      pkg.group == @sbom_types.DependencyGroup::Build {
+      continue
+    }
+    match pkg.source {
+      @sbom_types.DependencySource::Workspace => continue
+      _ => ()
+    }
+    let out = write_dependency_bundle(dist_dir, pkg, component.evidence_path)
     guard out is Ok(_) else { return Err(out.unwrap_err()) }
   }
   Ok(())
+}
+
+///|
+fn read_rego_from_dir(policies_dir : String) -> Result[String, @cli.CliError] {
+  let entries = @fs.read_dir(policies_dir) catch {
+    _ =>
+      return Err(build_error("cannot read policies directory: \{policies_dir}"))
+  }
+  let rego_files : Array[String] = []
+  for entry in entries {
+    if entry.has_suffix(".rego") {
+      rego_files.push(entry)
+    }
+  }
+  rego_files.sort()
+  let mut text = ""
+  for filename in rego_files {
+    let content = @fs.read_file_to_string("\{policies_dir}/\{filename}") catch {
+      _ =>
+        return Err(
+          build_error("cannot read policy file \{policies_dir}/\{filename}"),
+        )
+    }
+    text = text + content + "\n"
+  }
+  Ok(text)
 }
 
 ///|
@@ -719,31 +729,30 @@ fn build_opa_bundle_tar_gz(
     }
   }
   rego_files.sort()
-  let mut policy_text = @policy_catalog.builtin_rego()
-  if !rego_files.is_empty() {
-    policy_text = ""
+  let policy_text = if rego_files.is_empty() {
+    let fallback = read_rego_from_dir("./policies")
+    guard fallback is Ok(text) else { return Err(fallback.unwrap_err()) }
+    text
+  } else {
+    let mut text = ""
     for i in 0..<rego_files.length() {
-      let text = @fs.read_file_to_string("\{repo}/\{rego_files[i]}") catch {
+      let content = @fs.read_file_to_string("\{repo}/\{rego_files[i]}") catch {
         _ =>
           return Err(
             build_error("cannot read policy file \{repo}/\{rego_files[i]}"),
           )
       }
-      policy_text = policy_text + text + "\n"
+      text = text + content + "\n"
     }
+    text
   }
 
-  let catalog_rules : Array[@policy_catalog.Rule] = if rego_files.is_empty() {
-    @policy_catalog.builtin_rules()
-  } else {
-    let parsed_out = @policy_catalog.from_rego_text(policy_text)
-    guard parsed_out is Ok(parsed_rules) else {
-      return Err(parsed_out.unwrap_err())
-    }
-    parsed_rules
+  let catalog_rules_out = @policy_rules.from_rego_text(policy_text)
+  guard catalog_rules_out is Ok(catalog_rules) else {
+    return Err(catalog_rules_out.unwrap_err())
   }
-  let policy_rules = @policy_catalog.catalog_json(catalog_rules)
-  let manifest : Json = { "revision": config.purl, "roots": ["codeiq"] }
+  let policy_rules = @policy_rules.catalog_json(catalog_rules)
+  let manifest : Json = { "revision": config.purl, "roots": ["cogna"] }
   let tar_payload = tar_archive([
     ("policy.rego", utf8_bytes(policy_text)),
     ("data.json", utf8_bytes("{}\n")),
@@ -777,13 +786,15 @@ fn write_bundle_skeleton(
 
   let declarations_sha = sha256_hex(declarations_artifact)
   let symbols_sha = sha256_hex(symbols_artifact)
-  let sbom_components_out = @sbom.collect_components(config, repo)
-  guard sbom_components_out is Ok(sbom_components) else {
-    return Err(build_error(sbom_components_out.unwrap_err()))
+  let sbom_scan_out = collect_sbom_components(config, repo)
+  guard sbom_scan_out is Ok(sbom_scan) else {
+    return Err(build_error(sbom_scan_out.unwrap_err()))
   }
-  let sbom_artifacts = @sbom.build_sbom_artifacts(sbom_components)
-  let components_artifact = utf8_bytes(sbom_artifacts.components_ndjson)
-  let spdx_artifact = utf8_bytes(sbom_artifacts.spdx_json)
+  let sbom_artifacts = build_sbom_artifacts(sbom_scan)
+  let components_ndjson_text = sbom_artifacts.components_ndjson
+  let spdx_json_text = sbom_artifacts.spdx_json
+  let components_artifact = utf8_bytes(components_ndjson_text)
+  let spdx_artifact = utf8_bytes(spdx_json_text)
   let components_sha = sha256_hex(components_artifact)
   let spdx_sha = sha256_hex(spdx_artifact)
   let mut policy_rules_out : String? = None
@@ -817,23 +828,6 @@ fn write_bundle_skeleton(
     opa_bundle_sha,
     policy_rules_sha,
   )
-  let manifest_valid = if config.profile == "policy-bundle" {
-    @schema.validate_ciq_opa_bundle_v1(manifest_object)
-  } else {
-    @schema.validate_ciq_bundle_v1(manifest_object)
-  }
-  guard manifest_valid is Ok(_) else {
-    let expected_schema = if config.profile == "policy-bundle" {
-      "ciq-opa-bundle/v1"
-    } else {
-      "ciq-bundle/v1"
-    }
-    return Err(
-      build_error(
-        "manifest does not satisfy \{expected_schema} schema: \{manifest_valid.unwrap_err().to_string()}",
-      ),
-    )
-  }
   let manifest = manifest_object.stringify(indent=2)
   let metadata = metadata_json(config, extract).stringify(indent=2)
   let manifest_sha = sha256_hex(utf8_bytes(manifest))
@@ -913,7 +907,9 @@ fn write_bundle_skeleton(
   guard bundle_out is Ok(_) else { return Err(bundle_out.unwrap_err()) }
 
   let dependency_out = write_dependency_bundles(
-    config, dist_dir, sbom_components,
+    config,
+    dist_dir,
+    sbom_scan.components,
   )
   guard dependency_out is Ok(_) else { return Err(dependency_out.unwrap_err()) }
 

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "ciq-bundle/v1",
+  "purl": "pkg:golang/example/demo@0.1.0",
+  "profile": "go-module",
+  "source": {
+    "repo": "https://github.com/example/demo",
+    "ref": "main",
+    "commit": "<normalized>"
+  },
+  "artifacts": [
+    {
+      "path": "declarations.ndjson",
+      "sha256": "37e9cfc60ae0313a929e5599dfeaeb5fe7efafe12a5cf5b33444c2d22ecbd663",
+      "compression": "none"
+    },
+    {
+      "path": "symbols.ndjson",
+      "sha256": "517a3f6758390fe181e8cbfa5eb65a7d92fad58c43c483fa5727494ec8df132b",
+      "compression": "none"
+    },
+    {
+      "path": "software-components.ndjson",
+      "sha256": "2bba3031310003f79fe7ba9503bb2bbdb746eb8841048f5a342fea164af8cdf8",
+      "compression": "none"
+    },
+    {
+      "path": "sbom.spdx.json",
+      "sha256": "d5cd78743e35cbc0a0ce6db7e2a5ff09a90395168f901f8c7e6bed9c99b70f5e",
+      "compression": "none"
+    }
+  ]
+}

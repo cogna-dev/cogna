@@ -16,8 +16,7 @@ fn remove_dir_if_exists(path : String) -> Unit {
 fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/diff.json")
   remove_file_if_exists("\{repo}/dist/check.sarif.json")
-  remove_file_if_exists("\{repo}/dist/policy.ciq.tgz")
-  remove_file_if_exists("\{repo}/codeiq.yaml")
+  remove_file_if_exists("\{repo}/cogna.yaml")
   remove_file_if_exists("\{repo}/dist/manifest.json")
   remove_file_if_exists("\{repo}/dist/declarations.ndjson")
   remove_file_if_exists("\{repo}/dist/symbols.ndjson")
@@ -25,17 +24,15 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/sbom.spdx.json")
   remove_file_if_exists("\{repo}/dist/metadata.json")
   remove_file_if_exists("\{repo}/dist/checksums.txt")
-  remove_file_if_exists("\{repo}/dist/opa-bundle.tar.gz")
-  remove_file_if_exists("\{repo}/dist/policy.rules.json")
-  remove_file_if_exists("\{repo}/dist/bundle.ciq.tgz")
-  @sys.unset_env_var("CODEIQ_OPA_EVAL_JSON")
+  @sys.unset_env_var("COGNA_OPA_EVAL_JSON")
+  remove_dir_if_exists("\{repo}/dist/policies")
   remove_dir_if_exists("\{repo}/dist")
   remove_dir_if_exists(repo)
 }
 
 ///|
 fn tmp_check_repo(name : String) -> String {
-  "/tmp/codeiq-check-\{name}"
+  "/tmp/cogna-check-\{name}"
 }
 
 ///|
@@ -136,27 +133,6 @@ fn write_findings_diff(
 }
 
 ///|
-fn write_policy_bundle_config(path : String) -> Unit {
-  let content =
-    #|schemaVersion: ciq-config/v1
-    #|profile: policy-bundle
-    #|purl: pkg:generic/acme/compat-policy@2026.03.01
-    #|source:
-    #|  repo: https://github.com/acme/compat-policy
-    #|  ref: main
-    #|inputs:
-    #|  include:
-    #|    - "**/*.rego"
-    #|checks:
-    #|  format: sarif
-    #|  policy: default-compat
-    #|
-  @fs.write_string_to_file(path, content) catch {
-    _ => abort("failed to write policy bundle config")
-  }
-}
-
-///|
 test "check handles enriched diff with semanticDiff and emits valid sarif" {
   let repo = tmp_check_repo("enriched")
   cleanup_tmp_repo(repo)
@@ -164,15 +140,15 @@ test "check handles enriched diff with semanticDiff and emits valid sarif" {
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   write_enriched_diff(
     diff_path, "pkg:golang/example/demo@0.1.0", "pkg:golang/example/demo@0.2.0",
   )
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{
       #|  "result": [
@@ -196,7 +172,7 @@ test "check handles enriched diff with semanticDiff and emits valid sarif" {
     ),
   )
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("check should succeed with enriched diff")
@@ -235,22 +211,22 @@ test "check emits semantic message and precise location when findings and before
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   write_findings_diff(
     diff_path, "pkg:cargo/acme/mylib@1.0.0", "pkg:cargo/acme/mylib@1.1.0",
   )
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
   // No OPA policy results — just validate SARIF from diff enrichment
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{"result":[{"expressions":[{"value":[]}]}]}
     ),
   )
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("check should succeed with findings diff")
@@ -280,7 +256,7 @@ test "check prefers uri and startLine from real diff records" {
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   let content : Json = {
     "schemaVersion": "ciq-diff/v1",
     "basePurl": "pkg:golang/example/demo@0.1.0",
@@ -309,17 +285,17 @@ test "check prefers uri and startLine from real diff records" {
   @fs.write_string_to_file(diff_path, content.stringify(indent=2)) catch {
     _ => abort("failed to write real-location diff fixture")
   }
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{"result":[{"expressions":[{"value":[]}]}]}
     ),
   )
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("check should succeed with real diff record location")
@@ -353,15 +329,15 @@ test "check generates sarif from diff and policy" {
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   write_diff(
     diff_path, "pkg:openapi/acme/payment-api@2026.03.01", "pkg:openapi/acme/payment-api@2026.04.01",
   )
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{
       #|  "result": [
@@ -385,7 +361,7 @@ test "check generates sarif from diff and policy" {
     ),
   )
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(result) else {
     cleanup_tmp_repo(repo)
     fail("check should succeed")
@@ -393,7 +369,7 @@ test "check generates sarif from diff and policy" {
 
   inspect(
     result.display(),
-    content="Generated SARIF report at /tmp/codeiq-check-repo/dist/check.sarif.json",
+    content="Generated SARIF report at /tmp/cogna-check-repo/dist/check.sarif.json",
   )
 
   let sarif = @fs.read_file_to_string("\{repo}/dist/check.sarif.json") catch {
@@ -404,7 +380,7 @@ test "check generates sarif from diff and policy" {
     }
   }
   assert_true(sarif.contains("\"version\": \"2.1.0\""))
-  assert_true(sarif.contains("\"name\": \"codeiq-check\""))
+  assert_true(sarif.contains("\"name\": \"cogna-check\""))
   assert_true(sarif.contains("\"ruleId\": \"compat.changed\""))
   assert_true(sarif.contains("\"ruleId\": \"compat.core.removed-declaration\""))
   assert_true(sarif.contains("Public API removal blocked by policy"))
@@ -426,7 +402,7 @@ test "check routes componentDiff changes to componentChanges with richer evidenc
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   let content : Json = {
     "schemaVersion": "ciq-diff/v1",
     "basePurl": "pkg:npm/acme/sdk@1.0.0",
@@ -451,11 +427,11 @@ test "check routes componentDiff changes to componentChanges with richer evidenc
   @fs.write_string_to_file(diff_path, content.stringify(indent=2)) catch {
     _ => abort("failed to write component diff fixture")
   }
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{
       #|  "result": [
@@ -468,7 +444,7 @@ test "check routes componentDiff changes to componentChanges with richer evidenc
       #|              "level": "warning",
       #|              "message": "Software component version changed.",
       #|              "path": "package.json",
-       #|              "docs": "https://codeiq.xaclabs.dev/docs/policies/generated/component/version-upgrade"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/component/version-upgrade"
       #|            }
       #|          ]
       #|        }
@@ -479,7 +455,7 @@ test "check routes componentDiff changes to componentChanges with richer evidenc
     ),
   )
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("check should succeed with component diff")
@@ -512,7 +488,7 @@ test "check emits two sarif results when one change has two finding codes" {
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   let content : Json = {
     "schemaVersion": "ciq-diff/v1",
     "basePurl": "pkg:cargo/tokio@1.42.0",
@@ -546,12 +522,12 @@ test "check emits two sarif results when one change has two finding codes" {
   @fs.write_string_to_file(diff_path, content.stringify(indent=2)) catch {
     _ => abort("failed to write multi-finding diff fixture")
   }
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
   // Two deny results from one change — both findings fire
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{
       #|  "result": [
@@ -564,14 +540,14 @@ test "check emits two sarif results when one change has two finding codes" {
       #|              "level": "error",
       #|              "message": "Rust public item became unsafe.",
       #|              "path": "src/lib.rs",
-       #|              "docs": "https://codeiq.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
       #|            },
       #|            {
       #|              "rule_id": "compat.rust.signature-changed",
       #|              "level": "warning",
       #|              "message": "Rust public signature changed.",
       #|              "path": "src/lib.rs",
-       #|              "docs": "https://codeiq.xaclabs.dev/docs/policies/generated/rust/signature-changed"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed"
       #|            }
       #|          ]
       #|        }
@@ -582,7 +558,7 @@ test "check emits two sarif results when one change has two finding codes" {
     ),
   )
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("check should succeed with multi-finding diff")
@@ -620,7 +596,7 @@ test "check emits two sarif results when one change has two finding codes" {
 }
 
 ///|
-test "check fails when policy bundle is missing" {
+test "check fails when policies directory is missing" {
   let repo = tmp_check_repo("missing-policy")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
@@ -631,18 +607,15 @@ test "check fails when policy bundle is missing" {
     diff_path, "pkg:openapi/acme/payment-api@2026.03.01", "pkg:openapi/acme/payment-api@2026.04.01",
   )
 
-  let out = run({
-    diff_file: diff_path,
-    policy_bundle: "\{repo}/dist/policy.ciq.tgz",
-  })
+  let out = run({ diff_file: diff_path, policies_dir: "\{repo}/dist/policies" })
   guard out is Err(error) else {
     cleanup_tmp_repo(repo)
-    fail("check should fail when policy is missing")
+    fail("check should fail when policies directory is missing")
   }
 
   let text = error.to_string()
   assert_true(text.contains("check failed:"))
-  assert_true(text.contains("missing policy bundle file"))
+  assert_true(text.contains("missing policies directory"))
 
   cleanup_tmp_repo(repo)
 }
@@ -655,43 +628,40 @@ test "check fails when opa output env json is invalid" {
   @fs.create_dir("\{repo}/dist")
 
   let diff_path = "\{repo}/dist/diff.json"
-  let policy_path = "\{repo}/dist/policy.ciq.tgz"
+  let policy_path = "\{repo}/dist/policies"
   write_diff(
     diff_path, "pkg:openapi/acme/payment-api@2026.03.01", "pkg:openapi/acme/payment-api@2026.04.01",
   )
-  @fs.write_string_to_file(policy_path, "policy placeholder") catch {
-    _ => abort("failed to write policy fixture")
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
   }
-  @sys.set_env_var("CODEIQ_OPA_EVAL_JSON", "{")
+  @sys.set_env_var("COGNA_OPA_EVAL_JSON", "{")
 
-  let out = run({ diff_file: diff_path, policy_bundle: policy_path })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Err(error) else {
     cleanup_tmp_repo(repo)
-    fail("check should fail when CODEIQ_OPA_EVAL_JSON is invalid")
+    fail("check should fail when COGNA_OPA_EVAL_JSON is invalid")
   }
 
   let text = error.to_string()
   assert_true(text.contains("check failed:"))
-  assert_true(text.contains("invalid json in CODEIQ_OPA_EVAL_JSON"))
+  assert_true(text.contains("invalid json in COGNA_OPA_EVAL_JSON"))
 
   cleanup_tmp_repo(repo)
 }
 
 ///|
-test "check merges policy catalog rules from built bundle into sarif driver metadata" {
+test "check merges policy catalog rules into sarif driver metadata" {
   let repo = tmp_check_repo("catalog-merge")
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
 
-  write_policy_bundle_config("\{repo}/codeiq.yaml")
-  let build_out = @build_cmd.run(@build_cmd.BuildParams::{ repo, })
-  guard build_out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("policy bundle build should succeed")
-  }
-
   let diff_path = "\{repo}/dist/diff.json"
+  let policy_path = "\{repo}/dist/policies"
+  @fs.create_dir(policy_path) catch {
+    _ => abort("failed to create policies dir")
+  }
   let content : Json = {
     "schemaVersion": "ciq-diff/v1",
     "basePurl": "pkg:cargo/tokio@1.42.0",
@@ -726,7 +696,7 @@ test "check merges policy catalog rules from built bundle into sarif driver meta
     _ => abort("failed to write catalog merge diff fixture")
   }
   @sys.set_env_var(
-    "CODEIQ_OPA_EVAL_JSON",
+    "COGNA_OPA_EVAL_JSON",
     (
       #|{
       #|  "result": [
@@ -739,14 +709,14 @@ test "check merges policy catalog rules from built bundle into sarif driver meta
       #|              "level": "error",
       #|              "message": "Rust public item became unsafe.",
       #|              "path": "src/lib.rs",
-       #|              "docs": "https://codeiq.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
       #|            },
       #|            {
       #|              "rule_id": "compat.rust.signature-changed",
       #|              "level": "warning",
       #|              "message": "Rust public signature changed.",
       #|              "path": "src/lib.rs",
-       #|              "docs": "https://codeiq.xaclabs.dev/docs/policies/generated/rust/signature-changed"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed"
       #|            }
       #|          ]
       #|        }
@@ -757,13 +727,10 @@ test "check merges policy catalog rules from built bundle into sarif driver meta
     ),
   )
 
-  let out = run({
-    diff_file: diff_path,
-    policy_bundle: "\{repo}/dist/bundle.ciq.tgz",
-  })
+  let out = run({ diff_file: diff_path, policies_dir: policy_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
-    fail("check should succeed with built bundle catalog merge")
+    fail("check should succeed with catalog merge")
   }
 
   let sarif = @fs.read_file_to_string("\{repo}/dist/check.sarif.json") catch {
@@ -795,7 +762,7 @@ test "check merges policy catalog rules from built bundle into sarif driver meta
   )
   assert_true(
     sarif.contains(
-      "https://codeiq.xaclabs.dev/docs/policies/generated/rust/signature-changed",
+      "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed",
     ),
   )
 

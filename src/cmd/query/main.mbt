@@ -42,7 +42,9 @@ fn read_json(path : String, kind : String) -> Result[Json, @cli.CliError] {
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(value) else {
-    return Err(@cli.command_error("query failed: invalid json in \{kind} \{path}"))
+    return Err(
+      @cli.command_error("query failed: invalid json in \{kind} \{path}"),
+    )
   }
   Ok(value)
 }
@@ -81,17 +83,19 @@ pub fn run(params : QueryParams) -> @cli.CliResult[QueryResult, @cli.CliError] {
   let query_out = read_json(params.query_file, "query")
   guard query_out is Ok(query) else { return Err(query_out.unwrap_err()) }
 
-  let shape_out = @sdk_query.validate_query_shape(query, params.query_file)
+  let shape_out = @core.validate_query_shape(query, params.query_file)
   guard shape_out is Ok(_) else {
     return Err(@cli.command_error("query failed: \{shape_out.unwrap_err()}"))
   }
 
   let output_path = result_path(params.query_file)
-  let result_json = @sdk_query.build_ciq_result(query, params.query_file)
+  let result_json = @core.build_ciq_result(query, params.query_file)
 
-  let result_shape_out = @sdk_query.validate_result_shape(result_json)
+  let result_shape_out = @core.validate_result_shape(result_json)
   guard result_shape_out is Ok(_) else {
-    return Err(@cli.command_error("query failed: \{result_shape_out.unwrap_err()}"))
+    return Err(
+      @cli.command_error("query failed: \{result_shape_out.unwrap_err()}"),
+    )
   }
 
   let write_out = write_result(output_path, result_json)

@@ -1,22 +1,22 @@
 ///|
 pub(all) struct CheckParams {
   diff_file : String
-  policy_bundle : String
+  policies_dir : String
 } derive(Eq)
 
 ///|
 pub impl Show for CheckParams with output(self, logger) {
   logger.write_string("{diff_file: ")
   logger.write_object(self.diff_file)
-  logger.write_string(", policy_bundle: ")
-  logger.write_object(self.policy_bundle)
+  logger.write_string(", policies_dir: ")
+  logger.write_object(self.policies_dir)
   logger.write_char('}')
 }
 
 ///|
 pub(all) struct CheckResult {
   diff_file : String
-  policy_bundle : String
+  policies_dir : String
   summary : String
 } derive(Eq)
 
@@ -24,8 +24,8 @@ pub(all) struct CheckResult {
 pub impl Show for CheckResult with output(self, logger) {
   logger.write_string("{diff_file: ")
   logger.write_object(self.diff_file)
-  logger.write_string(", policy_bundle: ")
-  logger.write_object(self.policy_bundle)
+  logger.write_string(", policies_dir: ")
+  logger.write_object(self.policies_dir)
   logger.write_string(", summary: ")
   logger.write_object(self.summary)
   logger.write_char('}')
@@ -98,6 +98,48 @@ fn policy_rules_from_opa_json(value : Json) -> Array[Json] {
 }
 
 ///|
+fn read_rego_from_dir(policies_dir : String) -> Result[String, @cli.CliError] {
+  let entries = @fs.read_dir(policies_dir) catch {
+    err =>
+      return Err(
+        check_error("cannot read policies directory: \{err.to_string()}"),
+      )
+  }
+  let rego_files : Array[String] = []
+  for entry in entries {
+    if entry.has_suffix(".rego") {
+      rego_files.push(entry)
+    }
+  }
+  rego_files.sort()
+  let mut text = ""
+  for filename in rego_files {
+    let content = @fs.read_file_to_string("\{policies_dir}/\{filename}") catch {
+      err =>
+        return Err(
+          check_error("cannot read policy file \{filename}: \{err.to_string()}"),
+        )
+    }
+    text = text + content + "\n"
+  }
+  Ok(text)
+}
+
+///|
+fn read_catalog_rego_text(
+  policies_dir : String,
+) -> Result[String, @cli.CliError] {
+  let primary_out = read_rego_from_dir(policies_dir)
+  guard primary_out is Ok(primary_text) else {
+    return Err(primary_out.unwrap_err())
+  }
+  if primary_text != "" || policies_dir == "./policies" {
+    return Ok(primary_text)
+  }
+  read_rego_from_dir("./policies")
+}
+
+///|
 fn map_policy_level(level : String) -> String {
   match level {
     "error" => "error"
@@ -154,7 +196,7 @@ fn primary_finding_code(semantic_diff : Json) -> String {
 
 ///|
 fn rules_from_policy_results(policy_results : Array[Json]) -> Array[Json] {
-  let rules : Array[Json] = [@policy_catalog.diff_driver_rule()]
+  let rules : Array[Json] = [@policy_rules.diff_driver_rule()]
   let seen : Map[String, Unit] = { "compat.changed": () }
   for i in 0..<policy_results.length() {
     guard policy_results[i] is Object(policy) else { continue }
@@ -168,7 +210,7 @@ fn rules_from_policy_results(policy_results : Array[Json]) -> Array[Json] {
     }
     let docs = match policy.get("docs") {
       Some(String(value)) if value != "" => value
-      _ => @policy_catalog.index_uri()
+      _ => @policy_rules.index_uri()
     }
     rules.push({
       "id": rule_id,
@@ -191,15 +233,6 @@ fn merge_sarif_rules(
 ) -> Array[Json] {
   let merged : Array[Json] = []
   let seen : Map[String, Bool] = {}
-  for i in 0..<catalog_rules.length() {
-    guard catalog_rules[i] is Object(rule_object) else { continue }
-    guard rule_object.get("id") is Some(String(rule_id)) else { continue }
-    if seen.contains(rule_id) {
-      continue
-    }
-    merged.push(catalog_rules[i])
-    seen[rule_id] = true
-  }
   for i in 0..<policy_rules.length() {
     guard policy_rules[i] is Object(rule_object) else { continue }
     guard rule_object.get("id") is Some(String(rule_id)) else { continue }
@@ -207,6 +240,15 @@ fn merge_sarif_rules(
       continue
     }
     merged.push(policy_rules[i])
+    seen[rule_id] = true
+  }
+  for i in 0..<catalog_rules.length() {
+    guard catalog_rules[i] is Object(rule_object) else { continue }
+    guard rule_object.get("id") is Some(String(rule_id)) else { continue }
+    if seen.contains(rule_id) {
+      continue
+    }
+    merged.push(catalog_rules[i])
     seen[rule_id] = true
   }
   merged
@@ -403,21 +445,17 @@ fn write_temp_json(
 
 ///|
 fn evaluate_policy_with_opa(
-  policy_bundle : String,
+  policies_dir : String,
   diff_file : String,
   diff : Json,
 ) -> Result[Array[Json], @cli.CliError] {
-  let eval_json_override = @sys.get_env_var("CODEIQ_OPA_EVAL_JSON")
+  let eval_json_override = @sys.get_env_var("COGNA_OPA_EVAL_JSON")
   if eval_json_override is Some(text) {
     let parsed = try? @json.parse(text)
     guard parsed is Ok(value) else {
-      return Err(check_error("invalid json in CODEIQ_OPA_EVAL_JSON"))
+      return Err(check_error("invalid json in COGNA_OPA_EVAL_JSON"))
     }
     return Ok(policy_rules_from_opa_json(value))
-  }
-
-  if !@fs.path_exists(policy_bundle) {
-    return Err(check_error("missing policy bundle file: \{policy_bundle}"))
   }
 
   // Write OPA-shaped input to a temp file for OPA eval
@@ -426,21 +464,10 @@ fn evaluate_policy_with_opa(
   let write_out = write_temp_json(temp_input, enriched)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 
-  let bundle_path_out = opa_eval_bundle_path(policy_bundle)
-  guard bundle_path_out is Ok((bundle_path, cleanup_bundle_path)) else {
-    @fs.remove_file(temp_input) catch {
-      _ => ()
-    }
-    return Err(bundle_path_out.unwrap_err())
-  }
-  let command = "opa eval --bundle \{shell_escape(bundle_path)} --input \{shell_escape(temp_input)} --format json data.codeiq.compat.deny"
-  let (exit_code, stdout, stderr) = @host_async.run_command_capture(command)
+  let command = "opa eval --bundle \{shell_escape(policies_dir)} --input \{shell_escape(temp_input)} --format json data.cogna.compat.deny"
+  let (exit_code, stdout, stderr) = @shell.run_command_capture(command)
   @fs.remove_file(temp_input) catch {
     _ => ()
-  }
-  match cleanup_bundle_path {
-    Some(path) => @fs.remove_file(path) catch { _ => () }
-    None => ()
   }
   if exit_code != 0 {
     let details = if stderr != "" { stderr } else { stdout }
@@ -475,227 +502,15 @@ fn ensure_diff_shape(
   diff : Json,
   diff_path : String,
 ) -> Result[Unit, @cli.CliError] {
-  let out = @schema.validate_ciq_diff_v1(diff)
-  guard out is Ok(_) else {
+  guard diff is Object(diff_object) else {
+    return Err(check_error("diff \{diff_path} must be a JSON object"))
+  }
+  guard diff_object.get("schemaVersion") is Some(String("ciq-diff/v1")) else {
     return Err(
-      check_error(
-        "diff \{diff_path} does not satisfy ciq-diff/v1 schema: \{out.unwrap_err().to_string()}",
-      ),
+      check_error("diff \{diff_path} missing schemaVersion ciq-diff/v1"),
     )
   }
   Ok(())
-}
-
-///|
-fn decode_utf8_or_check_error(
-  data : Bytes,
-  path : String,
-) -> Result[String, @cli.CliError] {
-  let text = @utf8.decode(data) catch {
-    _ => return Err(check_error("cannot decode utf8 bytes in \{path}"))
-  }
-  Ok(text)
-}
-
-///|
-fn tar_field(header : Bytes, start : Int, length : Int) -> String {
-  let segment = header[start:start + length]
-  let mut end = segment.length()
-  for i in 0..<segment.length() {
-    if segment[i] == b'\x00' {
-      end = i
-      break
-    }
-  }
-  let content = segment[:end]
-  @utf8.decode(content.to_bytes()) catch {
-    _ => ""
-  }
-}
-
-///|
-fn tar_octal_field(header : Bytes, start : Int, length : Int) -> Int {
-  let text = tar_field(header, start, length).trim().to_string()
-  if text == "" {
-    return 0
-  }
-  let mut value = 0
-  for i in 0..<text.length() {
-    let code = text[i]
-    if code < '0' || code > '7' {
-      continue
-    }
-    value = value * 8 + (code.to_int() - 48)
-  }
-  value
-}
-
-///|
-fn parse_tar_entries(
-  payload : Bytes,
-) -> Result[Map[String, Bytes], @cli.CliError] {
-  let entries : Map[String, Bytes] = {}
-  let mut offset = 0
-  while offset + 512 <= payload.length() {
-    let header = payload[offset:offset + 512].to_bytes()
-    let mut all_zero = true
-    for i in 0..<512 {
-      if header[i] != b'\x00' {
-        all_zero = false
-        break
-      }
-    }
-    if all_zero {
-      break
-    }
-    let name = tar_field(header, 0, 100)
-    let size = tar_octal_field(header, 124, 12)
-    let body_start = offset + 512
-    let body_end = body_start + size
-    if body_end > payload.length() {
-      return Err(check_error("invalid tar archive: entry \{name} truncated"))
-    }
-    entries[name] = payload[body_start:body_end].to_bytes()
-    let padded_size = (size + 511) / 512 * 512
-    offset = body_start + padded_size
-  }
-  Ok(entries)
-}
-
-///|
-fn read_gzip_tar(path : String) -> Result[Map[String, Bytes], @cli.CliError] {
-  let gzip_bytes = @fs.read_file_to_bytes(path) catch {
-    _ => return Err(check_error("cannot read gzip tar \{path}"))
-  }
-  let source = @gio.Buffer::from_bytes(gzip_bytes)
-  let flate_reader : &@flate.Reader = source
-  let reader_out = @gzip.Reader::new(flate_reader)
-  guard reader_out is (reader, None) else {
-    return Err(check_error("cannot open gzip reader for \{path}"))
-  }
-  let read_out = @gio.read_all(reader)
-  let close_out = reader.close()
-  guard close_out is None else {
-    return Err(check_error("cannot close gzip reader for \{path}"))
-  }
-  guard read_out is (payload, None) else {
-    return Err(check_error("cannot read gzip payload for \{path}"))
-  }
-  parse_tar_entries(payload.to_bytes())
-}
-
-///|
-fn read_policy_catalog_from_bundle(
-  policy_bundle : String,
-) -> Result[Json?, @cli.CliError] {
-  let sibling_rules_path = "\{parent_dir(policy_bundle)}/policy.rules.json"
-  if @fs.path_exists(sibling_rules_path) {
-    let text_out = decode_utf8_or_check_error(
-      @fs.read_file_to_bytes(sibling_rules_path) catch {
-        _ => return Err(check_error("cannot read \{sibling_rules_path}"))
-      },
-      "policy.rules.json",
-    )
-    guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
-    let parsed = try? @json.parse(text)
-    guard parsed is Ok(value) else {
-      return Err(
-        check_error("invalid json in policy.rules.json from \{policy_bundle}"),
-      )
-    }
-    let schema_out = @schema.validate_codeiq_policy_rules_v1(value)
-    guard schema_out is Ok(_) else {
-      return Err(
-        check_error(
-          "policy.rules.json from \{policy_bundle} does not satisfy codeiq-policy-rules/v1 schema: \{schema_out.unwrap_err().to_string()}",
-        ),
-      )
-    }
-    return Ok(Some(value))
-  }
-  let outer_entries_out = read_gzip_tar(policy_bundle)
-  guard outer_entries_out is Ok(outer_entries) else {
-    return Err(outer_entries_out.unwrap_err())
-  }
-  let catalog_text = if outer_entries.contains("policy.rules.json") {
-    let text_out = decode_utf8_or_check_error(
-      outer_entries["policy.rules.json"],
-      "policy.rules.json",
-    )
-    guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
-    Some(text)
-  } else if outer_entries.contains("opa-bundle.tar.gz") {
-    let inner_path = "\{policy_bundle}.inner-opa-bundle.tar.gz"
-    @fs.write_bytes_to_file(inner_path, outer_entries["opa-bundle.tar.gz"]) catch {
-      _ =>
-        return Err(
-          check_error(
-            "cannot materialize inner opa bundle for \{policy_bundle}",
-          ),
-        )
-    }
-    let inner_entries_out = read_gzip_tar(inner_path)
-    @fs.remove_file(inner_path) catch {
-      _ => ()
-    }
-    guard inner_entries_out is Ok(inner_entries) else {
-      return Err(inner_entries_out.unwrap_err())
-    }
-    if !inner_entries.contains("policy.rules.json") {
-      None
-    } else {
-      let text_out = decode_utf8_or_check_error(
-        inner_entries["policy.rules.json"],
-        "policy.rules.json",
-      )
-      guard text_out is Ok(text) else { return Err(text_out.unwrap_err()) }
-      Some(text)
-    }
-  } else {
-    None
-  }
-  match catalog_text {
-    Some(text) => {
-      let parsed = try? @json.parse(text)
-      guard parsed is Ok(value) else {
-        return Err(
-          check_error("invalid json in policy.rules.json from \{policy_bundle}"),
-        )
-      }
-      let schema_out = @schema.validate_codeiq_policy_rules_v1(value)
-      guard schema_out is Ok(_) else {
-        return Err(
-          check_error(
-            "policy.rules.json from \{policy_bundle} does not satisfy codeiq-policy-rules/v1 schema: \{schema_out.unwrap_err().to_string()}",
-          ),
-        )
-      }
-      Ok(Some(value))
-    }
-    None => Ok(None)
-  }
-}
-
-///|
-fn opa_eval_bundle_path(
-  policy_bundle : String,
-) -> Result[(String, String?), @cli.CliError] {
-  let entries_out = read_gzip_tar(policy_bundle)
-  guard entries_out is Ok(entries) else { return Err(entries_out.unwrap_err()) }
-  if entries.contains("opa-bundle.tar.gz") {
-    let inner_path = "\{policy_bundle}.opa-eval.tar.gz"
-    @fs.write_bytes_to_file(inner_path, entries["opa-bundle.tar.gz"]) catch {
-      _ =>
-        return Err(
-          check_error(
-            "cannot materialize inner opa bundle for \{policy_bundle}",
-          ),
-        )
-    }
-    Ok((inner_path, Some(inner_path)))
-  } else {
-    Ok((policy_bundle, None))
-  }
 }
 
 ///|
@@ -819,7 +634,7 @@ fn sarif_results_from_diff(diff : Json) -> Array[Json] {
 ///|
 fn sarif_from_diff(
   diff : Json,
-  policy_bundle : String,
+  policies_dir : String,
   policy_results : Array[Json],
 ) -> Json {
   let results = sarif_results_from_diff(diff)
@@ -828,9 +643,23 @@ fn sarif_from_diff(
     results.push(from_policy[i])
   }
 
-  let catalog_rules = match read_policy_catalog_from_bundle(policy_bundle) {
-    Ok(Some(catalog)) => @policy_catalog.sarif_rules_from_catalog(catalog)
-    _ => []
+  let catalog_rules = {
+    let rego_out = read_catalog_rego_text(policies_dir)
+    match rego_out {
+      Ok(text) =>
+        match @policy_rules.from_rego_text(text) {
+          Ok(rules) => {
+            let catalog_text = @policy_rules.catalog_json(rules)
+            let parsed = try? @json.parse(catalog_text)
+            match parsed {
+              Ok(catalog) => @policy_rules.sarif_rules_from_catalog(catalog)
+              Err(_) => []
+            }
+          }
+          Err(_) => []
+        }
+      Err(_) => []
+    }
   }
   let driver_rules = merge_sarif_rules(
     catalog_rules,
@@ -841,10 +670,10 @@ fn sarif_from_diff(
     "version": "2.1.0",
     "runs": [
       {
-        "tool": { "driver": { "name": "codeiq-check", "rules": driver_rules } },
+        "tool": { "driver": { "name": "cogna-check", "rules": driver_rules } },
         "invocation": {
           "executionSuccessful": true,
-          "commandLine": "codeiq check --policy \{policy_bundle}",
+          "commandLine": "cogna check --policies \{policies_dir}",
         },
         "results": results,
       },
@@ -865,8 +694,8 @@ fn write_sarif(path : String, sarif : Json) -> Result[Unit, @cli.CliError] {
 
 ///|
 pub fn run(params : CheckParams) -> @cli.CliResult[CheckResult, @cli.CliError] {
-  let (diff_file, policy_bundle) = if params.diff_file == "" &&
-    params.policy_bundle == "" {
+  let (diff_file, policies_dir) = if params.diff_file == "" &&
+    params.policies_dir == "" {
     let resolved_out = @config.resolve(".")
     guard resolved_out is Ok(resolved) else {
       return Err(@cli.config_error(resolved_out.unwrap_err().to_string()))
@@ -879,10 +708,11 @@ pub fn run(params : CheckParams) -> @cli.CliResult[CheckResult, @cli.CliError] {
       ),
     )
   } else {
-    (params.diff_file, params.policy_bundle)
+    (params.diff_file, params.policies_dir)
   }
-  let policy_exists = ensure_file_exists(policy_bundle, "policy bundle")
-  guard policy_exists is Ok(_) else { return Err(policy_exists.unwrap_err()) }
+  if !@fs.path_exists(policies_dir) {
+    return Err(check_error("missing policies directory: \{policies_dir}"))
+  }
 
   let diff_out = read_json_file(diff_file, "diff")
   guard diff_out is Ok(diff) else { return Err(diff_out.unwrap_err()) }
@@ -890,29 +720,20 @@ pub fn run(params : CheckParams) -> @cli.CliResult[CheckResult, @cli.CliError] {
   guard diff_shape_out is Ok(_) else { return Err(diff_shape_out.unwrap_err()) }
 
   let policy_results_out = evaluate_policy_with_opa(
-    policy_bundle, diff_file, diff,
+    policies_dir, diff_file, diff,
   )
   guard policy_results_out is Ok(policy_results) else {
     return Err(policy_results_out.unwrap_err())
   }
 
   let sarif_path = "\{parent_dir(diff_file)}/check.sarif.json"
-  let sarif = sarif_from_diff(diff, policy_bundle, policy_results)
-  let sarif_shape_out = @schema.validate_sarif_v2_1_0_min(sarif)
-  guard sarif_shape_out is Ok(_) else {
-    return Err(
-      check_error(
-        "generated sarif does not satisfy minimal SARIF schema: \{sarif_shape_out.unwrap_err().to_string()}",
-      ),
-    )
-  }
-
+  let sarif = sarif_from_diff(diff, policies_dir, policy_results)
   let write_out = write_sarif(sarif_path, sarif)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 
   Ok({
     diff_file,
-    policy_bundle,
+    policies_dir,
     summary: "Generated SARIF report at \{sarif_path}",
   })
 }

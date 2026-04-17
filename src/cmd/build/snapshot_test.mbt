@@ -14,7 +14,7 @@ fn remove_dir_if_exists(path : String) -> Unit {
 
 ///|
 fn reset_repo(path : String) -> Unit {
-  remove_if_exists("\{path}/codeiq.yaml")
+  remove_if_exists("\{path}/cogna.yaml")
   remove_if_exists("\{path}/dist/manifest.json")
   remove_if_exists("\{path}/dist/declarations.ndjson")
   remove_if_exists("\{path}/dist/symbols.ndjson")
@@ -57,7 +57,7 @@ fn cleanup_case(path : String, source_file : String) -> Unit {
 
 ///|
 fn tmp_snapshot_repo(title : String) -> String {
-  "/tmp/codeiq-build-snapshot-\{title}"
+  "/tmp/cogna-build-snapshot-\{title}"
 }
 
 ///|
@@ -118,7 +118,7 @@ fn write_config_for(
     .replace(old="profile: ", new="profile: \{profile}")
     .replace(old="purl: ", new="purl: \{purl}")
     .replace(old="    - ", new="    - \{include_glob}")
-  @fs.write_string_to_file("\{path}/codeiq.yaml", content) catch {
+  @fs.write_string_to_file("\{path}/cogna.yaml", content) catch {
     _ => abort("failed to write config")
   }
 }
@@ -197,7 +197,6 @@ fn normalize_snapshot_text(content : String) -> String {
       "schemaVersion": root.get("schemaVersion").unwrap_or("ciq-bundle/v1"),
       "purl": root.get("purl").unwrap_or(""),
       "profile": root.get("profile").unwrap_or(""),
-      "declarationSchema": root.get("declarationSchema").unwrap_or({}),
       "source": normalized_source,
       "artifacts": root.get("artifacts").unwrap_or([]),
     }
@@ -293,7 +292,7 @@ fn run_snapshot_case(
     !@fs.path_exists(manifest_snapshot_path) ||
     !@fs.path_exists(metadata_snapshot_path) ||
     !@fs.path_exists(checksums_snapshot_path)
-  let update = match @sys.get_env_var("CODEIQ_UPDATE_SNAPSHOTS") {
+  let update = match @sys.get_env_var("COGNA_UPDATE_SNAPSHOTS") {
     Some("true") => true
     _ =>
       match @env.args().search("--update-snapshots") {
@@ -319,17 +318,17 @@ fn run_snapshot_case(
       )
     }
   } else if expected_dec == declarations &&
-     expected_sym == symbols &&
-     expected_manifest == normalized_manifest &&
-     expected_metadata == normalized_metadata &&
-      expected_checksums == normalized_checksums {
+    expected_sym == symbols &&
+    expected_manifest == normalized_manifest &&
+    expected_metadata == normalized_metadata &&
+    expected_checksums == normalized_checksums {
     ()
   } else if update {
     persist_snapshot(dec_snapshot_path, declarations)
     persist_snapshot(sym_snapshot_path, symbols)
     persist_snapshot(manifest_snapshot_path, normalized_manifest)
     persist_snapshot(metadata_snapshot_path, normalized_metadata)
-      persist_snapshot(checksums_snapshot_path, normalized_checksums)
+    persist_snapshot(checksums_snapshot_path, normalized_checksums)
   } else {
     cleanup_case(repo, source_file)
     fail(
@@ -346,7 +345,7 @@ fn run_snapshot_case(
 test "snapshot terraform baseline extractor output" {
   run_snapshot_case(
     "terraform", "terraform-module", "main.tf", "examples/terraform-module/full/repo/main.tf",
-    "**/*.tf", "examples/terraform-module/full/snapshots/codeiq",
+    "**/*.tf", "examples/terraform-module/full/snapshots/cogna",
   )
 }
 
@@ -354,7 +353,7 @@ test "snapshot terraform baseline extractor output" {
 test "snapshot openapi baseline extractor output" {
   run_snapshot_case(
     "openapi", "openapi-spec", "openapi/payment.yaml", "examples/openapi-spec/full/repo/openapi/payment.yaml",
-    "openapi/**/*.yaml", "examples/openapi-spec/full/snapshots/codeiq",
+    "openapi/**/*.yaml", "examples/openapi-spec/full/snapshots/cogna",
   )
 }
 
@@ -362,7 +361,7 @@ test "snapshot openapi baseline extractor output" {
 test "snapshot go canonical extractor output" {
   run_snapshot_case(
     "go", "go-module", "main.go", "examples/go-module/full/repo/main.go", "**/*.go",
-    "examples/go-module/full/snapshots/codeiq",
+    "examples/go-module/full/snapshots/cogna",
   )
 }
 
@@ -370,6 +369,6 @@ test "snapshot go canonical extractor output" {
 test "snapshot rust canonical extractor output" {
   run_snapshot_case(
     "rust", "rust-crate", "lib.rs", "examples/rust-crate/full/repo/lib.rs", "**/*.rs",
-    "examples/rust-crate/full/snapshots/codeiq",
+    "examples/rust-crate/full/snapshots/cogna",
   )
 }

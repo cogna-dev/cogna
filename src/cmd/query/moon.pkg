@@ -1,8 +1,8 @@
 import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/sdk/query" @sdk_query,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/core/api" @core,
 }
 
 import {

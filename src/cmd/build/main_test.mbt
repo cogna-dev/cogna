@@ -15,8 +15,8 @@ fn ensure_dir_removed(path : String) -> Unit {
 ///|
 fn cleanup_tmp_repo(repo : String) -> Unit {
   @build_shell.run_command_capture("rm -rf '\{repo}'") |> ignore
-  ensure_file_removed("\{repo}/codeiq.yml")
-  ensure_file_removed("\{repo}/codeiq.yaml")
+  ensure_file_removed("\{repo}/cogna.yml")
+  ensure_file_removed("\{repo}/cogna.yaml")
   ensure_file_removed("\{repo}/policy.rego")
   ensure_file_removed("\{repo}/a.rego")
   ensure_file_removed("\{repo}/z.rego")
@@ -129,7 +129,7 @@ fn write_valid_v2_config(path : String) -> Unit {
     #|  includeDependencies: true
     #|registry:
     #|  port: 8787
-    #|  storeDir: .codeiq/cache/registry
+    #|  storeDir: .cogna/cache/registry
     #|mcp:
     #|  port: 3000
     #|
@@ -168,7 +168,7 @@ fn read_text_main(path : String, fail_message : String) -> String {
 
 ///|
 fn tmp_build_repo(name : String) -> String {
-  "/tmp/codeiq-build-\{name}"
+  "/tmp/cogna-build-\{name}"
 }
 
 ///|
@@ -184,7 +184,7 @@ test "build creates bundle skeleton files" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_valid_config("\{repo}/codeiq.yaml")
+  write_valid_config("\{repo}/cogna.yaml")
   let out = run({ repo, })
   guard out is Ok(result) else {
     cleanup_tmp_repo(repo)
@@ -193,7 +193,7 @@ test "build creates bundle skeleton files" {
 
   inspect(
     result.display(),
-    content="Generated CIQ bundle skeleton at /tmp/codeiq-build-repo/dist",
+    content="Generated CIQ bundle skeleton at /tmp/cogna-build-repo/dist",
   )
 
   let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
@@ -260,11 +260,7 @@ test "build creates bundle skeleton files" {
     "\{repo}/dist/sbom.spdx.json",
     "spdx sbom should exist",
   )
-  assert_true(
-    spdx.contains(
-      "\"@context\": \"https://spdx.org/rdf/3.0.1/spdx-context.jsonld\"",
-    ),
-  )
+  assert_true(spdx.contains("\"spdxVersion\": \"SPDX-2.3\""))
 
   let bundle = @fs.read_file_to_bytes("\{repo}/dist/bundle.ciq.tgz") catch {
     _ => {
@@ -294,7 +290,7 @@ test "build writes dependency bundles for resolved local packages" {
     fail("failed to create react package")
   }
 
-  write_valid_v2_config("\{repo}/codeiq.yml")
+  write_valid_v2_config("\{repo}/cogna.yml")
   let package_out = try? @fs.write_string_to_file(
     "\{repo}/package.json",
     Json::object({
@@ -330,8 +326,12 @@ test "build writes dependency bundles for resolved local packages" {
     "dependency manifest should exist",
   )
   assert_true(
-    dependency_manifest.contains("\"model\": \"dependency-files-only\""),
+    dependency_manifest.contains("\"schemaVersion\": \"ciq-bundle/v1\""),
   )
+  assert_true(
+    dependency_manifest.contains("\"purl\": \"pkg:npm/react@18.2.0\""),
+  )
+  assert_true(!dependency_manifest.contains("\"declarationSchema\""))
   let dependency_files = read_text_main(
     "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/package.files.json",
     "dependency files should exist",
@@ -368,7 +368,7 @@ test "build returns config error when config file is missing" {
 
   let text = error.to_string()
   assert_true(text.contains("config error:"))
-  assert_true(text.contains("codeiq.yml"))
+  assert_true(text.contains("cogna.yml"))
 
   cleanup_tmp_repo(repo)
 }
@@ -379,9 +379,9 @@ test "build creates policy-bundle artifacts and opa manifest" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
+  write_policy_config("\{repo}/cogna.yaml")
   let policy =
-    #|package codeiq.compat
+    #|package cogna.compat
     #|
     #|deny contains out if {
     #|  out := {
@@ -409,7 +409,7 @@ test "build creates policy-bundle artifacts and opa manifest" {
   }
   assert_true(manifest.contains("\"schemaVersion\": \"ciq-opa-bundle/v1\""))
   assert_true(manifest.contains("\"profile\": \"policy-bundle\""))
-  assert_true(manifest.contains("\"entrypoint\": \"codeiq/compat/deny\""))
+  assert_true(manifest.contains("\"entrypoint\": \"cogna/compat/deny\""))
   assert_true(manifest.contains("\"provenance\""))
   assert_true(manifest.contains("\"checksums\": \"checksums.txt\""))
   assert_true(manifest.contains("\"status\": \"unsigned\""))
@@ -437,13 +437,13 @@ test "build creates policy-bundle artifacts and opa manifest" {
     }
   }
   assert_true(
-    policy_rules.contains("\"schemaVersion\": \"codeiq-policy-rules/v1\""),
+    policy_rules.contains("\"schemaVersion\": \"cogna-policy-rules/v1\""),
   )
   assert_true(policy_rules.contains("compat.core.removed-declaration"))
   assert_true(policy_rules.contains("\"family\": \"core\""))
   assert_true(policy_rules.contains("\"defaultLevel\": \"error\""))
   assert_true(
-    policy_rules.contains("\"entrypoint\": \"data.codeiq.compat.deny\""),
+    policy_rules.contains("\"entrypoint\": \"data.cogna.compat.deny\""),
   )
 
   let checksums = @fs.read_file_to_string("\{repo}/dist/checksums.txt") catch {
@@ -467,7 +467,7 @@ test "build policy-bundle uses builtin rego and generated catalog when repo has 
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
+  write_policy_config("\{repo}/cogna.yaml")
   let out = run({ repo, })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
@@ -482,8 +482,8 @@ test "build policy-bundle uses builtin rego and generated catalog when repo has 
     }
   }
   assert_true(
-    policy_rules.contains("\"schemaVersion\": \"codeiq-policy-rules/v1\"") ||
-    policy_rules.contains("\"schemaVersion\":\"codeiq-policy-rules/v1\""),
+    policy_rules.contains("\"schemaVersion\": \"cogna-policy-rules/v1\"") ||
+    policy_rules.contains("\"schemaVersion\":\"cogna-policy-rules/v1\""),
   )
   assert_true(policy_rules.contains("compat.core.removed-declaration"))
   assert_true(policy_rules.contains("compat.go.signature-changed"))
@@ -494,7 +494,7 @@ test "build policy-bundle uses builtin rego and generated catalog when repo has 
   assert_true(policy_rules.contains("compat.openapi.response-schema-narrowed"))
   assert_true(policy_rules.contains("compat.component.version-upgrade"))
   assert_true(
-    policy_rules.contains("\"entrypoint\": \"data.codeiq.compat.deny\""),
+    policy_rules.contains("\"entrypoint\": \"data.cogna.compat.deny\""),
   )
 
   let opa_bundle = @fs.read_file_to_bytes("\{repo}/dist/opa-bundle.tar.gz") catch {
@@ -515,9 +515,9 @@ test "build rejects duplicate custom policy rule ids" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
+  write_policy_config("\{repo}/cogna.yaml")
   let policy =
-    #|package codeiq.compat
+    #|package cogna.compat
     #|
     #|deny contains out if {
     #|  out := {
@@ -555,9 +555,9 @@ test "build reads custom rego files in deterministic lexicographic order" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
+  write_policy_config("\{repo}/cogna.yaml")
   let z_policy =
-    #|package codeiq.compat
+    #|package cogna.compat
     #|
     #|deny contains out if {
     #|  out := {
@@ -569,7 +569,7 @@ test "build reads custom rego files in deterministic lexicographic order" {
     #|}
     #|
   let a_policy =
-    #|package codeiq.compat
+    #|package cogna.compat
     #|
     #|deny contains out if {
     #|  out := {
@@ -627,9 +627,9 @@ test "build rejects custom policy rules missing literal metadata" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
+  write_policy_config("\{repo}/cogna.yaml")
   let policy =
-    #|package codeiq.compat
+    #|package cogna.compat
     #|
     #|deny contains out if {
     #|  out := {
@@ -657,9 +657,9 @@ test "build rejects custom policy bundles with no extracted rules" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
+  write_policy_config("\{repo}/cogna.yaml")
   let policy =
-    #|package codeiq.compat
+    #|package cogna.compat
     #|
     #|default deny = []
     #|
@@ -681,12 +681,12 @@ test "build policy-bundle supports signature status and key id env" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
-  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
+  write_policy_config("\{repo}/cogna.yaml")
+  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
   let out = run({ repo, })
-  @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
+  @sys.unset_env_var("COGNA_SIGNATURE_STATUS")
+  @sys.unset_env_var("COGNA_SIGNATURE_KEY_ID")
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("policy bundle build should succeed")
@@ -711,14 +711,14 @@ test "build policy-bundle includes signature value when provided" {
   cleanup_tmp_repo(repo)
   @fs.create_dir(repo)
 
-  write_policy_config("\{repo}/codeiq.yaml")
-  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
-  @sys.set_env_var("CODEIQ_SIGNATURE_VALUE", "ZmFrZS1zaWduYXR1cmU=")
+  write_policy_config("\{repo}/cogna.yaml")
+  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
+  @sys.set_env_var("COGNA_SIGNATURE_VALUE", "ZmFrZS1zaWduYXR1cmU=")
   let out = run({ repo, })
-  @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
+  @sys.unset_env_var("COGNA_SIGNATURE_STATUS")
+  @sys.unset_env_var("COGNA_SIGNATURE_KEY_ID")
+  @sys.unset_env_var("COGNA_SIGNATURE_VALUE")
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("policy bundle build should succeed")
@@ -759,7 +759,7 @@ test "build fails when lsp server is unavailable for go profile" {
     #|  format: sarif
     #|  policy: default-compat
     #|
-  @fs.write_string_to_file("\{repo}/codeiq.yaml", config) catch {
+  @fs.write_string_to_file("\{repo}/cogna.yaml", config) catch {
     _ => abort("failed to write go hardfail config")
   }
   @fs.write_string_to_file(
@@ -769,9 +769,9 @@ test "build fails when lsp server is unavailable for go profile" {
     _ => abort("failed to write go fixture")
   }
 
-  @sys.set_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK", "true")
+  @sys.set_env_var("COGNA_TEST_FORCE_LSP_FALLBACK", "true")
   let out = run({ repo, })
-  @sys.unset_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+  @sys.unset_env_var("COGNA_TEST_FORCE_LSP_FALLBACK")
   guard out is Err(e) else {
     cleanup_tmp_repo(repo)
     fail("build should fail when lsp server is missing for go-module")
@@ -803,7 +803,7 @@ test "build fails when lsp server is unavailable for rust profile" {
     #|  format: sarif
     #|  policy: default-compat
     #|
-  @fs.write_string_to_file("\{repo}/codeiq.yaml", config) catch {
+  @fs.write_string_to_file("\{repo}/cogna.yaml", config) catch {
     _ => abort("failed to write rust hardfail config")
   }
   @fs.write_string_to_file(
@@ -813,9 +813,9 @@ test "build fails when lsp server is unavailable for rust profile" {
     _ => abort("failed to write rust fixture")
   }
 
-  @sys.set_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK", "true")
+  @sys.set_env_var("COGNA_TEST_FORCE_LSP_FALLBACK", "true")
   let out = run({ repo, })
-  @sys.unset_env_var("CODEIQ_TEST_FORCE_LSP_FALLBACK")
+  @sys.unset_env_var("COGNA_TEST_FORCE_LSP_FALLBACK")
   guard out is Err(e) else {
     cleanup_tmp_repo(repo)
     fail("build should fail when lsp server is missing for rust-crate")
@@ -847,7 +847,7 @@ test "build keeps canonical metadata under lsp validation" {
     #|  format: sarif
     #|  policy: default-compat
     #|
-  @fs.write_string_to_file("\{repo}/codeiq.yaml", config) catch {
+  @fs.write_string_to_file("\{repo}/cogna.yaml", config) catch {
     _ => abort("failed to write go validation config")
   }
   @fs.write_string_to_file(

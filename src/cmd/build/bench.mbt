@@ -1,4 +1,5 @@
-///| BenchMetrics holds all measured metrics for one extractor run.
+///|
+/// BenchMetrics holds all measured metrics for one extractor run.
 pub(all) struct BenchMetrics {
   wall_ms : Int
   peak_rss_mb : Int
@@ -31,7 +32,8 @@ pub impl Show for BenchMetrics with output(self, logger) {
   logger.write_char('}')
 }
 
-///| BenchReport is the top-level JSON report for one backend run.
+///|
+/// BenchReport is the top-level JSON report for one backend run.
 pub(all) struct BenchReport {
   fixture : String
   backend : String
@@ -58,7 +60,8 @@ pub impl Show for BenchReport with output(self, logger) {
   logger.write_char('}')
 }
 
-///| LsifReport records LSIF dump size info for comparison, or marks it unsupported.
+///|
+/// LsifReport records LSIF dump size info for comparison, or marks it unsupported.
 pub(all) struct LsifReport {
   supported : Bool
   reason : String
@@ -79,7 +82,8 @@ pub impl Show for LsifReport with output(self, logger) {
   logger.write_char('}')
 }
 
-///| make_bench_metrics constructs a BenchMetrics value.
+///|
+/// make_bench_metrics constructs a BenchMetrics value.
 pub fn make_bench_metrics(
   wall_ms : Int,
   peak_rss_mb : Int,
@@ -102,7 +106,8 @@ pub fn make_bench_metrics(
   }
 }
 
-///| make_lsif_report constructs an LsifReport value.
+///|
+/// make_lsif_report constructs an LsifReport value.
 pub fn make_lsif_report(
   supported : Bool,
   reason : String,
@@ -112,7 +117,8 @@ pub fn make_lsif_report(
   { supported, reason, bytes_raw, bytes_gzip }
 }
 
-///| make_bench_report constructs a BenchReport value.
+///|
+/// make_bench_report constructs a BenchReport value.
 pub fn make_bench_report(
   fixture : String,
   backend : String,
@@ -124,7 +130,8 @@ pub fn make_bench_report(
   { fixture, backend, mode, parity, metrics, lsif }
 }
 
-///| bench_metrics_json serialises BenchMetrics to a Json object.
+///|
+/// bench_metrics_json serialises BenchMetrics to a Json object.
 pub fn bench_metrics_json(m : BenchMetrics) -> Json {
   {
     "wallMs": m.wall_ms,
@@ -139,7 +146,8 @@ pub fn bench_metrics_json(m : BenchMetrics) -> Json {
   }
 }
 
-///| lsif_report_json serialises LsifReport to a Json object.
+///|
+/// lsif_report_json serialises LsifReport to a Json object.
 pub fn lsif_report_json(r : LsifReport) -> Json {
   let base : Map[String, Json] = {
     "supported": r.supported,
@@ -150,7 +158,8 @@ pub fn lsif_report_json(r : LsifReport) -> Json {
   Json::object(base)
 }
 
-///| bench_report_json serialises BenchReport to a Json object.
+///|
+/// bench_report_json serialises BenchReport to a Json object.
 pub fn bench_report_json(r : BenchReport) -> Json {
   {
     "fixture": r.fixture,
@@ -162,7 +171,8 @@ pub fn bench_report_json(r : BenchReport) -> Json {
   }
 }
 
-///| normalize_bench_snapshot_text normalizes manifest/metadata snapshots so
+///|
+/// normalize_bench_snapshot_text normalizes manifest/metadata snapshots so
 /// benchmark parity compares semantic output rather than runtime noise.
 pub fn normalize_bench_snapshot_text(content : String) -> String {
   let parsed = try? @json.parse(content)
@@ -173,22 +183,23 @@ pub fn normalize_bench_snapshot_text(content : String) -> String {
       Some(Object(e)) => e
       _ => {}
     }
-    return ({
-      "schemaVersion": root.get("schemaVersion").unwrap_or("ciq-metadata/v1"),
-      "profile": root.get("profile").unwrap_or("unknown"),
-      "inputPatterns": root.get("inputPatterns").unwrap_or([]),
-      "build": root.get("build").unwrap_or({}),
-      "extractor": {
-        "role": extractor_obj.get("role").unwrap_or("canonical"),
-        "mode": "<normalized>",
-        "backend": extractor_obj.get("backend").unwrap_or("canonical"),
-        "server": extractor_obj.get("server").unwrap_or("canonical"),
-        "version": extractor_obj.get("version").unwrap_or("canonical-v1"),
-        "fallback": extractor_obj.get("fallback").unwrap_or(false),
-        "timingMs": extractor_obj.get("timingMs").unwrap_or({}),
-        "stats": extractor_obj.get("stats").unwrap_or({}),
-      },
-    } : Json).stringify(indent=2)
+    return (
+      {
+        "schemaVersion": root.get("schemaVersion").unwrap_or("ciq-metadata/v1"),
+        "profile": root.get("profile").unwrap_or("unknown"),
+        "inputPatterns": root.get("inputPatterns").unwrap_or([]),
+        "build": root.get("build").unwrap_or({}),
+        "extractor": {
+          "role": extractor_obj.get("role").unwrap_or("canonical"),
+          "mode": "<normalized>",
+          "backend": extractor_obj.get("backend").unwrap_or("canonical"),
+          "server": extractor_obj.get("server").unwrap_or("canonical"),
+          "version": extractor_obj.get("version").unwrap_or("canonical-v1"),
+          "fallback": extractor_obj.get("fallback").unwrap_or(false),
+          "timingMs": extractor_obj.get("timingMs").unwrap_or({}),
+          "stats": extractor_obj.get("stats").unwrap_or({}),
+        },
+      } : Json).stringify(indent=2)
   }
 
   if root.get("schemaVersion") is Some(String("ciq-bundle/v1")) {
@@ -203,20 +214,21 @@ pub fn normalize_bench_snapshot_text(content : String) -> String {
       }
       _ => Json::object({})
     }
-    return ({
-      "schemaVersion": root.get("schemaVersion").unwrap_or("ciq-bundle/v1"),
-      "purl": root.get("purl").unwrap_or(""),
-      "profile": root.get("profile").unwrap_or(""),
-      "declarationSchema": root.get("declarationSchema").unwrap_or({}),
-      "source": normalized_source,
-      "artifacts": root.get("artifacts").unwrap_or([]),
-    } : Json).stringify(indent=2)
+    return (
+      {
+        "schemaVersion": root.get("schemaVersion").unwrap_or("ciq-bundle/v1"),
+        "purl": root.get("purl").unwrap_or(""),
+        "profile": root.get("profile").unwrap_or(""),
+        "source": normalized_source,
+        "artifacts": root.get("artifacts").unwrap_or([]),
+      } : Json).stringify(indent=2)
   }
 
   content
 }
 
-///| normalize_bench_checksums_text masks checksum churn caused by
+///|
+/// normalize_bench_checksums_text masks checksum churn caused by
 /// runtime timestamps and commit-hash noise while preserving semantic artifact parity.
 pub fn normalize_bench_checksums_text(content : String) -> String {
   let lines = content.split("\n").to_array()
@@ -234,16 +246,16 @@ pub fn normalize_bench_checksums_text(content : String) -> String {
   normalized.join("\n")
 }
 
-///| bundle_file_sha256 returns a stable hash for a bundle file, or an empty
+///|
+/// bundle_file_sha256 returns a stable hash for a bundle file, or an empty
 /// marker when the artifact is missing.
 pub fn bundle_file_sha256(path : String) -> String {
-  let bytes = @fs.read_file_to_bytes(path) catch {
-    _ => return "<missing>"
-  }
+  let bytes = @fs.read_file_to_bytes(path) catch { _ => return "<missing>" }
   @sha256.sha256_hexdigest(bytes)
 }
 
-///| count_ndjson_lines counts non-empty lines in an NDJSON string.
+///|
+/// count_ndjson_lines counts non-empty lines in an NDJSON string.
 pub fn count_ndjson_lines(text : String) -> Int {
   let mut count = 0
   for line in text.split("\n") {
@@ -255,15 +267,15 @@ pub fn count_ndjson_lines(text : String) -> Int {
   count
 }
 
-///| measure_file_size returns the byte length of a file, or 0 if missing.
+///|
+/// measure_file_size returns the byte length of a file, or 0 if missing.
 pub fn measure_file_size(path : String) -> Int {
-  let content = @fs.read_file_to_string(path) catch {
-    _ => return 0
-  }
+  let content = @fs.read_file_to_string(path) catch { _ => return 0 }
   @utf8.encode(content).length()
 }
 
-///| gzip_size_of returns the gzip-compressed byte size of a string.
+///|
+/// gzip_size_of returns the gzip-compressed byte size of a string.
 pub fn gzip_size_of(text : String) -> Int {
   let raw = @utf8.encode(text)
   let buf = @gio.Buffer::new()
@@ -279,7 +291,8 @@ pub fn gzip_size_of(text : String) -> Int {
   buf.to_bytes().length()
 }
 
-///| compare_ndjson_lines returns the number of lines that differ between two
+///|
+/// compare_ndjson_lines returns the number of lines that differ between two
 /// NDJSON texts (a line-by-line diff count, ignoring blank lines).
 pub fn compare_ndjson_lines(a : String, b : String) -> Int {
   let lines_a = a

@@ -1,16 +1,16 @@
 ///|
 pub fn type_name(signature : String) -> String {
   let body = signature.strip_prefix("type ").unwrap_or(signature).to_string()
-    |> @parsec.trim_spaces
+    |> @extract.trim_spaces
   let plain = match body.find("=") {
-    Some(idx) => body[0:idx].to_string() |> @parsec.trim_spaces
+    Some(idx) => body[0:idx].to_string() |> @extract.trim_spaces
     None => body
   }
   let base = match plain.find("[") {
     Some(idx) => plain[0:idx].to_string()
-    None => @parsec.first_token(plain)
+    None => @extract.first_token(plain)
   }
-  @parsec.trim_spaces(base)
+  @extract.trim_spaces(base)
 }
 
 ///|
@@ -19,10 +19,10 @@ fn method_param_types(signature : String) -> Array[String] {
   if !rest.has_prefix("(") {
     return @extract.signature_param_types(signature)
   }
-  match @parsec.matching_delimiter_index(rest, 0, '(', ')') {
+  match @extract.matching_delimiter_index(rest, 0, '(', ')') {
     Some(close_idx) if close_idx + 1 < rest.length() =>
       @extract.signature_param_types(
-        rest[close_idx + 1:].to_string() |> @parsec.trim_spaces,
+        rest[close_idx + 1:].to_string() |> @extract.trim_spaces,
       )
     _ => @extract.signature_param_types(signature)
   }
@@ -30,26 +30,26 @@ fn method_param_types(signature : String) -> Array[String] {
 
 ///|
 fn return_types_after_params(value : String) -> Array[String] {
-  let tail = @parsec.strip_braces(@parsec.trim_spaces(value))
+  let tail = @extract.strip_braces(@extract.trim_spaces(value))
   if tail == "" {
     return []
   }
   if tail.has_prefix("(") {
-    return match @parsec.matching_delimiter_index(tail, 0, '(', ')') {
+    return match @extract.matching_delimiter_index(tail, 0, '(', ')') {
       Some(close_idx) if close_idx > 1 =>
-        @parsec.split_top_level(tail[1:close_idx].to_string(), ',')
-        |> @parsec.unique_trimmed_strings
+        @extract.split_top_level(tail[1:close_idx].to_string(), ',')
+        |> @extract.unique_trimmed_strings
       _ => []
     }
   }
-  @parsec.unique_trimmed_strings([tail])
+  @extract.unique_trimmed_strings([tail])
 }
 
 ///|
 fn function_return_types(signature : String) -> Array[String] {
   match signature.find("(") {
     Some(open_idx) =>
-      match @parsec.matching_delimiter_index(signature, open_idx, '(', ')') {
+      match @extract.matching_delimiter_index(signature, open_idx, '(', ')') {
         Some(close_idx) if close_idx + 1 < signature.length() =>
           return_types_after_params(signature[close_idx + 1:].to_string())
         _ => []
@@ -64,9 +64,11 @@ fn method_return_types(signature : String) -> Array[String] {
   if !rest.has_prefix("(") {
     return function_return_types(signature)
   }
-  match @parsec.matching_delimiter_index(rest, 0, '(', ')') {
+  match @extract.matching_delimiter_index(rest, 0, '(', ')') {
     Some(close_idx) if close_idx + 1 < rest.length() =>
-      function_return_types(rest[close_idx + 1:].to_string() |> @parsec.trim_spaces)
+      function_return_types(
+        rest[close_idx + 1:].to_string() |> @extract.trim_spaces,
+      )
     _ => function_return_types(signature)
   }
 }
@@ -77,9 +79,9 @@ fn receiver_parts(signature : String) -> (String, Bool) {
   if !rest.has_prefix("(") {
     return ("", false)
   }
-  match @parsec.matching_delimiter_index(rest, 0, '(', ')') {
+  match @extract.matching_delimiter_index(rest, 0, '(', ')') {
     Some(close_idx) if close_idx > 1 => {
-      let receiver = @parsec.trim_spaces(rest[1:close_idx].to_string())
+      let receiver = @extract.trim_spaces(rest[1:close_idx].to_string())
       let pointer = receiver.contains("*")
       let base = match receiver.find("*") {
         Some(idx) => receiver[idx + 1:].to_string()
@@ -93,7 +95,7 @@ fn receiver_parts(signature : String) -> (String, Bool) {
         Some(idx) => name[0:idx].to_string()
         None => name
       }
-      (@parsec.trim_spaces(trimmed), pointer)
+      (@extract.trim_spaces(trimmed), pointer)
     }
     _ => ("", false)
   }
@@ -101,7 +103,7 @@ fn receiver_parts(signature : String) -> (String, Bool) {
 
 ///|
 pub fn normalize_type_reference(value : String) -> String {
-  let trimmed = @parsec.strip_braces(@parsec.trim_spaces(value))
+  let trimmed = @extract.strip_braces(@extract.trim_spaces(value))
   if trimmed == "" {
     return ""
   }
@@ -117,7 +119,9 @@ pub fn enrich_record(record : Json) -> Unit {
   let name = @extract.field_string(record, "name")
   let signature = @extract.field_string(record, "signature")
   let type_params = @extract.signature_type_params(signature)
-  @extract.set_language_specific_string_array(record, "go", "typeParams", type_params)
+  @extract.set_language_specific_string_array(
+    record, "go", "typeParams", type_params,
+  )
   if kind == "struct" || kind == "interface" {
     let owner = type_name(signature)
     @extract.set_shape_string(record, "owner", owner)
@@ -136,7 +140,7 @@ pub fn enrich_record(record : Json) -> Unit {
       signature
     } else {
       match signature.find(" ") {
-        Some(idx) => signature[idx + 1:].to_string() |> @parsec.trim_spaces
+        Some(idx) => signature[idx + 1:].to_string() |> @extract.trim_spaces
         None => ""
       }
     }
@@ -146,9 +150,14 @@ pub fn enrich_record(record : Json) -> Unit {
     }
   }
   if kind == "import" {
-    let quoted = @parsec.quoted_parts(signature)
+    let quoted = @extract.quoted_parts(signature)
     if !quoted.is_empty() {
-      @extract.set_language_specific_string(record, "go", "importPath", quoted[0])
+      @extract.set_language_specific_string(
+        record,
+        "go",
+        "importPath",
+        quoted[0],
+      )
     }
     match name.find(" ") {
       Some(idx) if idx > 0 =>
@@ -156,7 +165,7 @@ pub fn enrich_record(record : Json) -> Unit {
           record,
           "go",
           "importAlias",
-          name[0:idx].to_string() |> @parsec.trim_spaces,
+          name[0:idx].to_string() |> @extract.trim_spaces,
         )
       _ => ()
     }
@@ -164,11 +173,21 @@ pub fn enrich_record(record : Json) -> Unit {
   if kind == "method" {
     let (receiver, pointer) = receiver_parts(signature)
     @extract.set_language_specific_string(record, "go", "receiver", receiver)
-    @extract.set_language_specific_bool(record, "go", "pointerReceiver", pointer)
+    @extract.set_language_specific_bool(
+      record, "go", "pointerReceiver", pointer,
+    )
     @extract.set_shape_string(record, "owner", receiver)
     @extract.set_language_specific_string(record, "go", "owner", receiver)
-    @extract.put_shape_string_array(record, "parameters", method_param_types(signature))
-    @extract.put_shape_string_array(record, "returns", method_return_types(signature))
+    @extract.put_shape_string_array(
+      record,
+      "parameters",
+      method_param_types(signature),
+    )
+    @extract.put_shape_string_array(
+      record,
+      "returns",
+      method_return_types(signature),
+    )
   }
 }
 
@@ -225,7 +244,10 @@ fn method_set_types(
       for i in 0..<embedded_types.length() {
         let (embedded_type, embedded_pointer) = embedded_types[i]
         let has_value = @extract.contains_string(method_sets, embedded_type)
-        let has_pointer = @extract.contains_string(method_sets, "*\{embedded_type}")
+        let has_pointer = @extract.contains_string(
+          method_sets,
+          "*\{embedded_type}",
+        )
         if embedded_pointer {
           if has_value || has_pointer {
             @extract.append_unique_string(method_sets, embedder)
@@ -266,8 +288,16 @@ fn rewrite_relations(record : Json, profile : String) -> Unit {
       if ty == "" {
         continue
       }
-      @extract.push_unique_relation(relations, "has_parameter", "type:\{profile}::\{ty}")
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
+      @extract.push_unique_relation(
+        relations,
+        "has_parameter",
+        "type:\{profile}::\{ty}",
+      )
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{ty}",
+      )
     }
     let return_types = if kind == "method" {
       method_return_types(signature)
@@ -279,25 +309,42 @@ fn rewrite_relations(record : Json, profile : String) -> Unit {
       if ty == "" {
         continue
       }
-      @extract.push_unique_relation(relations, "returns", "type:\{profile}::\{ty}")
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
+      @extract.push_unique_relation(
+        relations,
+        "returns",
+        "type:\{profile}::\{ty}",
+      )
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{ty}",
+      )
     }
     @extract.set_record_relations(record, relations)
     return
   }
   if kind == "field" || kind == "embedded_field" {
     let relations = @extract.filter_record_relations(record, ["references_type"])
-    let field_type = @extract.language_specific_profile_string(record, "go", "fieldType")
+    let field_type = @extract.language_specific_profile_string(
+      record, "go", "fieldType",
+    )
     let ty = normalize_type_reference(field_type)
     if ty != "" {
-      @extract.push_unique_relation(relations, "references_type", "type:\{profile}::\{ty}")
+      @extract.push_unique_relation(
+        relations,
+        "references_type",
+        "type:\{profile}::\{ty}",
+      )
     }
     @extract.set_record_relations(record, relations)
   }
 }
 
 ///|
-pub fn postprocess_declarations(declarations : Array[Json], profile : String) -> Unit {
+pub fn postprocess_declarations(
+  declarations : Array[Json],
+  profile : String,
+) -> Unit {
   let type_ids : Map[String, String] = {}
   for i in 0..<declarations.length() {
     if @extract.field_string(declarations[i], "language") != "go" {
@@ -332,10 +379,7 @@ pub fn postprocess_declarations(declarations : Array[Json], profile : String) ->
       match type_ids.get(owner) {
         Some(owner_id) =>
           @extract.append_relation_to_record_by_id(
-            declarations,
-            owner_id,
-            "has_member",
-            id,
+            declarations, owner_id, "has_member", id,
           )
         None => ()
       }
@@ -359,10 +403,7 @@ pub fn postprocess_declarations(declarations : Array[Json], profile : String) ->
         match type_ids.get(owner_type) {
           Some(owner_id) =>
             @extract.append_relation_to_record_by_id(
-              declarations,
-              owner_id,
-              "has_member",
-              id,
+              declarations, owner_id, "has_member", id,
             )
           None => ()
         }
@@ -377,11 +418,11 @@ fn names(segment : String) -> Array[String] {
     Some(idx) => segment[0:idx].to_string()
     None => segment
   }
-  let normalized = @parsec.strip_braces(lhs)
+  let normalized = @extract.strip_braces(lhs)
   let values : Array[String] = []
   let pieces = normalized.split(",").to_array()
   for i in 0..<pieces.length() {
-    let name = @parsec.first_token(pieces[i].to_string())
+    let name = @extract.first_token(pieces[i].to_string())
     if name != "" && name != "_" {
       values.push(name)
     }
@@ -417,24 +458,28 @@ fn push_records(
       ),
     )
     guard @extract.last_record(declarations) is Some(record) else {
-      symbols.push(@extract.make_symbol(profile, path, line_no, kind, names[i], signature))
+      symbols.push(
+        @extract.make_symbol(profile, path, line_no, kind, names[i], signature),
+      )
       continue
     }
     @extract.enrich_shape_metadata(record)
     enrich_record(record)
-    symbols.push(@extract.make_symbol(profile, path, line_no, kind, names[i], signature))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, kind, names[i], signature),
+    )
   }
 }
 
 ///|
 fn import_name(clean_line : String) -> String {
-  let parts = @parsec.quoted_parts(clean_line)
+  let parts = @extract.quoted_parts(clean_line)
   if parts.length() == 0 {
     return ""
   }
   let import_path = parts[0]
-  let tail = @parsec.trim_spaces(clean_line[7:].to_string())
-  let import_alias = @parsec.first_token(tail)
+  let tail = @extract.trim_spaces(clean_line[7:].to_string())
+  let import_alias = @extract.first_token(tail)
   if import_alias == "" || import_alias.has_prefix("\"") {
     import_path
   } else {
@@ -445,7 +490,7 @@ fn import_name(clean_line : String) -> String {
 ///|
 fn strip_tag(line : String) -> String {
   match line.find("`") {
-    Some(idx) => line[0:idx].to_string() |> @parsec.trim_spaces
+    Some(idx) => line[0:idx].to_string() |> @extract.trim_spaces
     None => line
   }
 }
@@ -457,7 +502,7 @@ fn struct_name(line : String, grouped~ : Bool) -> String {
   } else {
     line.strip_prefix("type ").unwrap_or(line).to_string()
   }
-  @parsec.first_token(source)
+  @extract.first_token(source)
 }
 
 ///|
@@ -472,13 +517,15 @@ fn extract_struct_field(
   line : String,
   docs : String,
 ) -> Unit {
-  let clean = @parsec.line_before_comment(line) |> @parsec.trim_spaces |> strip_tag
+  let clean = @extract.line_before_comment(line)
+    |> @extract.trim_spaces
+    |> strip_tag
   if clean == "" || clean == "{" || clean == "}" {
     return
   }
 
   let is_embedded = !clean.contains(" ") && !clean.contains("\t")
-  let raw_name = if is_embedded { clean } else { @parsec.first_token(clean) }
+  let raw_name = if is_embedded { clean } else { @extract.first_token(clean) }
   let name = raw_name.strip_prefix("*").unwrap_or(raw_name).to_string()
   if name == "" {
     return
@@ -488,24 +535,20 @@ fn extract_struct_field(
   let full_name = "\{owner}.\{name}"
   declarations.push(
     @extract.make_declaration(
-      profile,
-      server,
-      "go",
-      path,
-      line_no,
-      kind,
-      full_name,
-      clean,
-      docs,
+      profile, server, "go", path, line_no, kind, full_name, clean, docs,
     ),
   )
   guard @extract.last_record(declarations) is Some(record) else {
-    symbols.push(@extract.make_symbol(profile, path, line_no, kind, full_name, clean))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, kind, full_name, clean),
+    )
     return
   }
   @extract.enrich_shape_metadata(record)
   enrich_record(record)
-  symbols.push(@extract.make_symbol(profile, path, line_no, kind, full_name, clean))
+  symbols.push(
+    @extract.make_symbol(profile, path, line_no, kind, full_name, clean),
+  )
 }
 
 ///|
@@ -519,14 +562,14 @@ fn extract_record(
   line : String,
   docs : String,
 ) -> Unit {
-  let clean_line = @parsec.line_before_comment(line) |> @parsec.trim_spaces
+  let clean_line = @extract.line_before_comment(line) |> @extract.trim_spaces
   if clean_line == "" {
     return
   }
 
   if clean_line.has_prefix("type ") {
     let rest = clean_line[5:].to_string()
-    let name = @parsec.first_token(rest)
+    let name = @extract.first_token(rest)
     let kind = if rest.contains("=") {
       "type_alias"
     } else if rest.contains("struct") {
@@ -537,39 +580,55 @@ fn extract_record(
       "type"
     }
     declarations.push(
-      @extract.make_declaration(profile, server, "go", path, line_no, kind, name, clean_line, docs),
+      @extract.make_declaration(
+        profile, server, "go", path, line_no, kind, name, clean_line, docs,
+      ),
     )
     guard @extract.last_record(declarations) is Some(record) else {
-      symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, clean_line))
+      symbols.push(
+        @extract.make_symbol(profile, path, line_no, kind, name, clean_line),
+      )
       return
     }
     @extract.enrich_shape_metadata(record)
     enrich_record(record)
-    symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, clean_line))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, kind, name, clean_line),
+    )
     return
   }
 
   if clean_line.has_prefix("package ") {
-    let name = @parsec.first_token(clean_line[8:].to_string())
+    let name = @extract.first_token(clean_line[8:].to_string())
     declarations.push(
-      @extract.make_declaration(profile, server, "go", path, line_no, "package", name, clean_line, docs),
+      @extract.make_declaration(
+        profile, server, "go", path, line_no, "package", name, clean_line, docs,
+      ),
     )
-    symbols.push(@extract.make_symbol(profile, path, line_no, "package", name, clean_line))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, "package", name, clean_line),
+    )
     return
   }
 
   if clean_line.has_prefix("import ") {
     let name = import_name(clean_line)
     declarations.push(
-      @extract.make_declaration(profile, server, "go", path, line_no, "import", name, clean_line, docs),
+      @extract.make_declaration(
+        profile, server, "go", path, line_no, "import", name, clean_line, docs,
+      ),
     )
     guard @extract.last_record(declarations) is Some(record) else {
-      symbols.push(@extract.make_symbol(profile, path, line_no, "import", name, clean_line))
+      symbols.push(
+        @extract.make_symbol(profile, path, line_no, "import", name, clean_line),
+      )
       return
     }
     @extract.enrich_shape_metadata(record)
     enrich_record(record)
-    symbols.push(@extract.make_symbol(profile, path, line_no, "import", name, clean_line))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, "import", name, clean_line),
+    )
     return
   }
 
@@ -586,17 +645,23 @@ fn extract_record(
     } else {
       "function"
     }
-    let name = @parsec.token_before(rest, "(")
+    let name = @extract.token_before(rest, "(")
     declarations.push(
-      @extract.make_declaration(profile, server, "go", path, line_no, kind, name, clean_line, docs),
+      @extract.make_declaration(
+        profile, server, "go", path, line_no, kind, name, clean_line, docs,
+      ),
     )
     guard @extract.last_record(declarations) is Some(record) else {
-      symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, clean_line))
+      symbols.push(
+        @extract.make_symbol(profile, path, line_no, kind, name, clean_line),
+      )
       return
     }
     @extract.enrich_shape_metadata(record)
     enrich_record(record)
-    symbols.push(@extract.make_symbol(profile, path, line_no, kind, name, clean_line))
+    symbols.push(
+      @extract.make_symbol(profile, path, line_no, kind, name, clean_line),
+    )
     return
   }
 
@@ -650,11 +715,16 @@ pub fn extract_file(
 
   for i in 0..<lines.length() {
     let line_no = i + 1
-    let line = @parsec.trim_spaces(lines[i].to_string())
+    let line = @extract.trim_spaces(lines[i].to_string())
 
     if line.has_prefix("//") {
-      let piece = line.strip_prefix("//").unwrap_or(line).to_string() |> @parsec.trim_spaces
-      pending_doc = if pending_doc == "" { piece } else { "\{pending_doc}\n\{piece}" }
+      let piece = line.strip_prefix("//").unwrap_or(line).to_string()
+        |> @extract.trim_spaces
+      pending_doc = if pending_doc == "" {
+        piece
+      } else {
+        "\{pending_doc}\n\{piece}"
+      }
       pending_doc_line = line_no
       continue
     }
@@ -700,25 +770,26 @@ pub fn extract_file(
     }
 
     if group_kind != "" {
-      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no { pending_doc } else { "" }
+      let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
+        pending_doc
+      } else {
+        ""
+      }
       if active_struct != "" && active_struct_depth > 0 {
         extract_struct_field(
-          declarations,
-          symbols,
-          profile,
-          server,
-          path,
-          line_no,
-          active_struct,
-          line,
+          declarations, symbols, profile, server, path, line_no, active_struct, line,
           docs,
         )
       }
-      let group_line = @parsec.strip_braces(line)
+      let group_line = @extract.strip_braces(line)
       if group_scope_depth == 0 && group_line != "" {
         let synthetic = "\{group_kind} \{group_line}"
-        extract_record(declarations, symbols, profile, server, path, line_no, synthetic, docs)
-        if group_kind == "type" && line.contains("struct") && line.has_suffix("{") {
+        extract_record(
+          declarations, symbols, profile, server, path, line_no, synthetic, docs,
+        )
+        if group_kind == "type" &&
+          line.contains("struct") &&
+          line.has_suffix("{") {
           active_struct = struct_name(group_line, grouped=true)
           active_struct_depth = 0
         }
@@ -745,24 +816,27 @@ pub fn extract_file(
       continue
     }
 
-    let declaration_prefixes = ["package ", "import ", "type ", "func ", "const ", "var "]
-    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no { pending_doc } else { "" }
+    let declaration_prefixes = [
+      "package ", "import ", "type ", "func ", "const ", "var ",
+    ]
+    let docs = if pending_doc != "" && pending_doc_line + 1 >= line_no {
+      pending_doc
+    } else {
+      ""
+    }
     if active_struct != "" && active_struct_depth > 0 {
       extract_struct_field(
-        declarations,
-        symbols,
-        profile,
-        server,
-        path,
-        line_no,
-        active_struct,
-        line,
+        declarations, symbols, profile, server, path, line_no, active_struct, line,
         docs,
       )
     }
-    if @parsec.starts_with_any(line, declaration_prefixes) {
-      extract_record(declarations, symbols, profile, server, path, line_no, line, docs)
-      if line.has_prefix("type ") && line.contains("struct") && line.has_suffix("{") {
+    if @extract.starts_with_any(line, declaration_prefixes) {
+      extract_record(
+        declarations, symbols, profile, server, path, line_no, line, docs,
+      )
+      if line.has_prefix("type ") &&
+        line.contains("struct") &&
+        line.has_suffix("{") {
         active_struct = struct_name(line, grouped=false)
         active_struct_depth = 0
       }

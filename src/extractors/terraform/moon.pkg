@@ -1,3 +1,4 @@
 import {
   "cogna-dev/cogna/core/extract" @extract,
+  "cogna-dev/x/hcl" @hcl,
 }

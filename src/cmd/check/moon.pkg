@@ -1,20 +1,12 @@
 import {
-  "gmlewis/flate" @flate,
-  "gmlewis/gzip" @gzip,
-  "gmlewis/io" @gio,
   "moonbitlang/core/json" @json,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
-  "yufeiminds/codeiq/async" @host_async,
-  "yufeiminds/codeiq/policy" @policy_catalog,
-  "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/config" @config,
-  "yufeiminds/codeiq/schema" @schema,
+  "cogna-dev/cogna/process" @shell,
+  "cogna-dev/cogna/core/policy" @policy_rules,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/config" @config,
 }
-
-import {
-  "yufeiminds/codeiq/cmd/build" @build_cmd,
-} for "test"
 
 supported_targets = "native"
