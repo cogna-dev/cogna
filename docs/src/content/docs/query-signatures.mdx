@@ -1,12 +1,12 @@
 ---
 title: 检索函数签名
-description: 如何用 codeiq query 或 MCP 精确查询函数、方法、接口、变量或 API operation 的当前签名和文档。
+description: 如何用 cogna query 或 MCP 精确查询函数、方法、接口、变量或 API operation 的当前签名和文档。
 order: 14
 ---
 
 # 检索函数签名
 
-你在做代码升级评估时，经常需要知道某个函数的参数列表是否变了，某个 Terraform variable 是否还是可选的，或者某个 OpenAPI operation 的 response schema 是什么。与其翻源码或文档，你可以直接用 CodeIQ 查询本地 bundle 里的准确信息。
+你在做代码升级评估时，经常需要知道某个函数的参数列表是否变了，某个 Terraform variable 是否还是可选的，或者某个 OpenAPI operation 的 response schema 是什么。与其翻源码或文档，你可以直接用 Cogna 查询本地 bundle 里的准确信息。
 
 ---
 
@@ -14,8 +14,8 @@ order: 14
 
 | 场景 | 方式 |
 |------|------|
-| 查一个具体的符号 | `codeiq query <query-file>` |
-| 让 AI 自主探索和回答 | `codeiq mcp serve --port 3000` |
+| 查一个具体的符号 | `cogna query <query-file>` |
+| 让 AI 自主探索和回答 | `cogna mcp serve --port 3000` |
 
 ---
 
@@ -25,7 +25,7 @@ order: 14
 
 ```bash
 cd ./sdk
-codeiq build
+cogna build
 ```
 
 ### 步骤 2：准备查询文件
@@ -42,13 +42,13 @@ codeiq build
 }
 ```
 
-`intent` 字段说明你查询的目的（`upgrade` / `review` / `understand`），帮助 CodeIQ 优化返回内容。
+`intent` 字段说明你查询的目的（`upgrade` / `review` / `understand`），帮助 Cogna 优化返回内容。
 
 ### 步骤 3：执行查询
 
 ```bash
 cd ./sdk
-codeiq query ../query.json
+cogna query ../query.json
 
 # 结果保存在
 cat ./query.result.json
@@ -62,20 +62,20 @@ cat ./query.result.json
 
 ```bash
 cd ./sdk
-codeiq build
-codeiq mcp serve --port 3000
+cogna build
+cogna mcp serve --port 3000
 ```
 
 建议 AI 按以下顺序调用：
 
-1. **`codeiq.query.outlines`** — 先获取所有公开路径的大纲
-2. **`codeiq.query.symbol`** — 再精确查询某个路径的签名和文档
+1. **`cogna.query.outlines`** — 先获取所有公开路径的大纲
+2. **`cogna.query.symbol`** — 再精确查询某个路径的签名和文档
 
 这个顺序的好处是：先缩小范围，避免 AI 猜错路径。
 
 ### 示例：查询 Rust 函数签名
 
-AI 调用 `codeiq.query.symbol`：
+AI 调用 `cogna.query.symbol`：
 
 ```json
 {
@@ -169,13 +169,13 @@ AI 调用 `codeiq.query.symbol`：
 ```bash
 # 先构建新版本 bundle
 cd ./sdk
-codeiq build
+cogna build
 
 # 准备 dist/base 与 dist/target 两套产物后，用 diff 找出有哪些签名变了
-codeiq diff
+cogna diff
 
 # 再用 query 精确查询某个函数的当前签名
-codeiq query ../query.json
+cogna query ../query.json
 ```
 
 当前 CLI 不支持 `diff --since ...` 这种覆盖式参数；版本基线由你准备好的 `dist/base` / `dist/target` 决定。
@@ -184,8 +184,8 @@ codeiq query ../query.json
 
 ```bash
 cd ./sdk
-codeiq build
-codeiq mcp serve --port 3000
+cogna build
+cogna mcp serve --port 3000
 # 让 AI 调用 outlines 列出变化的函数，再用 symbol 一一确认
 ```
 

@@ -1,0 +1,42 @@
+{
+  "input": {
+    "package": "example/sdkacceptance",
+    "text": "label",
+    "limit": 5
+  },
+  "output": {
+    "package": "example/sdkacceptance",
+    "mode": "fuzzy-text",
+    "matches": [
+      {
+        "id": "decl:go:example/sdkacceptance.BuildLabels",
+        "symbol": "BuildLabels",
+        "kind": "function",
+        "signature": "func BuildLabels(items []string) []string",
+        "summary": "BuildLabels filters empty items and formats each as name:index",
+        "docs": null,
+        "score": 0.94,
+        "location": {
+          "uri": "main.go",
+          "start_line": 20,
+          "end_line": 25
+        }
+      },
+      {
+        "id": "decl:go:example/sdkacceptance.Greeter.Greet",
+        "symbol": "Greeter.Greet",
+        "kind": "method",
+        "signature": "func (g Greeter) Greet(name string) string",
+        "summary": "Greet returns a formatted greeting string for the given name",
+        "docs": null,
+        "score": 0.41,
+        "location": {
+          "uri": "main.go",
+          "start_line": 27,
+          "end_line": 35
+        }
+      }
+    ],
+    "cursor": null
+  }
+}

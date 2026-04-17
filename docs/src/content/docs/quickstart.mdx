@@ -6,11 +6,11 @@ order: 2
 
 # 快速开始
 
-这份教程会带你从零跑完一次完整的本地 CodeIQ 工作流。完成后你手里会有：一份配置文件、一个 bundle 快照、一份 diff 报告、一份 SARIF 检查结果。
+这份教程会带你从零跑完一次完整的本地 Cogna 工作流。完成后你手里会有：一份配置文件、一个 bundle 快照、一份 diff 报告、一份 SARIF 检查结果。
 
 ## 前置条件
 
-- 已安装 `codeiq` CLI
+- 已安装 `cogna` CLI
 - 有一个本地仓库（Go / Rust / Terraform / OpenAPI 都可以）
 - 如果要运行 `check`，需要额外安装 [`opa`](https://www.openpolicyagent.org/docs/latest/#running-opa)
 
@@ -21,10 +21,10 @@ order: 2
 在你的仓库根目录运行：
 
 ```bash
-codeiq init
+cogna init
 ```
 
-这会生成一个 `codeiq.yml`。打开它，先确认这几个字段：
+这会生成一个 `cogna.yml`。打开它，先确认这几个字段：
 
 ```yaml
 schemaVersion: ciq-config/v2
@@ -37,10 +37,10 @@ inputs:
   include:
     - "**/*.go"
 registry:
-  storeDir: .codeiq/cache/registry
+  storeDir: .cogna/cache/registry
 ```
 
-`profile` 决定 CodeIQ 如何理解你的代码。支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`、`policy-bundle`。
+`profile` 决定 Cogna 如何理解你的代码。支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`、`policy-bundle`。
 
 ---
 
@@ -48,7 +48,7 @@ registry:
 
 ```bash
 cd ./your-lib
-codeiq build
+cogna build
 ```
 
 构建完成后，`dist/` 目录会有这些文件：
@@ -76,7 +76,7 @@ dist/
 ```bash
 cd ./your-lib
 # 先把旧版本产物放到 dist/base，把当前产物放到 dist/target
-codeiq diff
+cogna diff
 ```
 
 这会生成 `dist/diff.json`。打开它，你会看到类似这样的结构：
@@ -113,7 +113,7 @@ codeiq diff
 
 `check` 命令需要一个 policy bundle 来判断哪些变化是可接受的。最简单的方式是用内置规则：
 
-**新建一个 policy 仓库**，配置 `codeiq.yml`：
+**新建一个 policy 仓库**，配置 `cogna.yml`：
 
 ```yaml
 schemaVersion: ciq-config/v2
@@ -126,14 +126,14 @@ inputs:
   include:
     - "**/*.rego"
 registry:
-  storeDir: .codeiq/cache/registry
+  storeDir: .cogna/cache/registry
 ```
 
 然后构建它：
 
 ```bash
 cd ./compat-policy
-codeiq build
+cogna build
 ```
 
 你会得到 `./compat-policy/dist/bundle.ciq.tgz`，这就是传给 `check` 的 policy bundle。
@@ -144,7 +144,7 @@ codeiq build
 
 ```bash
 cd ./your-lib
-codeiq check
+cogna check
 ```
 
 这会生成 `./your-lib/dist/check.sarif.json`。SARIF 是行业标准格式，可以被 GitHub Code Scanning、Azure DevOps、各种代码审查平台直接消费。
@@ -194,7 +194,7 @@ cat > query.json << 'EOF'
 EOF
 
 cd ./your-lib
-codeiq query ../query.json
+cogna query ../query.json
 ```
 
 结果会写到 `./query.result.json`。

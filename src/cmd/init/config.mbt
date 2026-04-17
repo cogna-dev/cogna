@@ -24,7 +24,7 @@ pub fn default_config_yaml() -> String {
     #|  includeDependencies: true
     #|registry:
     #|  port: 8787
-    #|  storeDir: .codeiq/cache/registry
+    #|  storeDir: .cogna/cache/registry
     #|mcp:
     #|  port: 3000
     #|

@@ -1,8 +1,0 @@
-import {
-  "yufeiminds/codeiq/scripts/bundle" @bundle,
-  "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cmd/build" @build_cmd,
-  "yufeiminds/codeiq/cmd/mcp" @mcp_cmd,
-} for "test"
-
-supported_targets = "native"

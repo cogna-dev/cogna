@@ -1,6 +1,6 @@
 # cli package
 
-Shared CLI-facing presentation and error helpers for CodeIQ commands.
+Shared CLI-facing presentation and error helpers for Cogna commands.
 
 This package intentionally contains:
 

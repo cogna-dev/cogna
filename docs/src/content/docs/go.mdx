@@ -1,16 +1,16 @@
 ---
 title: Go
-description: 如何用 CodeIQ 追踪 Go module 的公开 API 变化，以及什么样的代码改动会触发什么检查结果。
+description: 如何用 Cogna 追踪 Go module 的公开 API 变化，以及什么样的代码改动会触发什么检查结果。
 order: 20
 ---
 
 # Go
 
-CodeIQ 能帮你追踪 Go module 的公开 API 变化：导出函数签名、接口变化、方法集、receiver 类型等。当你在发布新版本之前，CodeIQ 告诉你哪些变化会影响调用方。
+Cogna 能帮你追踪 Go module 的公开 API 变化：导出函数签名、接口变化、方法集、receiver 类型等。当你在发布新版本之前，Cogna 告诉你哪些变化会影响调用方。
 
 ## 配置
 
-在你的 Go module 根目录创建 `codeiq.yml`：
+在你的 Go module 根目录创建 `cogna.yml`：
 
 ```yaml
 schemaVersion: ciq-config/v2
@@ -40,7 +40,7 @@ func (c *Client) Send(ctx context.Context, req *Request) (*Response, error)
 func (c *Client) Send(ctx context.Context, req *Request, opts ...Option) (*Response, error)
 ```
 
-**CodeIQ diff 输出：**
+**Cogna diff 输出：**
 
 ```json
 {
@@ -171,13 +171,13 @@ func NewClientV1(addr string) *Client { ... }
 ```bash
 # 1. 构建当前版本
 cd ./sdk
-codeiq build
+cogna build
 
 # 2. 准备 dist/base 与 dist/target 后对比
-codeiq diff
+cogna diff
 
 # 3. 检查结果
-codeiq check
+cogna check
 ```
 
 完成后查看 `dist/check.sarif.json`，优先处理 `level: error` 的结果。
@@ -197,6 +197,6 @@ codeiq check
 
 ## 注意事项
 
-- CodeIQ 只关注**导出的（exported）**声明，小写开头的 unexported 符号不会出现在 diff 里
+- Cogna 只关注**导出的（exported）**声明，小写开头的 unexported 符号不会出现在 diff 里
 - 如果你只修改了函数体，没有改签名，diff 结果通常为空
 - `method-set-expanded`（新增方法）是 `warning` 而不是 `error`，因为在某些情况下这会影响接口满足关系

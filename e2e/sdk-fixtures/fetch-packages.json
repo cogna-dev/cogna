@@ -1,0 +1,35 @@
+{
+  "input": {},
+  "output": {
+    "root": {
+      "name": "example/sdkacceptance",
+      "version": "0.1.0",
+      "ecosystem": "go",
+      "relation": "root",
+      "children": [
+        {
+          "name": "github.com/google/uuid",
+          "version": "1.6.0",
+          "ecosystem": "go",
+          "relation": "direct",
+          "children": []
+        },
+        {
+          "name": "github.com/samber/lo",
+          "version": "1.49.1",
+          "ecosystem": "go",
+          "relation": "direct",
+          "children": [
+            {
+              "name": "golang.org/x/text",
+              "version": "0.21.0",
+              "ecosystem": "go",
+              "relation": "transitive",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

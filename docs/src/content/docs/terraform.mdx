@@ -1,16 +1,16 @@
 ---
 title: Terraform
-description: 如何用 CodeIQ 检测 Terraform module 的契约变化，包括 variable、output、provider 等，避免模块升级破坏调用方。
+description: 如何用 Cogna 检测 Terraform module 的契约变化，包括 variable、output、provider 等，避免模块升级破坏调用方。
 order: 22
 ---
 
 # Terraform
 
-当你维护一个公共 Terraform module，并需要向团队内其他人发布新版本时，很容易出现这类问题：你修改了一个变量从可选变成了必填，或者删掉了某个 output，而调用方并不知道。CodeIQ 帮你把这些变化结构化，并在发版前给出清晰的兼容性报告。
+当你维护一个公共 Terraform module，并需要向团队内其他人发布新版本时，很容易出现这类问题：你修改了一个变量从可选变成了必填，或者删掉了某个 output，而调用方并不知道。Cogna 帮你把这些变化结构化，并在发版前给出清晰的兼容性报告。
 
-## CodeIQ 能检测哪些变化？
+## Cogna 能检测哪些变化？
 
-对 `profile: terraform-module` 的仓库，CodeIQ 会提取以下契约信息：
+对 `profile: terraform-module` 的仓库，Cogna 会提取以下契约信息：
 
 | 类别 | 说明 |
 |------|------|
@@ -60,9 +60,9 @@ variable "instance_type" {
 
 ```bash
 cd ./module
-codeiq build
-codeiq diff
-codeiq check
+cogna build
+cogna diff
+cogna check
 ```
 
 ### diff.json 中会出现（节选）
@@ -168,19 +168,19 @@ output "instance_id" {
 
 ```bash
 # 1. 初始化配置（首次使用）
-codeiq init
+cogna init
 # 选择 profile: terraform-module，填写模块的 PURL，例如：
 # purl: pkg:terraform/myorg/vpc-module@1.1.0
 
 # 2. 构建 bundle
 cd ./module
-codeiq build
+cogna build
 
 # 3. 对比基线与当前版本的变化
-codeiq diff
+cogna diff
 
 # 4. 执行兼容性检查，生成 SARIF
-codeiq check
+cogna check
 
 # 5. 查看结果
 cat ./dist/diff.json
@@ -195,14 +195,14 @@ cat ./dist/check.sarif.json
 
 ```bash
 cd ./module
-codeiq build
-codeiq mcp serve --port 3000
+cogna build
+cogna mcp serve --port 3000
 ```
 
 然后在你的 AI 工具中依次调用：
 
-1. `codeiq.query.outlines` — 列出模块的所有 variable、output 和 provider
-2. `codeiq.query.symbol` — 精确查询某个 variable 的类型、是否必填和说明
+1. `cogna.query.outlines` — 列出模块的所有 variable、output 和 provider
+2. `cogna.query.symbol` — 精确查询某个 variable 的类型、是否必填和说明
 
 ---
 

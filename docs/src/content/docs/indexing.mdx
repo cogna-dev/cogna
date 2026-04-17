@@ -1,18 +1,18 @@
 ---
 title: Bundle 与结果文件参考
-description: 精确查阅 CodeIQ 各类产物（Bundle、Diff、SARIF、Query Result）的文件结构和字段含义。
+description: 精确查阅 Cogna 各类产物（Bundle、Diff、SARIF、Query Result）的文件结构和字段含义。
 order: 8
 ---
 
 # Bundle 与结果文件参考
 
-这里列出 CodeIQ 每个命令生成的具体文件，以及每个文件中包含的内容。当你不确定某个产物是什么、在哪里、有什么字段时，查这里。
+这里列出 Cogna 每个命令生成的具体文件，以及每个文件中包含的内容。当你不确定某个产物是什么、在哪里、有什么字段时，查这里。
 
 ---
 
 ## 普通仓库 Bundle（CIQ Bundle）
 
-在目标仓库目录执行 `codeiq build` 后，`dist/` 下会生成：
+在目标仓库目录执行 `cogna build` 后，`dist/` 下会生成：
 
 ```text
 dist/
@@ -26,7 +26,7 @@ dist/
 └── bundle.ciq.tgz          ← 完整归档（上传 / 分发用）
 ```
 
-其中 `bundle.ciq.tgz` 是 `codeiq publish` 使用的主要文件；如果这是 policy 仓库，它也会作为 `checks.policy` 指向的 policy bundle。
+其中 `bundle.ciq.tgz` 是 `cogna publish` 使用的主要文件；如果这是 policy 仓库，它也会作为 `checks.policy` 指向的 policy bundle。
 
 对 Go / Rust 仓库，`metadata.json` 中记录的是 canonical author path 的结果；当配置 `validation: lsp` 时，LSP 只做 parity validation，不会再写出第二份 backend-specific bundle 或第二套 snapshot truth。
 
@@ -34,7 +34,7 @@ dist/
 
 ## Policy Bundle（CIQ OPA Bundle）
 
-在 policy 仓库目录执行 `codeiq build`（`profile: policy-bundle`）后，`dist/` 下会生成：
+在 policy 仓库目录执行 `cogna build`（`profile: policy-bundle`）后，`dist/` 下会生成：
 
 ```text
 dist/
@@ -46,13 +46,13 @@ dist/
 └── bundle.ciq.tgz          ← 给 `checks.policy` 引用的文件
 ```
 
-**注意：** 当前 `codeiq check` 不再从 CLI 读取 `--policy` 参数，而是从 `codeiq.yml -> checks.policy` 读取 policy bundle。真正要引用的文件仍然是 `bundle.ciq.tgz`，不是 `opa-bundle.tar.gz`。
+**注意：** 当前 `cogna check` 不再从 CLI 读取 `--policy` 参数，而是从 `cogna.yml -> checks.policy` 读取 policy bundle。真正要引用的文件仍然是 `bundle.ciq.tgz`，不是 `opa-bundle.tar.gz`。
 
 ---
 
 ## Diff 文件（CIQ Diff）
 
-执行 `codeiq diff` 后，`./sdk/dist/diff.json` 的结构：
+执行 `cogna diff` 后，`./sdk/dist/diff.json` 的结构：
 
 ```json
 {
@@ -96,7 +96,7 @@ dist/
 
 ## SARIF 文件（check.sarif.json）
 
-执行 `codeiq check` 后，`./sdk/dist/check.sarif.json` 符合 SARIF 2.1.0 标准：
+执行 `cogna check` 后，`./sdk/dist/check.sarif.json` 符合 SARIF 2.1.0 标准：
 
 ```json
 {
@@ -104,11 +104,11 @@ dist/
   "runs": [{
     "tool": {
       "driver": {
-        "name": "CodeIQ",
+        "name": "Cogna",
         "rules": [
           {
             "id": "compat.go.signature-changed",
-            "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/go/signature-changed"
+            "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed"
           }
         ]
       }
@@ -148,7 +148,7 @@ dist/
 }
 ```
 
-执行 `codeiq query ./query.json` 后，结果保存在 `./query.result.json`。
+执行 `cogna query ./query.json` 后，结果保存在 `./query.result.json`。
 
 ---
 

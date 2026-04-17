@@ -17,12 +17,12 @@ Terraform provider reference changed.
 | `ruleId` | `compat.terraform.provider-ref-changed` |
 | `family` | `terraform` |
 | `defaultLevel` | `error` |
-| `entrypoint` | `data.codeiq.compat.deny` |
-| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/terraform/provider-ref-changed` |
+| `entrypoint` | `data.cogna.compat.deny` |
+| `helpUri` | `https://cogna.xaclabs.dev/docs/policies/generated/terraform/provider-ref-changed` |
 
 ## 触发条件
 
-当 `semanticDiff.findings[]` 中出现 `terraform-provider-ref-changed` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+当 OPA compatibility policy 命中该规则的谓词时，会在 `data.cogna.compat.deny` 下返回结果。
 
 ## SARIF 示例
 
@@ -30,8 +30,10 @@ Terraform provider reference changed.
 {
   "ruleId": "compat.terraform.provider-ref-changed",
   "level": "error",
-  "message": { "text": "Terraform provider reference changed." },
-  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/terraform/provider-ref-changed"
+  "message": {
+    "text": "Terraform provider reference changed."
+  },
+  "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/provider-ref-changed"
 }
 ```
 

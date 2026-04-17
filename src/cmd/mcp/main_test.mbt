@@ -38,18 +38,16 @@ test "mcp start writes server descriptor" {
       ""
     }
   }
-  assert_true(content.contains("\"name\": \"codeiq-mcp\""))
+  assert_true(content.contains("\"name\": \"cogna-mcp\""))
   assert_true(content.contains("\"protocolVersion\": \"2025-11-25\""))
   assert_true(content.contains("\"bundleResolved\""))
   assert_true(content.contains("\"listChanged\": true"))
   assert_true(content.contains("\"initializeResult\""))
-  assert_true(content.contains("\"codeiq.query.outlines\""))
-  assert_true(content.contains("\"codeiq.query.symbol\""))
-  assert_true(content.contains("\"transport\": \"http\""))
-  assert_true(content.contains("\"rpcUrl\": \"http://127.0.0.1:8080/rpc\""))
-  assert_true(
-    content.contains("\"healthUrl\": \"http://127.0.0.1:8080/health\""),
-  )
+  assert_true(content.contains("\"fetch_packages\""))
+  assert_true(content.contains("\"query_outlines\""))
+  assert_true(content.contains("\"query\""))
+  assert_true(content.contains("\"transport\": \"streamable-http\""))
+  assert_true(content.contains("\"mcpUrl\": \"http://127.0.0.1:8080/mcp\""))
   assert_true(content.contains("\"pid\":"))
   assert_true(@fs.path_exists("./dist/mcp-tools-state.json"))
 
@@ -105,15 +103,14 @@ test "mcp status reports running for serve-written descriptor" {
     _ => ()
   }
   let descriptor : Json = {
-    "schemaVersion": "codeiq-mcp-descriptor/v1",
-    "name": "codeiq-mcp",
+    "schemaVersion": "cogna-mcp-descriptor/v1",
+    "name": "cogna-mcp",
     "protocolVersion": "2025-11-25",
-    "transport": "http",
+    "transport": "streamable-http",
     "port": 65534,
     "pid": null,
     "baseUrl": "http://127.0.0.1:65534",
-    "rpcUrl": "http://127.0.0.1:65534/rpc",
-    "healthUrl": "http://127.0.0.1:65534/health",
+    "mcpUrl": "http://127.0.0.1:65534/mcp",
   }
   @fs.write_string_to_file(
     "./dist/mcp-server.json",

@@ -1,0 +1,27 @@
+{
+  "input": {
+    "package": "example/sdkacceptance",
+    "exact_id": "decl:go:example/sdkacceptance.Greeter"
+  },
+  "output": {
+    "package": "example/sdkacceptance",
+    "mode": "exact-id",
+    "matches": [
+      {
+        "id": "decl:go:example/sdkacceptance.Greeter",
+        "symbol": "Greeter",
+        "kind": "type",
+        "signature": "type Greeter struct { Prefix string `json:\"prefix\"` }",
+        "summary": "Greeter holds a prefix string used when greeting",
+        "docs": null,
+        "score": null,
+        "location": {
+          "uri": "main.go",
+          "start_line": 12,
+          "end_line": 14
+        }
+      }
+    ],
+    "cursor": null
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "input": {
+    "base": "v0.0.1",
+    "target": "working-tree",
+    "include_test_changes": false
+  },
+  "output": {
+    "summary": {
+      "added": 4,
+      "removed": 0,
+      "changed": 0,
+      "deprecated": 0
+    },
+    "changes": [
+      {
+        "kind": "added",
+        "id": "decl:go:example/sdkacceptance.Greeter",
+        "symbol": "Greeter",
+        "level": "non-breaking",
+        "message": "new exported type added"
+      },
+      {
+        "kind": "added",
+        "id": "decl:go:example/sdkacceptance.Greeter.Greet",
+        "symbol": "Greeter.Greet",
+        "level": "non-breaking",
+        "message": "new exported method added"
+      },
+      {
+        "kind": "added",
+        "id": "decl:go:example/sdkacceptance.NewRequestID",
+        "symbol": "NewRequestID",
+        "level": "non-breaking",
+        "message": "new exported function added"
+      },
+      {
+        "kind": "added",
+        "id": "decl:go:example/sdkacceptance.BuildLabels",
+        "symbol": "BuildLabels",
+        "level": "non-breaking",
+        "message": "new exported function added"
+      }
+    ],
+    "test_changes": null
+  }
+}

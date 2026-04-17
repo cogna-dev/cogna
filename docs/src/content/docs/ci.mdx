@@ -1,26 +1,26 @@
 ---
 title: 持续集成
-description: 如何在 GitHub Actions 中通过 setup-moonbit、setup-codeiq 与 run-codeiq 运行 CodeIQ 的 build、diff、check 流程。
+description: 如何在 GitHub Actions 中通过 setup-moonbit、setup-cogna 与 run-cogna 运行 Cogna 的 build、diff、check 流程。
 order: 19
 ---
 
 # 持续集成
 
-把 CodeIQ 接入 CI 是最常见的使用场景之一：每次提交 Pull Request 时，自动检测这次变更是否破坏了 API 兼容性，并把结果展示在 PR 页面上。
+把 Cogna 接入 CI 是最常见的使用场景之一：每次提交 Pull Request 时，自动检测这次变更是否破坏了 API 兼容性，并把结果展示在 PR 页面上。
 
 当前仓库推荐的接入方式是三层组合动作：
 
 - `setup-moonbit`：安装 MoonBit toolchain；
-- `setup-codeiq`：从当前仓库源码安装 `codeiq` CLI，并写入 PATH；
-- `run-codeiq`：执行 `codeiq <command>`，在 `check` 时可选上传 SARIF。
+- `setup-cogna`：从当前仓库源码安装 `cogna` CLI，并写入 PATH；
+- `run-cogna`：执行 `cogna <command>`，在 `check` 时可选上传 SARIF。
 
 ## 工作流概览
 
 ```mermaid
 flowchart LR
-    A["PR 提交\n或 push to main"] --> B["CI: codeiq build\n构建 bundle"]
-    B --> C["CI: 准备 dist/base / dist/target\ncodeiq diff"]
-    C --> D["CI: codeiq check\n读取 checks.policy"]
+    A["PR 提交\n或 push to main"] --> B["CI: cogna build\n构建 bundle"]
+    B --> C["CI: 准备 dist/base / dist/target\ncogna diff"]
+    C --> D["CI: cogna check\n读取 checks.policy"]
     D --> E{"有 breaking change?"}
     E -- "是（error）" --> F["CI 失败\n阻止合并"]
     E -- "否" --> G["CI 通过\n允许合并"]
@@ -31,10 +31,10 @@ flowchart LR
 
 ## GitHub Actions 完整示例
 
-下面是一个可直接使用的 GitHub Actions workflow。它假设你的仓库里已经准备好了 `codeiq.yml`，并且在运行 `diff` 前会生成 `dist/base` 与 `dist/target`：
+下面是一个可直接使用的 GitHub Actions workflow。它假设你的仓库里已经准备好了 `cogna.yml`，并且在运行 `diff` 前会生成 `dist/base` 与 `dist/target`：
 
 ```yaml
-name: CodeIQ Compatibility Check
+name: Cogna Compatibility Check
 
 on:
   pull_request:
@@ -59,23 +59,23 @@ jobs:
       - name: Setup MoonBit
         uses: ./integrations/actions/setup-moonbit
 
-      - name: Setup CodeIQ
-        uses: ./integrations/actions/setup-codeiq
+      - name: Setup Cogna
+        uses: ./integrations/actions/setup-cogna
 
       - name: Build bundle
-        uses: ./integrations/actions/run-codeiq
+        uses: ./integrations/actions/run-cogna
         with:
           working-directory: ./sdk
           command: build
 
       - name: Generate diff
-        uses: ./integrations/actions/run-codeiq
+        uses: ./integrations/actions/run-cogna
         with:
           working-directory: ./sdk
           command: diff
 
       - name: Run compatibility check
-        uses: ./integrations/actions/run-codeiq
+        uses: ./integrations/actions/run-cogna
         with:
           working-directory: ./sdk
           command: check
@@ -85,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: codeiq-results
+          name: cogna-results
           path: |
             ./sdk/dist/diff.json
             ./sdk/dist/check.sarif.json
@@ -96,8 +96,8 @@ jobs:
 
 ```yaml
 - uses: ./integrations/actions/setup-moonbit
-- uses: ./integrations/actions/setup-codeiq
-- run: codeiq init --output /tmp/codeiq-smoke.yml
+- uses: ./integrations/actions/setup-cogna
+- run: cogna init --output /tmp/cogna-smoke.yml
 ```
 
 ---
@@ -109,23 +109,23 @@ jobs:
 在发版 PR 或 release branch 上运行，有 `error` 级别的 breaking change 时让 CI 失败：
 
 ```yaml
-- uses: ./integrations/actions/run-codeiq
+- uses: ./integrations/actions/run-cogna
   with:
     working-directory: ./sdk
     command: check
     upload-sarif: true
 ```
 
-`run-codeiq` 会保留 `check` 的退出码，因此当有 `error` 级别结果时，workflow 会失败；同时仍然会尝试把 `dist/check.sarif.json` 编码后上传到 GitHub Code Scanning REST API。
+`run-cogna` 会保留 `check` 的退出码，因此当有 `error` 级别结果时，workflow 会失败；同时仍然会尝试把 `dist/check.sarif.json` 编码后上传到 GitHub Code Scanning REST API。
 
 ### 用法二：仅记录，人工审查（不阻止合并）
 
-如果你的团队还在逐步引入 CodeIQ，可以先先跑 `build` / `diff` / `check`，但把最终失败策略留给 workflow 外层控制。例如保留 artifact 和 SARIF，而不把这一步设成 merge gate。
+如果你的团队还在逐步引入 Cogna，可以先先跑 `build` / `diff` / `check`，但把最终失败策略留给 workflow 外层控制。例如保留 artifact 和 SARIF，而不把这一步设成 merge gate。
 
 ```yaml
 - name: Run compatibility check for review only
   continue-on-error: true
-  uses: ./integrations/actions/run-codeiq
+  uses: ./integrations/actions/run-cogna
   with:
     working-directory: ./sdk
     command: check
@@ -138,10 +138,10 @@ jobs:
 
 ## 关键约束
 
-- `setup-codeiq` 复用当前仓库的本地源码安装语义，而不是依赖远程 install script；
-- `run-codeiq` 不会替你准备 `dist/base` 与 `dist/target`，这些输入仍需在 `diff` 前准备好；
+- `setup-cogna` 复用当前仓库的本地源码安装语义，而不是依赖远程 install script；
+- `run-cogna` 不会替你准备 `dist/base` 与 `dist/target`，这些输入仍需在 `diff` 前准备好；
 - 当 `command: check` 且 `upload-sarif: true` 时，workflow 必须具备 `security-events: write` 权限；
-- `run-codeiq` 默认读取 `working-directory/dist/check.sarif.json`，也可以通过 `sarif-file` 覆盖。
+- `run-cogna` 默认读取 `working-directory/dist/check.sarif.json`，也可以通过 `sarif-file` 覆盖。
 
 ## 用 act 做本地端到端验证
 
@@ -154,10 +154,10 @@ just action-e2e
 这会以 `linux/amd64` 容器运行 `act`，完整覆盖：
 
 - `setup-moonbit`
-- `setup-codeiq`
-- `run-codeiq build`
-- `run-codeiq diff`
-- `run-codeiq check`
+- `setup-cogna`
+- `run-cogna build`
+- `run-cogna diff`
+- `run-cogna check`
 - `ACT=true` 分支下的 SARIF payload capture 与断言
 
 ---

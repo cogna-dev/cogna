@@ -6,7 +6,7 @@ order: 15
 
 # 分析变更
 
-`git diff` 告诉你哪些文件被改了，但它不能告诉你这次改动是否会破坏调用方。CodeIQ 的 `diff` 命令提取的是公开 API 契约层面的变化——不是文本级别的行差异，而是语义级别的声明变化：这个函数的签名变了，那个 output 被删了，这个参数从可选变成了必填。
+`git diff` 告诉你哪些文件被改了，但它不能告诉你这次改动是否会破坏调用方。Cogna 的 `diff` 命令提取的是公开 API 契约层面的变化——不是文本级别的行差异，而是语义级别的声明变化：这个函数的签名变了，那个 output 被删了，这个参数从可选变成了必填。
 
 ---
 
@@ -14,7 +14,7 @@ order: 15
 
 ```bash
 cd ./sdk
-codeiq build
+cogna build
 ```
 
 构建会把仓库中的公开声明、符号、依赖关系提取出来，生成 `dist/bundle.ciq.tgz`。
@@ -25,7 +25,7 @@ codeiq build
 
 ```bash
 # 准备 dist/base 与 dist/target 两套产物后执行
-codeiq diff
+cogna diff
 ```
 
 结果保存在：
@@ -36,7 +36,7 @@ codeiq diff
 
 如果你还想检查测试文件中引用的 API 是否也发生了变化：
 
-`testChanges` 是否写入 diff 由 `codeiq.yml -> diff.includeTestChanges` 决定；当前 CLI 不再提供 `--test-changes` 覆盖参数。
+`testChanges` 是否写入 diff 由 `cogna.yml -> diff.includeTestChanges` 决定；当前 CLI 不再提供 `--test-changes` 覆盖参数。
 
 ---
 
@@ -139,15 +139,15 @@ codeiq diff
 ```bash
 # 分析变更
 cd ./sdk
-codeiq build
-codeiq diff
+cogna build
+cogna diff
 
 # 执行 policy 检查，生成 SARIF
-codeiq check
+cogna check
 
 # 用 AI 查询某个具体声明的当前状态
-codeiq mcp serve --port 3000
-# 然后调用 codeiq.query.symbol 查询
+cogna mcp serve --port 3000
+# 然后调用 cogna.query.symbol 查询
 ```
 
 ---

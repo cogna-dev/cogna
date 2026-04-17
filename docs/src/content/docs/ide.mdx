@@ -1,16 +1,16 @@
 ---
 title: IDE 集成
-description: 如何使用 CodeIQ VSCode 扩展运行 build/diff/check、加载 SARIF diagnostics，并跳转到规则文档。
+description: 如何使用 Cogna VSCode 扩展运行 build/diff/check、加载 SARIF diagnostics，并跳转到规则文档。
 order: 17
 ---
 
 # IDE 集成
 
-CodeIQ 现在提供了仓库内的 **VSCode 扩展实现**（位于 `integrations/vscode/`）。它复用本地 `codeiq` CLI，读取 `dist/check.sarif.json`，并把 policy 结果映射成编辑器 diagnostics。
+Cogna 现在提供了仓库内的 **VSCode 扩展实现**（位于 `integrations/vscode/`）。它复用本地 `cogna` CLI，读取 `dist/check.sarif.json`，并把 policy 结果映射成编辑器 diagnostics。
 
 当前扩展覆盖三件事：
 
-1. **运行分析**：按 `build -> diff -> check` 顺序调用本地 `codeiq`
+1. **运行分析**：按 `build -> diff -> check` 顺序调用本地 `cogna`
 2. **加载 diagnostics**：读取 `dist/check.sarif.json` 并在编辑器中标注问题
 3. **打开规则文档**：根据 SARIF 中的 `helpUri` 跳转到稳定的策略文档页
 
@@ -18,16 +18,16 @@ CodeIQ 现在提供了仓库内的 **VSCode 扩展实现**（位于 `integration
 
 ## 支持的命令
 
-- `CodeIQ: Run Analysis`
-- `CodeIQ: Refresh Diagnostics`
-- `CodeIQ: Open Rule Documentation`
+- `Cogna: Run Analysis`
+- `Cogna: Refresh Diagnostics`
+- `Cogna: Open Rule Documentation`
 
 ## 支持的设置
 
-- `codeiq.cliPath`
-- `codeiq.workingDirectory`
-- `codeiq.runOnSave`
-- `codeiq.autoOpenPolicyDocs`
+- `cogna.cliPath`
+- `cogna.workingDirectory`
+- `cogna.runOnSave`
+- `cogna.autoOpenPolicyDocs`
 
 ## 本地使用方式
 
@@ -39,9 +39,9 @@ npm install
 npm run compile
 ```
 
-然后在 VSCode Extension Development Host 中打开一个包含 `codeiq.yml` 的工作区，并确保本机能执行 `codeiq`。扩展会优先读取：
+然后在 VSCode Extension Development Host 中打开一个包含 `cogna.yml` 的工作区，并确保本机能执行 `cogna`。扩展会优先读取：
 
-- `codeiq.workingDirectory`（若已配置）
+- `cogna.workingDirectory`（若已配置）
 - 否则读取当前第一个 workspace folder
 
 分析完成后，扩展会从 `<working-directory>/dist/check.sarif.json` 读取结果并刷新 diagnostics。
@@ -50,7 +50,7 @@ npm run compile
 
 ```mermaid
 flowchart LR
-    A["打开包含 codeiq.yml 的工作区"] --> B["Run Analysis\n执行 build -> diff -> check"]
+    A["打开包含 cogna.yml 的工作区"] --> B["Run Analysis\n执行 build -> diff -> check"]
     B --> C["读取 dist/check.sarif.json"]
     C --> D["刷新编辑器 diagnostics"]
     D --> E["Open Rule Documentation\n跳到 helpUri"]
@@ -70,7 +70,7 @@ npm run test:unit
 npm run test:extension
 ```
 
-其中 `test:extension` 会准备一个临时 workspace、安装本地 `codeiq` CLI、写入示例 SARIF，然后在 VSCode test host 中验证命令注册、diagnostics 刷新、文档跳转与完整分析流程。
+其中 `test:extension` 会准备一个临时 workspace、安装本地 `cogna` CLI、写入示例 SARIF，然后在 VSCode test host 中验证命令注册、diagnostics 刷新、文档跳转与完整分析流程。
 
 ---
 
@@ -79,11 +79,11 @@ npm run test:extension
 除了 VSCode 扩展，你仍然可以继续使用 MCP 让 AI 编程助手直接查询本地 bundle：
 
 ```bash
-codeiq mcp serve --port 3000
+cogna mcp serve --port 3000
 ```
 
-- `codeiq.query.outlines` — 列出所有公开符号路径
-- `codeiq.query.symbol` — 查询某个函数的完整签名和文档
+- `cogna.query.outlines` — 列出所有公开符号路径
+- `cogna.query.symbol` — 查询某个函数的完整签名和文档
 
 ---
 

@@ -1,12 +1,12 @@
 ---
 title: 构建索引
-description: 把你的代码仓库或 API 规格文件构建成可对比、可检查、可查询的 CodeIQ bundle。
+description: 把你的代码仓库或 API 规格文件构建成可对比、可检查、可查询的 Cogna bundle。
 order: 13
 ---
 
 # 构建索引
 
-**构建索引**是 CodeIQ 的第一步，也是所有后续操作的基础。执行 `codeiq build` 之后，你会在 `dist/` 目录下得到一个标准化的 bundle 文件——无论是版本对比、策略检查、AI 查询，还是团队共享，都从这个 bundle 开始。
+**构建索引**是 Cogna 的第一步，也是所有后续操作的基础。执行 `cogna build` 之后，你会在 `dist/` 目录下得到一个标准化的 bundle 文件——无论是版本对比、策略检查、AI 查询，还是团队共享，都从这个 bundle 开始。
 
 ---
 
@@ -15,13 +15,13 @@ order: 13
 在仓库根目录执行：
 
 ```bash
-codeiq init
+cogna init
 ```
 
-这会生成一个 `codeiq.yml` 文件，内容大致如下：
+这会生成一个 `cogna.yml` 文件，内容大致如下：
 
 ```yaml
-# codeiq.yml（Go 模块示例）
+# cogna.yml（Go 模块示例）
 schemaVersion: ciq-config/v2
 profile: go-module
 purl: pkg:golang/github.com/acme/sdk@v1.2.0
@@ -37,7 +37,7 @@ inputs:
 
 | 字段 | 作用 | 常见值 |
 |------|------|--------|
-| `profile` | 告诉 CodeIQ 这是哪种类型的仓库 | `go-module` / `rust-crate` / `terraform-module` / `openapi-spec` / `policy-bundle` |
+| `profile` | 告诉 Cogna 这是哪种类型的仓库 | `go-module` / `rust-crate` / `terraform-module` / `openapi-spec` / `policy-bundle` |
 | `purl` | 这个仓库的唯一标识符（Package URL） | `pkg:golang/github.com/acme/sdk@v1.2.0` |
 | `inputs` | 要扫描的路径 | 默认为当前目录 `.` |
 
@@ -47,7 +47,7 @@ inputs:
 
 ```bash
 cd ./sdk
-codeiq build
+cogna build
 ```
 
 构建完成后，`dist/` 目录结构如下：
@@ -73,7 +73,7 @@ codeiq build
 
 ```bash
 cd ./policy
-codeiq build
+cogna build
 ```
 
 此时 `dist/` 目录会有所不同：
@@ -92,7 +92,7 @@ codeiq build
 ```bash
 # 在 SDK 仓库目录里执行检查
 cd ./sdk
-codeiq check
+cogna check
 ```
 
 ---
@@ -115,8 +115,8 @@ codeiq check
 
 ```bash
 cd ./sdk
-codeiq build
-codeiq diff
+cogna build
+cogna diff
 # 输出 dist/diff.json，列出所有 breaking change
 ```
 
@@ -125,9 +125,9 @@ codeiq diff
 构建后启动 MCP 服务，让 Claude / Cursor 等工具直接查询你的 API：
 
 ```bash
-codeiq build
-codeiq mcp serve --port 3000
-# 此后 AI 工具可以通过 codeiq.query.symbol 等工具查询 bundle
+cogna build
+cogna mcp serve --port 3000
+# 此后 AI 工具可以通过 cogna.query.symbol 等工具查询 bundle
 ```
 
 ### 分享给团队
@@ -136,8 +136,8 @@ codeiq mcp serve --port 3000
 
 ```bash
 cd ./sdk
-codeiq build
-codeiq publish
+cogna build
+cogna publish
 # 上传后可用 PURL 检索：pkg:golang/github.com/acme/sdk@v1.2.0
 ```
 

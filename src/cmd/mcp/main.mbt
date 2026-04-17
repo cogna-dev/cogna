@@ -106,7 +106,7 @@ fn tool_definitions() -> Array[Json] {
 
 ///|
 fn tools_state_path() -> String {
-  @mcp_sdk.tools_state_path()
+  @mcp_core.tools_state_path()
 }
 
 ///|
@@ -126,9 +126,7 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
 
 ///|
 fn sync_tools_state() -> Result[Bool, @cli.CliError] {
-  let out = @mcp_sdk.sync_tools_state(tool_definitions())
-  guard out is Ok(changed) else { return Err(mcp_error(out.unwrap_err())) }
-  Ok(changed)
+  @mcp_core.sync_tools_state()
 }
 
 ///|
@@ -143,7 +141,7 @@ fn project_root_path() -> String {
 
 ///|
 fn native_target_dir(port : Int) -> String {
-  "/tmp/codeiq-mcp-\{port}"
+  "/tmp/cogna-mcp-\{port}"
 }
 
 ///|
@@ -171,18 +169,16 @@ fn pid_json(pid : Int?) -> Json {
 fn mcp_server_info(port : Int, pid? : Int) -> Json {
   let bundle_resolved = @fs.path_exists("./dist/manifest.json")
   let base_url = @mcp_core.base_url(port)
-  let rpc_url = @mcp_core.rpc_url(port)
-  let health_url = @mcp_core.health_url(port)
+  let mcp_url = @mcp_core.mcp_url(port)
   {
-    "schemaVersion": "codeiq-mcp-descriptor/v1",
-    "name": "codeiq-mcp",
+    "schemaVersion": "cogna-mcp-descriptor/v1",
+    "name": "cogna-mcp",
     "protocolVersion": "2025-11-25",
-    "transport": "http",
+    "transport": "streamable-http",
     "port": port,
     "pid": pid_json(pid),
     "baseUrl": base_url,
-    "rpcUrl": rpc_url,
-    "healthUrl": health_url,
+    "mcpUrl": mcp_url,
     "command": native_serve_command(port),
     "bundleResolved": bundle_resolved,
     "initializeResult": @mcp_core.initialize_result(),
@@ -193,7 +189,10 @@ fn mcp_server_info(port : Int, pid? : Int) -> Json {
 ///|
 fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
-    err => return Err(mcp_error("cannot write descriptor \{path}: \{err.to_string()}"))
+    err =>
+      return Err(
+        mcp_error("cannot write descriptor \{path}: \{err.to_string()}"),
+      )
   }
   Ok(())
 }
@@ -201,7 +200,10 @@ fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
 ///|
 fn read_mcp_info(path : String) -> Result[McpDescriptor, @cli.CliError] {
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err(mcp_error("cannot read descriptor \{path}: \{err.to_string()}"))
+    err =>
+      return Err(
+        mcp_error("cannot read descriptor \{path}: \{err.to_string()}"),
+      )
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(info) else {
@@ -238,31 +240,57 @@ fn descriptor_string(info : Json, field : String) -> String? {
 }
 
 ///|
-fn descriptor_health_url(info : Json, port : Int) -> String {
-  match descriptor_string(info, "healthUrl") {
+fn descriptor_mcp_url(info : Json, port : Int) -> String {
+  match descriptor_string(info, "mcpUrl") {
     Some(url) => url
-    None => @mcp_core.health_url(port)
+    None => @mcp_core.mcp_url(port)
   }
 }
 
 ///|
-fn wait_for_health(
+fn wait_for_server_ready(
   url : String,
   attempts? : Int = 20,
   sleep_ms? : Int = 100,
 ) -> Bool {
+  let payload =
+    #|{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"cogna-cli","version":"0.1.0"}}}
+    #|
   for _ in 0..<attempts {
-    let request_out = @host_async.http_request(
-      "GET",
-      url,
-      {},
-      @host_async.HttpBody::Empty,
-    )
-    match request_out {
-      Ok(result) => if result.status == 200 { return true }
-      Err(_) => ()
+    let status : Ref[Int?] = Ref::new(None)
+    @mbasync.run_async_main(() => {
+      try {
+        let client = @http.Client::new(url)
+        client.request(@http.RequestMethod::Post, "/", extra_headers={
+          "Content-Type": "application/json",
+        })
+        client.write(payload)
+        let response = client.end_request()
+        client.close()
+        status.val = Some(response.code)
+      } catch {
+        _ => ()
+      }
+    })
+    if status.val == Some(200) {
+      return true
     }
-    @host_async.sleep_ms(sleep_ms)
+    @process.sleep_ms(sleep_ms)
+  }
+  false
+}
+
+///|
+fn wait_for_process_boot(
+  pid : Int,
+  attempts? : Int = 30,
+  sleep_ms? : Int = 100,
+) -> Bool {
+  for _ in 0..<attempts {
+    if @process.is_alive(pid) {
+      return true
+    }
+    @process.sleep_ms(sleep_ms)
   }
   false
 }
@@ -279,10 +307,10 @@ fn write_runtime_state_with_pid(
 ///|
 fn wait_for_process_stop(pid : Int) -> Bool {
   for _ in 0..<20 {
-    if !@host_async.is_alive(pid) {
+    if !@process.is_alive(pid) {
       return true
     }
-    @host_async.sleep_ms(100)
+    @process.sleep_ms(100)
   }
   false
 }
@@ -290,7 +318,7 @@ fn wait_for_process_stop(pid : Int) -> Bool {
 ///|
 fn spawn_detached_server_process(port : Int) -> Result[Int, @cli.CliError] {
   let command = native_serve_command(port)
-  let spawn_out = @host_async.spawn_detached(command)
+  let spawn_out = @process.spawn_detached(command)
   guard spawn_out is Ok(pid) else {
     return Err(mcp_error(spawn_out.unwrap_err()))
   }
@@ -298,26 +326,11 @@ fn spawn_detached_server_process(port : Int) -> Result[Int, @cli.CliError] {
 }
 
 ///|
-fn wait_for_server_health(port : Int, pid : Int) -> Bool {
-  let health_url = @mcp_core.health_url(port)
-  for _ in 0..<200 {
-    if wait_for_health(health_url, attempts=1, sleep_ms=0) {
-      return true
-    }
-    if !@host_async.is_alive(pid) {
-      return false
-    }
-    @host_async.sleep_ms(100)
-  }
-  false
-}
-
-///|
 fn stop_process_if_alive(pid : Int) -> Unit {
-  if @host_async.is_alive(pid) {
-    ignore(@host_async.terminate(pid))
+  if @process.is_alive(pid) {
+    ignore(@process.terminate(pid))
     if !wait_for_process_stop(pid) {
-      ignore(@host_async.force_kill(pid))
+      ignore(@process.force_kill(pid))
       ignore(wait_for_process_stop(pid))
     }
   }
@@ -337,16 +350,16 @@ pub fn run_start(
 
   let pid_out = spawn_detached_server_process(params.port)
   guard pid_out is Ok(pid) else { return Err(pid_out.unwrap_err()) }
-  if !wait_for_server_health(params.port, pid) {
+  if !wait_for_process_boot(pid) {
     stop_process_if_alive(pid)
-    return Err(mcp_error("MCP server did not become healthy in time"))
+    return Err(mcp_error("MCP server did not stay alive after start"))
   }
   let info_path = descriptor_path()
   let write_out = write_runtime_state_with_pid(info_path, params.port, pid)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
   let sync_out = sync_tools_state()
   guard sync_out is Ok(_) else { return Err(sync_out.unwrap_err()) }
-  @mcp_sdk.clear_runtime_state()
+  @mcp_core.clear_runtime_state()
 
   Ok({
     port: params.port,
@@ -361,18 +374,14 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
     let info_out = read_mcp_info(info_path)
     guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }
     let port = descriptor_port(descriptor.info).unwrap_or(0)
-    let health_url = descriptor_health_url(descriptor.info, port)
-    let healthy = wait_for_health(
-      health_url,
-      attempts=1,
-      sleep_ms=0,
-    )
+    let mcp_url = descriptor_mcp_url(descriptor.info, port)
     match descriptor_pid(descriptor.info) {
-      Some(pid) =>
-        if @host_async.is_alive(pid) && healthy {
+      Some(pid) => {
+        let healthy = wait_for_server_ready(mcp_url, attempts=50, sleep_ms=100)
+        if @process.is_alive(pid) && healthy {
           Ok({
             status: "running",
-            summary: "MCP server healthy at \{health_url} with live pid \{pid}",
+            summary: "MCP server healthy at \{mcp_url} with live pid \{pid}",
           })
         } else {
           Ok({
@@ -380,12 +389,10 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
             summary: "MCP descriptor found at \{info_path} but server is not healthy (pid \{pid})",
           })
         }
+      }
       None =>
-        if healthy {
-          Ok({
-            status: "running",
-            summary: "MCP server healthy at \{health_url}",
-          })
+        if wait_for_server_ready(mcp_url, attempts=1, sleep_ms=0) {
+          Ok({ status: "running", summary: "MCP server healthy at \{mcp_url}" })
         } else {
           Ok({
             status: "stopped",
@@ -405,7 +412,7 @@ pub fn run_status() -> @cli.CliResult[McpStatusResult, @cli.CliError] {
 pub fn run_stop() -> @cli.CliResult[McpStopResult, @cli.CliError] {
   let info_path = descriptor_path()
   let state_path = tools_state_path()
-  @mcp_sdk.clear_runtime_state()
+  @mcp_core.clear_runtime_state()
   if @fs.path_exists(info_path) {
     let info_out = read_mcp_info(info_path)
     guard info_out is Ok(descriptor) else { return Err(info_out.unwrap_err()) }

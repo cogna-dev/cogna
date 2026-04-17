@@ -1,16 +1,16 @@
 ---
 title: OpenAPI
-description: 如何用 CodeIQ 检测 OpenAPI 规格的 breaking change，包括参数必填性、response 状态码删除、schema 收窄等，保护 API 调用方。
+description: 如何用 Cogna 检测 OpenAPI 规格的 breaking change，包括参数必填性、response 状态码删除、schema 收窄等，保护 API 调用方。
 order: 23
 ---
 
 # OpenAPI
 
-当你在迭代 REST API 时，哪些改动会破坏调用方？很多时候不是删掉了整个接口，而是悄悄把一个参数变成了必填、删掉了某个 response 状态码，或者把返回体的 schema 收窄了。CodeIQ 帮你在发版前把这些细小但危险的变化找出来，生成可供人工审查和 CI 消费的报告。
+当你在迭代 REST API 时，哪些改动会破坏调用方？很多时候不是删掉了整个接口，而是悄悄把一个参数变成了必填、删掉了某个 response 状态码，或者把返回体的 schema 收窄了。Cogna 帮你在发版前把这些细小但危险的变化找出来，生成可供人工审查和 CI 消费的报告。
 
-## CodeIQ 能检测哪些变化？
+## Cogna 能检测哪些变化？
 
-对 `profile: openapi-spec` 的仓库，CodeIQ 会提取以下契约信息：
+对 `profile: openapi-spec` 的仓库，Cogna 会提取以下契约信息：
 
 | 类别 | 说明 |
 |------|------|
@@ -69,9 +69,9 @@ paths:
 
 ```bash
 cd ./api
-codeiq build
-codeiq diff
-codeiq check
+cogna build
+cogna diff
+cogna check
 ```
 
 ### diff.json 中会出现（节选）
@@ -237,19 +237,19 @@ components:
 
 ```bash
 # 1. 初始化配置（首次使用）
-codeiq init
+cogna init
 # 选择 profile: openapi-spec，填写 PURL，例如：
 # purl: pkg:oci/myorg/api@2.1.0
 
 # 2. 构建 bundle
 cd ./api
-codeiq build
+cogna build
 
 # 3. 准备 dist/base 与 dist/target 两套产物后对比
-codeiq diff
+cogna diff
 
 # 4. 执行兼容性检查，生成 SARIF
-codeiq check
+cogna check
 
 # 5. 查看结果
 cat ./dist/diff.json
@@ -264,14 +264,14 @@ cat ./dist/check.sarif.json
 
 ```bash
 cd ./api
-codeiq build
-codeiq mcp serve --port 3000
+cogna build
+cogna mcp serve --port 3000
 ```
 
 然后在 AI 工具中依次调用：
 
-1. `codeiq.query.outlines` — 列出所有 path 和 operation
-2. `codeiq.query.symbol` — 精确查询某个 operation 的参数列表、request body 和 response schema
+1. `cogna.query.outlines` — 列出所有 path 和 operation
+2. `cogna.query.symbol` — 精确查询某个 operation 的参数列表、request body 和 response schema
 
 ---
 

@@ -17,12 +17,12 @@ OpenAPI media types were added.
 | `ruleId` | `compat.openapi.media-types-added` |
 | `family` | `openapi` |
 | `defaultLevel` | `note` |
-| `entrypoint` | `data.codeiq.compat.deny` |
-| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/openapi/media-types-added` |
+| `entrypoint` | `data.cogna.compat.deny` |
+| `helpUri` | `https://cogna.xaclabs.dev/docs/policies/generated/openapi/media-types-added` |
 
 ## 触发条件
 
-当 `semanticDiff.findings[]` 中出现 `openapi-media-types-added` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+当 OPA compatibility policy 命中该规则的谓词时，会在 `data.cogna.compat.deny` 下返回结果。
 
 ## SARIF 示例
 
@@ -30,8 +30,10 @@ OpenAPI media types were added.
 {
   "ruleId": "compat.openapi.media-types-added",
   "level": "note",
-  "message": { "text": "OpenAPI media types were added." },
-  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/openapi/media-types-added"
+  "message": {
+    "text": "OpenAPI media types were added."
+  },
+  "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/media-types-added"
 }
 ```
 

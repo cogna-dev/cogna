@@ -14,14 +14,14 @@ order: 9
 
 | 命令 | 说明 |
 |------|------|
-| `codeiq mcp serve [--port <port>]` | 在前台运行 MCP server |
-| `codeiq mcp status` | 查看 MCP descriptor 和健康状态 |
+| `cogna mcp serve [--port <port>]` | 在前台运行 MCP server |
+| `cogna mcp status` | 查看 MCP descriptor 和健康状态 |
 
 示例：
 
 ```bash
-codeiq build
-codeiq mcp serve --port 3000
+cogna build
+cogna mcp serve --port 3000
 ```
 
 ---
@@ -30,27 +30,27 @@ codeiq mcp serve --port 3000
 
 | 命令 | 说明 |
 |------|------|
-| `codeiq publish` | 发布当前仓库 `dist/bundle.ciq.tgz` |
-| `codeiq registry serve [--port <port>]` | 启动本地 HTTP registry server |
-| `codeiq registry status` | 查看 registry descriptor 和健康状态 |
+| `cogna publish` | 发布当前仓库 `dist/bundle.ciq.tgz` |
+| `cogna registry serve [--port <port>]` | 启动本地 HTTP registry server |
+| `cogna registry status` | 查看 registry descriptor 和健康状态 |
 
 ### Registry store 目录优先级
 
-1. `CODEIQ_REGISTRY_STORE_DIR`
-2. `codeiq.yml -> registry.storeDir`
-3. `.codeiq/cache/registry`
+1. `COGNA_REGISTRY_STORE_DIR`
+2. `cogna.yml -> registry.storeDir`
+3. `.cogna/cache/registry`
 
 示例：
 
 ```bash
-CODEIQ_REGISTRY_STORE_DIR=/data/registry codeiq registry serve --port 8787
+COGNA_REGISTRY_STORE_DIR=/data/registry cogna registry serve --port 8787
 ```
 
 ---
 
 ## HTTP Registry 接口
 
-运行 `codeiq registry serve` 后，可用的 API：
+运行 `cogna registry serve` 后，可用的 API：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -68,16 +68,16 @@ CODEIQ_REGISTRY_STORE_DIR=/data/registry codeiq registry serve --port 8787
 P6 完成后，registry server 可以直接以容器方式交付：
 
 ```bash
-docker build -f integrations/deployments/docker/Dockerfile -t codeiq-registry:local .
+docker build -f integrations/deployments/docker/Dockerfile -t cogna-registry:local .
 
 docker run --rm \
   -p 8787:8787 \
-  -e CODEIQ_REGISTRY_STORE_DIR=/data/registry \
-  -v "$PWD/.codeiq-docker-registry:/data/registry" \
-  codeiq-registry:local
+  -e COGNA_REGISTRY_STORE_DIR=/data/registry \
+  -v "$PWD/.cogna-docker-registry:/data/registry" \
+  cogna-registry:local
 ```
 
-容器里 `CODEIQ_REGISTRY_STORE_DIR` 必须指向可写目录，通常配合 volume 持久化。
+容器里 `COGNA_REGISTRY_STORE_DIR` 必须指向可写目录，通常配合 volume 持久化。
 
 ---
 

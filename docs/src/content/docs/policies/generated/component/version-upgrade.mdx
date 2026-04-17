@@ -17,12 +17,12 @@ Software component version changed.
 | `ruleId` | `compat.component.version-upgrade` |
 | `family` | `component` |
 | `defaultLevel` | `warning` |
-| `entrypoint` | `data.codeiq.compat.deny` |
-| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/component/version-upgrade` |
+| `entrypoint` | `data.cogna.compat.deny` |
+| `helpUri` | `https://cogna.xaclabs.dev/docs/policies/generated/component/version-upgrade` |
 
 ## 触发条件
 
-当组件级 diff 的 `componentDiff.upgradeKind` 等于 `version-upgrade` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+当 OPA compatibility policy 命中该规则的谓词时，会在 `data.cogna.compat.deny` 下返回结果。
 
 ## SARIF 示例
 
@@ -30,8 +30,10 @@ Software component version changed.
 {
   "ruleId": "compat.component.version-upgrade",
   "level": "warning",
-  "message": { "text": "Software component version changed." },
-  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/component/version-upgrade"
+  "message": {
+    "text": "Software component version changed."
+  },
+  "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/component/version-upgrade"
 }
 ```
 

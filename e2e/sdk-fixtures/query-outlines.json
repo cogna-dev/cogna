@@ -1,0 +1,58 @@
+{
+  "input": {
+    "package": "example/sdkacceptance"
+  },
+  "output": {
+    "package": "example/sdkacceptance",
+    "outlines": [
+      {
+        "id": "decl:go:example/sdkacceptance.Greeter",
+        "symbol": "Greeter",
+        "kind": "type",
+        "summary": "Greeter holds a prefix string used when greeting",
+        "deprecated": false,
+        "location": {
+          "uri": "main.go",
+          "start_line": 12,
+          "end_line": 14
+        }
+      },
+      {
+        "id": "decl:go:example/sdkacceptance.Greeter.Greet",
+        "symbol": "Greeter.Greet",
+        "kind": "method",
+        "summary": "Greet returns a formatted greeting string for the given name",
+        "deprecated": false,
+        "location": {
+          "uri": "main.go",
+          "start_line": 27,
+          "end_line": 35
+        }
+      },
+      {
+        "id": "decl:go:example/sdkacceptance.NewRequestID",
+        "symbol": "NewRequestID",
+        "kind": "function",
+        "summary": "NewRequestID generates a new UUID-based request ID with the given prefix",
+        "deprecated": false,
+        "location": {
+          "uri": "main.go",
+          "start_line": 16,
+          "end_line": 18
+        }
+      },
+      {
+        "id": "decl:go:example/sdkacceptance.BuildLabels",
+        "symbol": "BuildLabels",
+        "kind": "function",
+        "summary": "BuildLabels filters empty items and formats each as name:index",
+        "deprecated": false,
+        "location": {
+          "uri": "main.go",
+          "start_line": 20,
+          "end_line": 25
+        }
+      }
+    ]
+  }
+}

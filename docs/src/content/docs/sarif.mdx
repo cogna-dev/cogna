@@ -6,14 +6,14 @@ order: 26
 
 # 启用 SARIF 集成
 
-SARIF（Static Analysis Results Interchange Format）是一种标准化的静态分析结果格式，被 GitHub Code Scanning、Azure DevOps、SonarQube 等众多平台广泛支持。CodeIQ 的 `check` 命令在执行 policy 检查后，会自动把结果输出为 SARIF 文件，你可以把它接入任何支持 SARIF 的平台，无需额外转换。
+SARIF（Static Analysis Results Interchange Format）是一种标准化的静态分析结果格式，被 GitHub Code Scanning、Azure DevOps、SonarQube 等众多平台广泛支持。Cogna 的 `check` 命令在执行 policy 检查后，会自动把结果输出为 SARIF 文件，你可以把它接入任何支持 SARIF 的平台，无需额外转换。
 
 ## 生成 SARIF 的完整步骤
 
 ```mermaid
 flowchart LR
-    A["codeiq build"] --> B["准备 dist/base / dist/target\ncodeiq diff"]
-    B --> C["codeiq check\n读取 checks.policy"]
+    A["cogna build"] --> B["准备 dist/base / dist/target\ncogna diff"]
+    B --> C["cogna check\n读取 checks.policy"]
     C --> D["check.sarif.json\n标准 SARIF 格式"]
     D --> E["GitHub Code Scanning\n/ Azure DevOps\n/ 其他平台"]
 ```
@@ -22,9 +22,9 @@ flowchart LR
 
 ```bash
 cd ./sdk
-codeiq build
-codeiq diff
-codeiq check
+cogna build
+cogna diff
+cogna check
 ```
 
 生成的 SARIF 文件位于：
@@ -47,13 +47,13 @@ codeiq check
     {
       "tool": {
         "driver": {
-          "name": "CodeIQ",
+          "name": "Cogna",
           "version": "0.1.0",
           "rules": [
             {
               "id": "compat.go.signature-changed",
               "name": "SignatureChanged",
-              "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/go/signature-changed",
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed",
               "defaultConfiguration": {
                 "level": "warning"
               }
@@ -102,10 +102,10 @@ codeiq check
 
 ## 接入 GitHub Code Scanning
 
-当前推荐的方式不是手写 `curl install + codeiq check + upload-sarif`，而是直接复用仓库内的组合动作：
+当前推荐的方式不是手写 `curl install + cogna check + upload-sarif`，而是直接复用仓库内的组合动作：
 
 ```yaml
-name: CodeIQ Compatibility Check
+name: Cogna Compatibility Check
 
 on:
   pull_request:
@@ -124,9 +124,9 @@ jobs:
 
       - uses: ./integrations/actions/setup-moonbit
 
-      - uses: ./integrations/actions/setup-codeiq
+      - uses: ./integrations/actions/setup-cogna
 
-      - uses: ./integrations/actions/run-codeiq
+      - uses: ./integrations/actions/run-cogna
         with:
           working-directory: ./sdk
           command: check
@@ -136,12 +136,12 @@ jobs:
 其中：
 
 - `setup-moonbit` 负责安装 MoonBit；
-- `setup-codeiq` 负责从当前仓库源码产出 `codeiq` CLI；
-- `run-codeiq` 在 `command: check` 时会查找 `dist/check.sarif.json`，构造 gzip + base64 的 SARIF payload，并通过 GitHub Code Scanning REST API 上传。
+- `setup-cogna` 负责从当前仓库源码产出 `cogna` CLI；
+- `run-cogna` 在 `command: check` 时会查找 `dist/check.sarif.json`，构造 gzip + base64 的 SARIF payload，并通过 GitHub Code Scanning REST API 上传。
 
 上传后，GitHub 会在 Pull Request 页面直接显示兼容性警告，点击可以跳转到对应的源文件行；对于 built-in rules，还可以继续通过 `helpUri` 跳到稳定的规则文档页。
 
-本仓库同时提供了本地 `act` 端到端验证路径：当 `ACT=true` 时，`run-codeiq` 不会真的调用 GitHub API，而是把 upload payload capture 到本地文件，供 workflow 断言 `commit_sha`、`ref` 与压缩后的 `sarif` 字段。
+本仓库同时提供了本地 `act` 端到端验证路径：当 `ACT=true` 时，`run-cogna` 不会真的调用 GitHub API，而是把 upload payload capture 到本地文件，供 workflow 断言 `commit_sha`、`ref` 与压缩后的 `sarif` 字段。
 
 ---
 

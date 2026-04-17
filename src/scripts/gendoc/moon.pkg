@@ -1,5 +1,0 @@
-import {
-  "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/policy" @policy_catalog,
-  "yufeiminds/codeiq/cli" @cli,
-}

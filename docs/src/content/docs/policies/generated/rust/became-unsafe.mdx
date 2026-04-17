@@ -17,12 +17,12 @@ Rust public item became unsafe.
 | `ruleId` | `compat.rust.became-unsafe` |
 | `family` | `rust` |
 | `defaultLevel` | `error` |
-| `entrypoint` | `data.codeiq.compat.deny` |
-| `helpUri` | `https://codeiq.xaclabs.dev/docs/policies/generated/rust/became-unsafe` |
+| `entrypoint` | `data.cogna.compat.deny` |
+| `helpUri` | `https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe` |
 
 ## 触发条件
 
-当 `semanticDiff.findings[]` 中出现 `rust-became-unsafe` 时，这条规则会在 `data.codeiq.compat.deny` 下产生命中。
+当 OPA compatibility policy 命中该规则的谓词时，会在 `data.cogna.compat.deny` 下返回结果。
 
 ## SARIF 示例
 
@@ -30,8 +30,10 @@ Rust public item became unsafe.
 {
   "ruleId": "compat.rust.became-unsafe",
   "level": "error",
-  "message": { "text": "Rust public item became unsafe." },
-  "helpUri": "https://codeiq.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
+  "message": {
+    "text": "Rust public item became unsafe."
+  },
+  "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
 }
 ```
 

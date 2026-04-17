@@ -16,7 +16,7 @@ export interface FooterGroup {
 export const topNavigation: NavItem[] = [
   { title: "用户文档", href: "/docs" },
   { title: "贡献者文档", href: "/contrib/introduction" },
-  { title: "GitHub", href: "https://github.com/yufeiminds/codeiq" },
+  { title: "GitHub", href: "https://github.com/cogna-dev/cogna" },
 ]
 
 export const userSidebar: NavGroup[] = [

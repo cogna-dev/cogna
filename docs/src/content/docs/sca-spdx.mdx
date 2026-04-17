@@ -1,26 +1,26 @@
 ---
 title: SCA 与 SBOM
-description: CodeIQ 当前输出 SPDX-only SBOM，以及如何把它接入现有的 SCA 工作流。
+description: Cogna 当前输出 SPDX-only SBOM，以及如何把它接入现有的 SCA 工作流。
 order: 24
 ---
 
 # SCA 与 SBOM
 
-`codeiq build` 除了生成 API bundle，也会同时生成依赖清单与 SPDX SBOM。当前版本已经收口为 **SPDX-only**：不再生成 CycloneDX 文件。
+`cogna build` 除了生成 API bundle，也会同时生成依赖清单与 SPDX SBOM。当前版本已经收口为 **SPDX-only**：不再生成 CycloneDX 文件。
 
 ---
 
 ## 构建后会生成哪些组件产物
 
 ```bash
-codeiq build
+cogna build
 ```
 
 构建完成后，`dist/` 中会包含：
 
 ```text
 dist/
-├── software-components.ndjson   ← CodeIQ 内部组件列表
+├── software-components.ndjson   ← Cogna 内部组件列表
 └── sbom.spdx.json               ← SPDX JSON SBOM
 ```
 
@@ -46,13 +46,13 @@ dist/dependencies/<safe-purl>/
 - 本地依赖的 evidence path
 - 基于本地内容快照生成的校验信息（`verifiedUsing`）
 
-这使得 CodeIQ 后续的 `diff`、`publish` 和 dependency bundle 编排都能使用同一套组件事实来源。
+这使得 Cogna 后续的 `diff`、`publish` 和 dependency bundle 编排都能使用同一套组件事实来源。
 
 ---
 
 ## 组件变化（componentChanges）
 
-`codeiq diff` 不只比较 API，也比较组件版本变化。例如依赖从 `1.0.195` 升到 `1.0.197` 时，`diff.json` 里会出现：
+`cogna diff` 不只比较 API，也比较组件版本变化。例如依赖从 `1.0.195` 升到 `1.0.197` 时，`diff.json` 里会出现：
 
 ```json
 {
@@ -89,7 +89,7 @@ dist/dependencies/<safe-purl>/
 cp ./sdk/dist/sbom.spdx.json ./release-assets/
 ```
 
-如果你的 SCA 平台只接受 CycloneDX，那么当前需要在 CodeIQ 之外做一次 SPDX → CycloneDX 转换；CodeIQ 自身不再直接生成 `sbom.cdx.json`。
+如果你的 SCA 平台只接受 CycloneDX，那么当前需要在 Cogna 之外做一次 SPDX → CycloneDX 转换；Cogna 自身不再直接生成 `sbom.cdx.json`。
 
 ---
 

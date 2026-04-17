@@ -1,11 +1,12 @@
 import {
   "moonbitlang/core/env" @env,
   "moonbitlang/core/json" @json,
-  "yufeiminds/codeiq/cmd/mcp/core" @mcp_core,
-  "yufeiminds/codeiq/async" @host_async,
-  "yufeiminds/codeiq/lib/mcp-sdk" @mcp_sdk,
+  "moonbitlang/async" @mbasync,
+  "moonbitlang/async/http" @http,
+  "cogna-dev/cogna/cmd/mcp/core" @mcp_core,
+  "cogna-dev/cogna/process" @process,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cli" @cli,
+  "cogna-dev/cogna/cli" @cli,
 }
 
 supported_targets = "native"

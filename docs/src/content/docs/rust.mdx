@@ -1,16 +1,16 @@
 ---
 title: Rust
-description: 如何用 CodeIQ 追踪 Rust crate 的公开 API 变化，以及什么样的代码改动会触发什么检查结果。
+description: 如何用 Cogna 追踪 Rust crate 的公开 API 变化，以及什么样的代码改动会触发什么检查结果。
 order: 21
 ---
 
 # Rust
 
-CodeIQ 能帮你追踪 Rust crate 的公开 API 变化——不是代码风格，而是真正影响调用方的契约变化：函数签名、`unsafe` 状态、extern ABI、where clause 等。
+Cogna 能帮你追踪 Rust crate 的公开 API 变化——不是代码风格，而是真正影响调用方的契约变化：函数签名、`unsafe` 状态、extern ABI、where clause 等。
 
 ## 配置
 
-在你的 Rust crate 根目录创建 `codeiq.yml`：
+在你的 Rust crate 根目录创建 `cogna.yml`：
 
 ```yaml
 schemaVersion: ciq-config/v2
@@ -40,7 +40,7 @@ pub fn process(data: &[u8]) -> Result<Output, Error> { ... }
 pub fn process(data: &[u8], opts: Options) -> Result<Output, Error> { ... }
 ```
 
-**CodeIQ diff 输出：**
+**Cogna diff 输出：**
 
 ```json
 {
@@ -186,13 +186,13 @@ pub fn legacy_api() -> String { ... }
 ```bash
 # 1. 构建当前版本快照
 cd ./my-crate
-codeiq build
+cogna build
 
 # 2. 准备 dist/base 与 dist/target 后对比
-codeiq diff
+cogna diff
 
 # 3. 运行 policy 检查
-codeiq check
+cogna check
 ```
 
 ### 升级依赖前评估风险
@@ -200,8 +200,8 @@ codeiq check
 ```bash
 # 先看 tokio 的公开 API 长什么样
 cd ./my-crate
-codeiq build
-codeiq mcp serve --port 3000
+cogna build
+cogna mcp serve --port 3000
 # 让 AI Agent 查询 tokio::sync::Mutex::lock 的签名
 ```
 
@@ -220,6 +220,6 @@ codeiq mcp serve --port 3000
 
 ## 注意事项
 
-- CodeIQ 关注的是**公开 API 面**（`pub` item），不分析 private 实现
+- Cogna 关注的是**公开 API 面**（`pub` item），不分析 private 实现
 - `unsafe` 状态变化始终是 `error` 级别，因为调用方必须修改代码
 - 如果你只是改了实现、没有改公开签名，diff 通常是空的

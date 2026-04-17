@@ -8,7 +8,7 @@ order: 16
 
 <span style="display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:6px;padding:4px 12px;font-size:0.9rem;font-weight:600;">⚠️ 尚未支持</span>
 
-CodeIQ 目前不提供云端托管的索引服务。所有的 build、index 和 query 操作都在本地完成。
+Cogna 目前不提供云端托管的索引服务。所有的 build、index 和 query 操作都在本地完成。
 
 ---
 
@@ -34,13 +34,13 @@ CodeIQ 目前不提供云端托管的索引服务。所有的 build、index 和 
 ```bash
 # 先构建 bundle
 cd ./sdk
-codeiq build
+cogna build
 
 # 发布到本地 registry
-codeiq publish
+cogna publish
 
 # 启动 HTTP server，让团队其他人访问
-codeiq registry serve --port 8787
+cogna registry serve --port 8787
 ```
 
 其他人通过 HTTP 下载：
@@ -58,7 +58,7 @@ curl "http://localhost:8787/api/v1/bundles/resolve?purl=pkg:golang/myorg/mylib@1
 curl "http://localhost:8787/api/v1/bundles/resolve?purl=pkg:cargo/tokio@1.43.0"
 
 # 启动 MCP（会自动加载已物化的 bundle）
-codeiq mcp serve --port 3000
+cogna mcp serve --port 3000
 ```
 
 现在你的 AI 工具可以查询 `tokio@1.43.0` 的函数签名，就像查本地代码一样。
@@ -72,9 +72,9 @@ codeiq mcp serve --port 3000
 curl -o policy.bundle.ciq.tgz \
   "http://localhost:8787/api/v1/bundles/<bundleId>/download"
 
-# 把下载得到的 policy bundle 路径写入 codeiq.yml -> checks.policy，然后执行检查
+# 把下载得到的 policy bundle 路径写入 cogna.yml -> checks.policy，然后执行检查
 cd ./sdk
-codeiq check
+cogna check
 ```
 
 ---

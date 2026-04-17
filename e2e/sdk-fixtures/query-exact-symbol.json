@@ -1,0 +1,27 @@
+{
+  "input": {
+    "package": "example/sdkacceptance",
+    "exact_symbol": "Greeter.Greet"
+  },
+  "output": {
+    "package": "example/sdkacceptance",
+    "mode": "exact-symbol",
+    "matches": [
+      {
+        "id": "decl:go:example/sdkacceptance.Greeter.Greet",
+        "symbol": "Greeter.Greet",
+        "kind": "method",
+        "signature": "func (g Greeter) Greet(name string) string",
+        "summary": "Greet returns a formatted greeting string for the given name",
+        "docs": null,
+        "score": null,
+        "location": {
+          "uri": "main.go",
+          "start_line": 27,
+          "end_line": 35
+        }
+      }
+    ],
+    "cursor": null
+  }
+}

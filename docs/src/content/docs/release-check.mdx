@@ -1,6 +1,6 @@
 ---
 title: 发版检查
-description: 如何在发布前用 CodeIQ 生成变更 diff、执行 policy 检查，并读懂 diff.json 和 SARIF 结果，决定是否可以安全发版。
+description: 如何在发布前用 Cogna 生成变更 diff、执行 policy 检查，并读懂 diff.json 和 SARIF 结果，决定是否可以安全发版。
 order: 3
 ---
 
@@ -12,7 +12,7 @@ order: 3
 2. **哪些变化可能有风险？** — 是否有 breaking change 会影响调用方
 3. **是否违反了团队的兼容性策略？** — policy 检查结果如何
 
-CodeIQ 通过 `build → diff → check` 三步流程帮你系统地回答这三个问题。
+Cogna 通过 `build → diff → check` 三步流程帮你系统地回答这三个问题。
 
 ---
 
@@ -21,28 +21,28 @@ CodeIQ 通过 `build → diff → check` 三步流程帮你系统地回答这三
 ```bash
 # 1. 构建当前版本的 bundle
 cd ./sdk
-codeiq build
+cogna build
 
 # 2. 准备 dist/base 与 dist/target 两套产物后做对比
-codeiq diff
+cogna diff
 
 # 3. 执行兼容性检查
-codeiq check
+cogna check
 ```
 
 ### 目前的 diff 前提
 
-当前 `codeiq diff` 不从 CLI 接收 `--since` 或 `--test-changes`。你需要：
+当前 `cogna diff` 不从 CLI 接收 `--since` 或 `--test-changes`。你需要：
 
 - 先把基线版本产物放到 `dist/base/`
 - 再把当前版本产物放到 `dist/target/`
-- 如果要纳入测试变化，则在 `codeiq.yml -> diff.includeTestChanges` 中开启
+- 如果要纳入测试变化，则在 `cogna.yml -> diff.includeTestChanges` 中开启
 
 ---
 
 ## 读懂 diff.json
 
-`diff.json` 是 `codeiq diff` 的核心输出，包含所有检测到的变化。
+`diff.json` 是 `cogna diff` 的核心输出，包含所有检测到的变化。
 
 ### 关键字段
 
