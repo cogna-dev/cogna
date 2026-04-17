@@ -31,7 +31,7 @@ fn valid_config_yaml() -> String {
     #|  includeDependencies: true
     #|registry:
     #|  port: 8787
-    #|  storeDir: .codeiq/cache/registry
+    #|  storeDir: .cogna/cache/registry
     #|mcp:
     #|  port: 3000
     #|
@@ -135,7 +135,7 @@ test "load config rejects unsupported profile" {
       #|  includeDependencies: true
       #|registry:
       #|  port: 8787
-      #|  storeDir: .codeiq/cache/registry
+      #|  storeDir: .cogna/cache/registry
       #|mcp:
       #|  port: 3000
       #|
@@ -187,7 +187,7 @@ test "load config rejects README/example inputs" {
       #|  includeDependencies: true
       #|registry:
       #|  port: 8787
-      #|  storeDir: .codeiq/cache/registry
+      #|  storeDir: .cogna/cache/registry
       #|mcp:
       #|  port: 3000
       #|
@@ -218,8 +218,12 @@ test "load config parses explicit validation mode" {
   cleanup_tmp_config(path)
   let wrote = write_tmp_config(
     path,
-    valid_config_yaml().replace(old="profile: openapi-spec", new="profile: go-module")
-    .replace(old="purl: pkg:openapi/acme/payment-api@2026.03.01", new="validation: lsp\npurl: pkg:golang/acme/payment-api@2026.03.01")
+    valid_config_yaml()
+    .replace(old="profile: openapi-spec", new="profile: go-module")
+    .replace(
+      old="purl: pkg:openapi/acme/payment-api@2026.03.01",
+      new="validation: lsp\npurl: pkg:golang/acme/payment-api@2026.03.01",
+    )
     .replace(old="openapi/**/*.yaml", new="**/*.go"),
   )
   guard wrote is Ok(_) else { fail("failed to write validation tmp config") }
@@ -239,23 +243,23 @@ test "load config parses explicit validation mode" {
 }
 
 ///|
-test "resolve prefers codeiq.yml and falls back to codeiq.yaml" {
+test "resolve prefers cogna.yml and falls back to cogna.yaml" {
   let dir = "src/config/tmp_resolve_config"
-  cleanup_tmp_config("\{dir}/codeiq.yml")
-  cleanup_tmp_config("\{dir}/codeiq.yaml")
+  cleanup_tmp_config("\{dir}/cogna.yml")
+  cleanup_tmp_config("\{dir}/cogna.yaml")
   @fs.remove_dir(dir) catch {
     _ => ()
   }
   @fs.create_dir(dir)
 
   let legacy = write_tmp_config(
-    "\{dir}/codeiq.yaml",
+    "\{dir}/cogna.yaml",
     valid_config_yaml().replace(old="ciq-config/v2", new="ciq-config/v1"),
   )
   guard legacy is Ok(_) else { fail("failed to write fallback config") }
   let fallback = resolve(dir)
   guard fallback is Ok(legacy_resolved) else {
-    cleanup_tmp_config("\{dir}/codeiq.yaml")
+    cleanup_tmp_config("\{dir}/cogna.yaml")
     @fs.remove_dir(dir) catch {
       _ => ()
     }
@@ -263,15 +267,15 @@ test "resolve prefers codeiq.yml and falls back to codeiq.yaml" {
   }
   inspect(
     legacy_resolved.path,
-    content="src/config/tmp_resolve_config/codeiq.yaml",
+    content="src/config/tmp_resolve_config/cogna.yaml",
   )
 
-  let preferred = write_tmp_config("\{dir}/codeiq.yml", valid_config_yaml())
+  let preferred = write_tmp_config("\{dir}/cogna.yml", valid_config_yaml())
   guard preferred is Ok(_) else { fail("failed to write preferred config") }
   let resolved = resolve(dir)
   guard resolved is Ok(preferred_resolved) else {
-    cleanup_tmp_config("\{dir}/codeiq.yml")
-    cleanup_tmp_config("\{dir}/codeiq.yaml")
+    cleanup_tmp_config("\{dir}/cogna.yml")
+    cleanup_tmp_config("\{dir}/cogna.yaml")
     @fs.remove_dir(dir) catch {
       _ => ()
     }
@@ -279,11 +283,11 @@ test "resolve prefers codeiq.yml and falls back to codeiq.yaml" {
   }
   inspect(
     preferred_resolved.path,
-    content="src/config/tmp_resolve_config/codeiq.yml",
+    content="src/config/tmp_resolve_config/cogna.yml",
   )
 
-  cleanup_tmp_config("\{dir}/codeiq.yml")
-  cleanup_tmp_config("\{dir}/codeiq.yaml")
+  cleanup_tmp_config("\{dir}/cogna.yml")
+  cleanup_tmp_config("\{dir}/cogna.yaml")
   @fs.remove_dir(dir) catch {
     _ => ()
   }

@@ -2,20 +2,20 @@ import {
   "moonbitlang/core/argparse" @argparse,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/string" @string,
-  "yufeiminds/codeiq/cmd/init" @init_cmd,
-  "yufeiminds/codeiq/cmd/build" @build_cmd,
-  "yufeiminds/codeiq/cmd/diff" @diff_cmd,
-  "yufeiminds/codeiq/cmd/check" @check_cmd,
-  "yufeiminds/codeiq/cmd/query" @query_cmd,
-  "yufeiminds/codeiq/cmd/publish" @publish_cmd,
-  "yufeiminds/codeiq/cmd/registry" @registry_cmd,
-  "yufeiminds/codeiq/cmd/mcp" @mcp_cmd,
-  "yufeiminds/codeiq/cmd/mcp/core" @mcp_core,
-  "yufeiminds/codeiq/cli" @cli,
+  "cogna-dev/cogna/cmd/init" @init_cmd,
+  "cogna-dev/cogna/cmd/build" @build_cmd,
+  "cogna-dev/cogna/cmd/diff" @diff_cmd,
+  "cogna-dev/cogna/cmd/check" @check_cmd,
+  "cogna-dev/cogna/cmd/query" @query_cmd,
+  "cogna-dev/cogna/cmd/publish" @publish_cmd,
+  "cogna-dev/cogna/cmd/registry" @registry_cmd,
+  "cogna-dev/cogna/cmd/mcp" @mcp_cmd,
+  "cogna-dev/cogna/cmd/mcp/core" @mcp_core,
+  "cogna-dev/cogna/cli" @cli,
 }
+
+supported_targets = "native"
 
 options(
   "is-main": true,
 )
-
-supported_targets = "native"

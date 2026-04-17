@@ -1,6 +1,6 @@
 # config package
 
-Project configuration schema, defaults, loading, and validation for CodeIQ.
+Project configuration schema, defaults, loading, and validation for Cogna.
 
 This package intentionally contains:
 
@@ -16,6 +16,6 @@ Other packages should depend on resolved config data rather than reimplementing 
 ```mbt check
 ///|
 test "config defaults target the local registry cache" {
-  inspect(default_config().registry.store_dir, content=".codeiq/cache/registry")
+  inspect(default_config().registry.store_dir, content=".cogna/cache/registry")
 }
 ```

@@ -1,11 +1,11 @@
 import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/scripts/bundle" @bundle,
-  "yufeiminds/codeiq/async" @host_async,
-  "yufeiminds/codeiq/lib/registry" @registry_lib,
-  "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/registry" @registry_impl,
+  "cogna-dev/cogna/core/bundle" @bundle,
+  "cogna-dev/cogna/process" @process,
+  "cogna-dev/cogna/registry/client" @client,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/registry/server" @registry_impl,
 }
 
 import {
@@ -15,6 +15,7 @@ import {
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
+  "cogna-dev/cogna/registry/client" @client,
 } for "test"
 
 supported_targets = "native"

@@ -2,13 +2,10 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/config" @config,
-  "yufeiminds/codeiq/schema" @schema,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/config" @config,
 }
 
 options(
-  targets: {
-    "main_test.mbt": [ "wasm" ],
-  },
+  targets: { "main_test.mbt": [ "wasm" ] },
 )

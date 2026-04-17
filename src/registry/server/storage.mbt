@@ -218,7 +218,7 @@ pub fn read_json_file(path : String) -> Result[Json, @cli.CliError] {
 fn read_registry_index_object(
   purl : String,
 ) -> Result[Map[String, Json]?, @cli.CliError] {
-  let index_path = "\{@registry_lib.local_store_index_dir()}/\{index_key(purl)}.json"
+  let index_path = "\{@client.local_store_index_dir()}/\{index_key(purl)}.json"
   if !@fs.path_exists(index_path) {
     return Ok(None)
   }
@@ -236,7 +236,7 @@ fn read_registry_index_object(
 fn find_registry_index_by_bundle_id(
   bundle_id : String,
 ) -> Result[Map[String, Json]?, @cli.CliError] {
-  let index_dir = @registry_lib.local_store_index_dir()
+  let index_dir = @client.local_store_index_dir()
   if !@fs.path_exists(index_dir) {
     return Ok(None)
   }
@@ -264,7 +264,7 @@ fn find_registry_index_by_bundle_id(
         registry_error("registry index entry must be object: \{entry_path}"),
       )
     }
-    match @registry_lib.string_field_optional(receipt_object, "bundleId") {
+    match @client.string_field_optional(receipt_object, "bundleId") {
       Some(candidate) if candidate == bundle_id =>
         return Ok(Some(receipt_object))
       _ => ()
@@ -277,7 +277,7 @@ fn find_registry_index_by_bundle_id(
 pub fn bundle_path_for_bundle_id(
   bundle_id : String,
 ) -> Result[String, @cli.CliError] {
-  let path = "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.ciq.tgz"
+  let path = "\{@client.local_store_bundles_dir()}/\{bundle_id}.ciq.tgz"
   if @fs.path_exists(path) {
     Ok(path)
   } else {
@@ -306,13 +306,16 @@ fn join_url(base_url : String, path : String) -> String {
 
 ///|
 fn server_bundle_download_url(port : Int, bundle_id : String) -> String {
-  join_url(registry_server_base_url(port), @registry_lib.bundle_download_path(bundle_id))
+  join_url(
+    registry_server_base_url(port),
+    @client.bundle_download_path(bundle_id),
+  )
 }
 
 ///|
 pub fn registry_versions_response(
   purl : String,
-) -> Result[@registry_lib.RegistryApiResponse, @cli.CliError] {
+) -> Result[@client.RegistryApiResponse, @cli.CliError] {
   let versions : Array[Json] = []
   let index_out = read_registry_index_object(purl)
   guard index_out is Ok(index_object) else {
@@ -320,9 +323,9 @@ pub fn registry_versions_response(
   }
   match index_object {
     Some(index) => {
-      let bundle_id = @registry_lib.string_field_optional(index, "bundleId")
-      let digest = @registry_lib.string_field_optional(index, "digest")
-      let bundle_type = @registry_lib.string_field_optional(index, "bundleType")
+      let bundle_id = @client.string_field_optional(index, "bundleId")
+      let digest = @client.string_field_optional(index, "digest")
+      let bundle_type = @client.string_field_optional(index, "bundleType")
       let version = purl_version(purl)
       if bundle_id is Some(resolved_bundle_id) &&
         digest is Some(resolved_digest) &&
@@ -341,7 +344,7 @@ pub fn registry_versions_response(
     None => ()
   }
   let body : Json = {
-    "schemaVersion": "codeiq-registry-package-versions/v1",
+    "schemaVersion": "cogna-registry-package-versions/v1",
     "purl": purl,
     "versions": Json::array(versions),
   }
@@ -352,11 +355,11 @@ pub fn registry_versions_response(
 pub fn registry_bundle_detail_response(
   bundle_id : String,
   port : Int,
-) -> Result[@registry_lib.RegistryApiResponse, @cli.CliError] {
+) -> Result[@client.RegistryApiResponse, @cli.CliError] {
   let bundle_path_out = bundle_path_for_bundle_id(bundle_id)
   guard bundle_path_out is Ok(_) else {
     let body : Json = {
-      "schemaVersion": "codeiq-registry-bundle-detail/v1",
+      "schemaVersion": "cogna-registry-bundle-detail/v1",
       "bundleId": bundle_id,
       "status": 404,
       "message": "bundle detail not found in local registry",
@@ -365,11 +368,11 @@ pub fn registry_bundle_detail_response(
   }
   let receipt_out = find_registry_index_by_bundle_id(bundle_id)
   guard receipt_out is Ok(receipt) else { return Err(receipt_out.unwrap_err()) }
-  let etag = read_etag(
-    "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
-  ).unwrap_or("\"\{bundle_id}\"")
+  let etag = read_etag("\{@client.local_store_bundles_dir()}/\{bundle_id}.etag").unwrap_or(
+    "\"\{bundle_id}\"",
+  )
   let body : Map[String, Json] = {
-    "schemaVersion": Json::string("codeiq-registry-bundle-detail/v1"),
+    "schemaVersion": Json::string("cogna-registry-bundle-detail/v1"),
     "bundleId": Json::string(bundle_id),
     "status": Json::number(200.0, repr="200"),
     "downloadUrl": Json::string(server_bundle_download_url(port, bundle_id)),
@@ -377,15 +380,15 @@ pub fn registry_bundle_detail_response(
   }
   match receipt {
     Some(index) => {
-      match @registry_lib.string_field_optional(index, "purl") {
+      match @client.string_field_optional(index, "purl") {
         Some(value) => body["purl"] = Json::string(value)
         None => ()
       }
-      match @registry_lib.string_field_optional(index, "digest") {
+      match @client.string_field_optional(index, "digest") {
         Some(value) => body["digest"] = Json::string(value)
         None => ()
       }
-      match @registry_lib.string_field_optional(index, "bundleType") {
+      match @client.string_field_optional(index, "bundleType") {
         Some(value) => body["bundleType"] = Json::string(value)
         None => ()
       }
@@ -398,7 +401,7 @@ pub fn registry_bundle_detail_response(
 ///|
 pub fn registry_bundle_download_http(
   bundle_id : String,
-) -> Result[@host_async.HttpResponse, @cli.CliError] {
+) -> Result[@mapi.ResponseEnvelope, @cli.CliError] {
   let path_out = bundle_path_for_bundle_id(bundle_id)
   guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
   let bytes = @fs.read_file_to_bytes(path) catch {
@@ -411,11 +414,11 @@ pub fn registry_bundle_download_http(
     "Content-Type": "application/octet-stream",
     "Content-Length": "\{bytes.length()}",
   }
-  let etag = read_etag(
-    "\{@registry_lib.local_store_bundles_dir()}/\{bundle_id}.etag",
-  ).unwrap_or("\"\{bundle_id}\"")
+  let etag = read_etag("\{@client.local_store_bundles_dir()}/\{bundle_id}.etag").unwrap_or(
+    "\"\{bundle_id}\"",
+  )
   headers["ETag"] = etag
-  Ok(@host_async.binary_response(200, bytes, headers~))
+  Ok({ status: 200, headers, body: Some(bytes) })
 }
 
 ///|
@@ -423,13 +426,13 @@ fn receipt_provenance(
   source : String,
   digest_verified : Bool,
   etag : String,
-  signature : @registry_lib.SignatureStatus,
+  signature : @client.SignatureStatus,
 ) -> Json {
   {
     "source": source,
     "digestVerified": digest_verified,
     "etag": etag,
-    "signature": @registry_lib.signature_json(signature),
+    "signature": @client.signature_json(signature),
   }
 }
 
@@ -437,7 +440,7 @@ fn receipt_provenance(
 fn parse_upload(
   upload_request : Json,
 ) -> Result[
-  (String, String, String, String, Int, @registry_lib.SignatureStatus),
+  (String, String, String, String, Int, @client.SignatureStatus),
   @cli.CliError,
 ] {
   guard upload_request is Object(object) else {
@@ -461,33 +464,22 @@ fn parse_upload(
   }
   let size_out = int_field(object, "size")
   guard size_out is Ok(size) else { return Err(size_out.unwrap_err()) }
-  let signature = @registry_lib.signature_status_from_upload_request(object)
+  let signature = @client.signature_status_from_upload_request(object)
   Ok((bundle_file, bundle_type, purl, digest, size, signature))
 }
 
 ///|
 fn verify_signature_for_bundle_file(
   bundle_file : String,
-  signature : @registry_lib.SignatureStatus,
-) -> @registry_lib.SignatureStatus {
-  @registry_lib.verify_signature_for_file(
-    bundle_file, signature, "signature.verify",
-  )
+  signature : @client.SignatureStatus,
+) -> @client.SignatureStatus {
+  @client.verify_signature_for_file(bundle_file, signature, "signature.verify")
 }
 
 ///|
 pub fn upload_local(
   upload_request : Json,
-) -> Result[@registry_lib.UploadResult, @cli.CliError] {
-  let upload_valid = @schema.validate_codeiq_registry_upload_v1(upload_request)
-  guard upload_valid is Ok(_) else {
-    return Err(
-      registry_error(
-        "upload request does not satisfy codeiq-registry-upload/v1 schema: \{upload_valid.unwrap_err().to_string()}",
-      ),
-    )
-  }
-
+) -> Result[@client.UploadResult, @cli.CliError] {
   let parsed_out = parse_upload(upload_request)
   guard parsed_out
     is Ok((bundle_file, bundle_type, purl, digest, size, request_signature)) else {
@@ -522,12 +514,12 @@ pub fn upload_local(
     )
   }
 
-  let root = @registry_lib.local_store_root()
-  let bundles_dir = @registry_lib.local_store_bundles_dir()
-  let index_dir = @registry_lib.local_store_index_dir()
-  let root_out = ensure_dir(".codeiq")
+  let root = @client.local_store_root()
+  let bundles_dir = @client.local_store_bundles_dir()
+  let index_dir = @client.local_store_index_dir()
+  let root_out = ensure_dir(".cogna")
   guard root_out is Ok(_) else { return Err(root_out.unwrap_err()) }
-  let cache_out = ensure_dir(".codeiq/cache")
+  let cache_out = ensure_dir(".cogna/cache")
   guard cache_out is Ok(_) else { return Err(cache_out.unwrap_err()) }
   let registry_out = ensure_dir(root)
   guard registry_out is Ok(_) else { return Err(registry_out.unwrap_err()) }
@@ -555,7 +547,7 @@ pub fn upload_local(
     stored_bundle_path, request_signature,
   )
   let receipt : Json = {
-    "schemaVersion": "codeiq-publish-receipt/v1",
+    "schemaVersion": "cogna-publish-receipt/v1",
     "publishId": publish_id,
     "bundleId": bundle_id,
     "purl": purl,
@@ -566,15 +558,6 @@ pub fn upload_local(
     "provenance": receipt_provenance(
       "local-registry", true, etag, resolved_signature,
     ),
-  }
-
-  let receipt_valid = @schema.validate_codeiq_publish_receipt_v1(receipt)
-  guard receipt_valid is Ok(_) else {
-    return Err(
-      registry_error(
-        "generated receipt does not satisfy codeiq-publish-receipt/v1 schema: \{receipt_valid.unwrap_err().to_string()}",
-      ),
-    )
   }
 
   let purl_key = index_key(purl)
@@ -596,7 +579,7 @@ pub fn upload_local(
 
 ///|
 fn read_header_env(key : String) -> String? {
-  @sys.get_env_var("CODEIQ_REGISTRY_HEADER_\{key}")
+  @sys.get_env_var("COGNA_REGISTRY_HEADER_\{key}")
 }
 
 ///|
@@ -604,8 +587,8 @@ pub fn download_local_by_purl_with_if_none_match(
   purl : String,
   if_none_match : String?,
 ) -> Result[Json, @cli.CliError] {
-  let index_dir = @registry_lib.local_store_index_dir()
-  let bundles_dir = @registry_lib.local_store_bundles_dir()
+  let index_dir = @client.local_store_index_dir()
+  let bundles_dir = @client.local_store_bundles_dir()
   let key = index_key(purl)
   let index_path = "\{index_dir}/\{key}.json"
   if !@fs.path_exists(index_path) {
@@ -630,7 +613,7 @@ pub fn download_local_by_purl_with_if_none_match(
   }
   let digest_out = string_field(receipt, "digest")
   guard digest_out is Ok(digest) else { return Err(digest_out.unwrap_err()) }
-  let signature = @registry_lib.signature_status_from_receipt(receipt)
+  let signature = @client.signature_status_from_receipt(receipt)
 
   let stored_bundle_path = "\{bundles_dir}/\{bundle_id}.ciq.tgz"
   if !@fs.path_exists(stored_bundle_path) {
@@ -645,7 +628,7 @@ pub fn download_local_by_purl_with_if_none_match(
   }
   if not_modified {
     let response : Json = {
-      "schemaVersion": "codeiq-registry-download/v1",
+      "schemaVersion": "cogna-registry-download/v1",
       "status": 304,
       "purl": purl,
       "bundleId": bundle_id,
@@ -653,15 +636,7 @@ pub fn download_local_by_purl_with_if_none_match(
       "etag": stored_etag,
       "downloadUrl": "local://\{stored_bundle_path}",
       "notModified": true,
-      "signature": @registry_lib.signature_json(signature),
-    }
-    let valid = @schema.validate_codeiq_registry_download_v1(response)
-    guard valid is Ok(_) else {
-      return Err(
-        registry_error(
-          "generated download response does not satisfy codeiq-registry-download/v1 schema: \{valid.unwrap_err().to_string()}",
-        ),
-      )
+      "signature": @client.signature_json(signature),
     }
     return Ok(response)
   }
@@ -676,7 +651,7 @@ pub fn download_local_by_purl_with_if_none_match(
   }
 
   let response : Json = {
-    "schemaVersion": "codeiq-registry-download/v1",
+    "schemaVersion": "cogna-registry-download/v1",
     "status": 200,
     "purl": purl,
     "bundleId": bundle_id,
@@ -685,15 +660,7 @@ pub fn download_local_by_purl_with_if_none_match(
     "downloadUrl": "local://\{stored_bundle_path}",
     "contentLength": bytes.length(),
     "notModified": false,
-    "signature": @registry_lib.signature_json(signature),
-  }
-  let valid = @schema.validate_codeiq_registry_download_v1(response)
-  guard valid is Ok(_) else {
-    return Err(
-      registry_error(
-        "generated download response does not satisfy codeiq-registry-download/v1 schema: \{valid.unwrap_err().to_string()}",
-      ),
-    )
+    "signature": @client.signature_json(signature),
   }
   Ok(response)
 }
@@ -710,7 +677,7 @@ pub fn download_local_by_purl(purl : String) -> Result[Json, @cli.CliError] {
 pub fn api_resolve(
   purl : String,
   if_none_match : String?,
-) -> Result[@registry_lib.RegistryApiResponse, @cli.CliError] {
+) -> Result[@client.RegistryApiResponse, @cli.CliError] {
   let out = download_local_by_purl_with_if_none_match(purl, if_none_match)
   guard out is Ok(body) else { return Err(out.unwrap_err()) }
   guard body is Object(body_object) else {
@@ -734,7 +701,7 @@ pub fn api_resolve(
 ///|
 pub fn api_upload(
   upload_request : Json,
-) -> Result[@registry_lib.RegistryApiResponse, @cli.CliError] {
+) -> Result[@client.RegistryApiResponse, @cli.CliError] {
   let upload_out = upload_local(upload_request)
   guard upload_out is Ok(uploaded) else { return Err(upload_out.unwrap_err()) }
   let status = if uploaded.receipt

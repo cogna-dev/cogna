@@ -16,9 +16,9 @@ test "registry download returns 304 when etag matches" {
     fail("upload_local should succeed")
   }
 
-  @sys.set_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match", uploaded.etag)
+  @sys.set_env_var("COGNA_REGISTRY_HEADER_If-None-Match", uploaded.etag)
   let download_out = download_local_by_purl(purl)
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
+  @sys.unset_env_var("COGNA_REGISTRY_HEADER_If-None-Match")
   guard download_out is Ok(download) else {
     cleanup_registry()
     remove_dir_if_exists(repo)
@@ -52,9 +52,9 @@ test "registry download returns 200 when etag mismatched" {
     fail("upload_local should succeed")
   }
 
-  @sys.set_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match", "\"other-etag\"")
+  @sys.set_env_var("COGNA_REGISTRY_HEADER_If-None-Match", "\"other-etag\"")
   let download_out = download_local_by_purl(purl)
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
+  @sys.unset_env_var("COGNA_REGISTRY_HEADER_If-None-Match")
   guard download_out is Ok(download) else {
     cleanup_registry()
     remove_dir_if_exists(repo)
@@ -102,7 +102,7 @@ test "registry run_upload_local reads request file and returns receipt" {
   assert_true(result.summary.contains("Uploaded bundle from"))
   let receipt_text = result.receipt.stringify(indent=2)
   assert_true(
-    receipt_text.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""),
+    receipt_text.contains("\"schemaVersion\": \"cogna-publish-receipt/v1\""),
   )
   assert_true(
     receipt_text.contains("\"purl\": \"pkg:generic/acme/demo@0.3.0\""),
@@ -144,7 +144,7 @@ test "registry run_download_local returns response for purl" {
   assert_true(
     response_text.contains("\"purl\": \"pkg:generic/acme/demo@0.4.0\""),
   )
-  assert_true(response_text.contains("local://.codeiq/cache/registry/bundles/"))
+  assert_true(response_text.contains("local://.cogna/cache/registry/bundles/"))
 
   cleanup_registry()
   remove_dir_if_exists(repo)
@@ -166,9 +166,7 @@ test "registry upload_local writes bundle and index into shared cache store" {
   let repo = tmp_registry_repo("shared-store")
   cleanup_registry()
   remove_dir_if_exists(repo)
-  @sys.set_env_var(
-    "CODEIQ_REGISTRY_STORE_DIR", tmp_registry_store_root(),
-  )
+  @sys.set_env_var("COGNA_REGISTRY_STORE_DIR", tmp_registry_store_root())
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
 
@@ -231,35 +229,33 @@ test "registry local store root prefers env then config then default" {
   cleanup_registry()
   remove_dir_if_exists(repo)
   @fs.create_dir(repo)
-  let config_out = try? @fs.write_string_to_file("\{repo}/codeiq.yml", config)
+  let config_out = try? @fs.write_string_to_file("\{repo}/cogna.yml", config)
   guard config_out is Ok(_) else {
     cleanup_registry()
     remove_dir_if_exists(repo)
     fail("failed to write config")
   }
 
-  let default_root = @registry_lib.resolved_local_store_root(
+  let default_root = @client.resolved_local_store_root(
     tmp_registry_repo("no-config"),
   )
-  inspect(default_root, content=".codeiq/cache/registry")
+  inspect(default_root, content=".cogna/cache/registry")
 
-  @sys.set_env_var(
-    "CODEIQ_REGISTRY_STORE_DIR", tmp_registry_store_root(),
-  )
+  @sys.set_env_var("COGNA_REGISTRY_STORE_DIR", tmp_registry_store_root())
   inspect(
-    @registry_lib.resolved_local_store_root(repo),
-    content="/tmp/codeiq-registry-store",
+    @client.resolved_local_store_root(repo),
+    content="/tmp/cogna-registry-store",
   )
-  @sys.unset_env_var("CODEIQ_REGISTRY_STORE_DIR")
+  @sys.unset_env_var("COGNA_REGISTRY_STORE_DIR")
 
-  let config_root = @registry_lib.resolved_local_store_root(repo)
+  let config_root = @client.resolved_local_store_root(repo)
   inspect(
     config_root,
-    content="/tmp/codeiq-registry-config-store/custom-registry",
+    content="/tmp/cogna-registry-config-store/custom-registry",
   )
 
   cleanup_registry()
-  @fs.remove_file("\{repo}/codeiq.yml") catch {
+  @fs.remove_file("\{repo}/cogna.yml") catch {
     _ => ()
   }
   remove_dir_if_exists(repo)
@@ -337,8 +333,8 @@ test "registry upload_local includes signature metadata from env" {
   let purl = "pkg:generic/acme/demo@4.4.2"
   let bundle_path = bundle_fixture(repo)
   let request = upload_request(bundle_path, purl)
-  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
+  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
   let out = upload_local(request)
   guard out is Ok(uploaded) else {
     cleanup_registry()

@@ -31,7 +31,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 
 ///|
 fn tmp_diff_repo(name : String) -> String {
-  "/tmp/codeiq-diff-\{name}"
+  "/tmp/cogna-diff-\{name}"
 }
 
 ///|
@@ -41,11 +41,6 @@ fn write_manifest(path : String, purl : String, profile : String) -> Unit {
     "schemaVersion": "ciq-bundle/v1",
     "purl": purl,
     "profile": profile,
-    "declarationSchema": {
-      "version": "ciq-declarations/v1",
-      "format": "ndjson",
-      "model": "signature + shape + language_specific tagged union",
-    },
     "source": {
       "repo": "https://github.com/acme/payment-api",
       "ref": "main",
@@ -115,7 +110,7 @@ test "diff generates skeleton diff output" {
 
   inspect(
     result.display(),
-    content="Generated CIQ declaration diff at /tmp/codeiq-diff-repo/dist/diff.json",
+    content="Generated CIQ declaration diff at /tmp/cogna-diff-repo/dist/diff.json",
   )
 
   let diff_text = @fs.read_file_to_string("\{repo}/dist/diff.json") catch {

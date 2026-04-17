@@ -7,7 +7,7 @@ pub fn default_config() -> Config {
     purl: "pkg:openapi/acme/payment-api@2026.03.01",
     source: { repo: "https://github.com/acme/payment-api", source_ref: "main" },
     inputs: { include_paths: ["openapi/**/*.yaml"] },
-    checks: { format: "sarif", policy: "./dist/policy.ciq.tgz" },
+    checks: { format: "sarif", policy: "./policies" },
     diff: { since: None, include_test_changes: false },
     sbom: {
       format: "spdx",
@@ -15,7 +15,7 @@ pub fn default_config() -> Config {
       require_local_packages: true,
     },
     publish: { include_dependencies: true },
-    registry: { port: 8787, store_dir: ".codeiq/cache/registry" },
+    registry: { port: 8787, store_dir: ".cogna/cache/registry" },
     mcp: { port: 3000 },
   }
 }

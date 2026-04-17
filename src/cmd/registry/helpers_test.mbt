@@ -6,63 +6,57 @@ fn remove_dir_if_exists(path : String) -> Unit {
   let is_dir_out = try? @fs.is_dir(path)
   match is_dir_out {
     Ok(true) => {
-      let entries = @fs.read_dir(path) catch {
-        _ => []
-      }
+      let entries = @fs.read_dir(path) catch { _ => [] }
       for entry in entries {
         let child = "\{path}/\{entry}"
         let child_is_dir_out = try? @fs.is_dir(child)
         match child_is_dir_out {
           Ok(true) => remove_dir_if_exists(child)
-          _ => @fs.remove_file(child) catch {
-            _ => ()
-          }
+          _ => @fs.remove_file(child) catch { _ => () }
         }
       }
       @fs.remove_dir(path) catch {
         _ => ()
       }
     }
-    _ => @fs.remove_file(path) catch {
-      _ => ()
-    }
+    _ => @fs.remove_file(path) catch { _ => () }
   }
 }
 
 ///|
 fn clear_registry_env_vars() -> Unit {
-  @sys.unset_env_var("CODEIQ_REGISTRY_STORE_DIR")
-  @sys.unset_env_var("CODEIQ_REGISTRY_BASE_URL")
-  @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
-  @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_Authorization")
-  @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_X_API_KEY")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_STATUS")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_KEY_ID")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_VALUE")
-  @sys.unset_env_var("CODEIQ_SIGNATURE_PUBLIC_KEY_FILE")
-  @sys.unset_env_var("CODEIQ_REGISTRY_ALLOW_INSECURE_HTTP")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_MAX_TIME")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_RETRY")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_CONNECT_TIMEOUT")
-  @sys.unset_env_var("CODEIQ_REGISTRY_CURL_INSECURE_TLS")
-  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CA_FILE")
-  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CLIENT_CERT_FILE")
-  @sys.unset_env_var("CODEIQ_REGISTRY_TLS_CLIENT_KEY_FILE")
+  @sys.unset_env_var("COGNA_REGISTRY_STORE_DIR")
+  @sys.unset_env_var("COGNA_REGISTRY_BASE_URL")
+  @sys.unset_env_var("COGNA_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
+  @sys.unset_env_var("COGNA_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
+  @sys.unset_env_var("COGNA_REGISTRY_HEADER_If-None-Match")
+  @sys.unset_env_var("COGNA_REGISTRY_HEADER_Authorization")
+  @sys.unset_env_var("COGNA_REGISTRY_HEADER_X_API_KEY")
+  @sys.unset_env_var("COGNA_SIGNATURE_STATUS")
+  @sys.unset_env_var("COGNA_SIGNATURE_KEY_ID")
+  @sys.unset_env_var("COGNA_SIGNATURE_VALUE")
+  @sys.unset_env_var("COGNA_SIGNATURE_PUBLIC_KEY_FILE")
+  @sys.unset_env_var("COGNA_REGISTRY_ALLOW_INSECURE_HTTP")
+  @sys.unset_env_var("COGNA_REGISTRY_CURL_MAX_TIME")
+  @sys.unset_env_var("COGNA_REGISTRY_CURL_RETRY")
+  @sys.unset_env_var("COGNA_REGISTRY_CURL_CONNECT_TIMEOUT")
+  @sys.unset_env_var("COGNA_REGISTRY_CURL_INSECURE_TLS")
+  @sys.unset_env_var("COGNA_REGISTRY_TLS_CA_FILE")
+  @sys.unset_env_var("COGNA_REGISTRY_TLS_CLIENT_CERT_FILE")
+  @sys.unset_env_var("COGNA_REGISTRY_TLS_CLIENT_KEY_FILE")
 }
 
 ///|
 fn cleanup_registry() -> Unit {
-  remove_dir_if_exists(".codeiq/registry/index")
-  remove_dir_if_exists(".codeiq/registry/bundles")
-  remove_dir_if_exists(".codeiq/registry/http")
-  remove_dir_if_exists(".codeiq/registry")
-  remove_dir_if_exists(".codeiq/cache/registry/index")
-  remove_dir_if_exists(".codeiq/cache/registry/bundles")
-  remove_dir_if_exists(".codeiq/cache/registry")
-  remove_dir_if_exists(".codeiq/cache")
-  remove_dir_if_exists(".codeiq")
+  remove_dir_if_exists(".cogna/registry/index")
+  remove_dir_if_exists(".cogna/registry/bundles")
+  remove_dir_if_exists(".cogna/registry/http")
+  remove_dir_if_exists(".cogna/registry")
+  remove_dir_if_exists(".cogna/cache/registry/index")
+  remove_dir_if_exists(".cogna/cache/registry/bundles")
+  remove_dir_if_exists(".cogna/cache/registry")
+  remove_dir_if_exists(".cogna/cache")
+  remove_dir_if_exists(".cogna")
   remove_dir_if_exists(tmp_registry_store_root())
   clear_registry_env_vars()
 }
@@ -74,12 +68,12 @@ fn dbt_cleanup_registry() -> Unit {
 
 ///|
 fn tmp_registry_repo(name : String) -> String {
-  "/tmp/codeiq-registry-\{name}"
+  "/tmp/cogna-registry-\{name}"
 }
 
 ///|
 fn tmp_registry_store_root() -> String {
-  "/tmp/codeiq-registry-store"
+  "/tmp/cogna-registry-store"
 }
 
 ///|
@@ -97,7 +91,7 @@ fn upload_request(bundle_path : String, purl : String) -> Json {
     _ => abort("failed to read bundle fixture")
   }
   {
-    "schemaVersion": "codeiq-registry-upload/v1",
+    "schemaVersion": "cogna-registry-upload/v1",
     "endpoint": "POST /api/v1/bundles",
     "bundleFile": bundle_path,
     "bundleType": "ciq-bundle",
@@ -267,10 +261,11 @@ test "registry helper imports stay live on native" {
   @fs.create_dir(repo)
   @fs.create_dir("\{repo}/dist")
   let bundle_path = bundle_fixture(repo)
-  let request = upload_request_with_signature(bundle_path, "pkg:generic/acme/helper@0.0.1", {
-    "status": "verified",
-    "algorithm": "sha256",
-  })
+  let request = upload_request_with_signature(
+    bundle_path,
+    "pkg:generic/acme/helper@0.0.1",
+    { "status": "verified", "algorithm": "sha256" },
+  )
   guard request is Object(object) else {
     cleanup_registry()
     remove_dir_if_exists(repo)

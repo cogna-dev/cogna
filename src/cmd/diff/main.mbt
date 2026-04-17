@@ -94,12 +94,12 @@ fn validate_manifest_shape(
   manifest : Json,
   path : String,
 ) -> Result[Unit, @cli.CliError] {
-  let out = @schema.validate_ciq_bundle_v1(manifest)
-  guard out is Ok(_) else {
+  guard manifest is Object(object) else {
+    return Err(diff_error("manifest \{path} must be a JSON object"))
+  }
+  guard object.get("schemaVersion") is Some(String("ciq-bundle/v1")) else {
     return Err(
-      diff_error(
-        "manifest \{path} does not satisfy ciq-bundle/v1 schema: \{out.unwrap_err().to_string()}",
-      ),
+      diff_error("manifest \{path} missing schemaVersion ciq-bundle/v1"),
     )
   }
   Ok(())
@@ -1207,15 +1207,6 @@ pub fn run(params : DiffParams) -> @cli.CliResult[DiffResult, @cli.CliError] {
     }
     diff_object["testChanges"] = Json::array(all_test_changes)
   }
-  let diff_schema_out = @schema.validate_ciq_diff_v1(diff)
-  guard diff_schema_out is Ok(_) else {
-    return Err(
-      diff_error(
-        "generated diff does not satisfy ciq-diff/v1 schema: \{diff_schema_out.unwrap_err().to_string()}",
-      ),
-    )
-  }
-
   let write_out = write_diff(output_path, diff)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
 

@@ -62,14 +62,14 @@ pub impl Show for CliInvocation with output(self, logger) {
 
 ///|
 fn is_known_subcommand(name : String) -> Bool {
-    match name {
-      "init"
-      | "build"
-      | "diff"
-      | "check"
-      | "query"
-      | "publish"
-      | "registry"
+  match name {
+    "init"
+    | "build"
+    | "diff"
+    | "check"
+    | "query"
+    | "publish"
+    | "registry"
     | "mcp"
     | "help" => true
     _ => false
@@ -89,12 +89,12 @@ fn normalize_cli_args(argv : Array[String]) -> Array[String] {
 ///|
 fn grouped_help() -> String {
   (
-    #|CodeIQ declaration-aware CLI
+    #|Cogna declaration-aware CLI
     #|
-    #|Usage: codeiq <command> [options]
+    #|Usage: cogna <command> [options]
     #|
     #|Core
-    #|  init                Initialize codeiq.yml
+    #|  init                Initialize cogna.yml
     #|  build               Build CIQ bundle
     #|  diff                Compute CIQ diff
     #|  check               Run policy checks
@@ -125,15 +125,15 @@ fn parse_invocation(
   argv : Array[String],
 ) -> @cli.CliResult[CliInvocation, @cli.CliError] {
   let command = @argparse.Command::new(
-    "codeiq",
-    about="CodeIQ declaration-aware CLI",
+    "cogna",
+    about="Cogna declaration-aware CLI",
     subcommands=[
-      @argparse.Command::new("init", about="Initialize codeiq.yml", options=[
+      @argparse.Command::new("init", about="Initialize cogna.yml", options=[
         @argparse.OptionArg::new(
           "output",
           long="output",
           action=@argparse.OptionAction::Set,
-          default_values=["./codeiq.yml"],
+          default_values=["./cogna.yml"],
         ),
       ]),
       @argparse.Command::new("build", about="Build CIQ bundle"),
@@ -190,9 +190,7 @@ fn parse_invocation(
     subcommand_required=true,
   )
   let parse_result = try? @argparse.parse(command, argv~)
-  guard parse_result is Ok(matches) else {
-    return Err(usage_error())
-  }
+  guard parse_result is Ok(matches) else { return Err(usage_error()) }
   match matches.subcommand {
     Some(("init", init_matches)) => {
       let output_values = init_matches.values["output"]
@@ -215,7 +213,7 @@ fn parse_invocation(
     }
     Some(("check", check_matches)) => {
       ignore(check_matches)
-      Ok(Check(@check_cmd.CheckParams::{ diff_file: "", policy_bundle: "" }))
+      Ok(Check(@check_cmd.CheckParams::{ diff_file: "", policies_dir: "" }))
     }
     Some(("query", query_matches)) => {
       let query_values = query_matches.values["query_file"]

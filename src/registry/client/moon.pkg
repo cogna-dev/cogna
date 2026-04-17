@@ -1,13 +1,14 @@
 import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,
+  "moonbitlang/core/env" @env,
   "moonbitlang/x/fs" @fs,
   "moonbitlang/x/sys" @sys,
+  "moonbitlang/async" @mbasync,
+  "moonbitlang/async/http" @http,
   "shu-kitamura/sha256" @sha256,
-  "yufeiminds/codeiq/async" @host_async,
-  "yufeiminds/codeiq/lib/registry" @registry_lib,
-  "yufeiminds/codeiq/cli" @cli,
-  "yufeiminds/codeiq/schema" @schema,
+  "cogna-dev/cogna/config" @config,
+  "cogna-dev/cogna/cli" @cli,
 }
 
 supported_targets = "native"

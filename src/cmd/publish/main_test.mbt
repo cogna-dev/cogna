@@ -34,6 +34,15 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   )
   remove_dir_if_exists("\{repo}/dist/dependencies/pkg_npm_react_18.2.0")
   remove_dir_if_exists("\{repo}/dist/dependencies")
+  remove_dir_if_exists(".cogna/registry/http")
+  remove_dir_if_exists(".cogna/registry/index")
+  remove_dir_if_exists(".cogna/registry/bundles")
+  remove_dir_if_exists(".cogna/registry")
+  remove_dir_if_exists(".cogna/cache/registry/index")
+  remove_dir_if_exists(".cogna/cache/registry/bundles")
+  remove_dir_if_exists(".cogna/cache/registry")
+  remove_dir_if_exists(".cogna/cache")
+  remove_dir_if_exists(".cogna")
   remove_dir_if_exists(".codeiq/registry/http")
   remove_dir_if_exists(".codeiq/registry/index")
   remove_dir_if_exists(".codeiq/registry/bundles")
@@ -45,6 +54,17 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_dir_if_exists(".codeiq")
   remove_dir_if_exists("\{repo}/dist")
   remove_dir_if_exists(repo)
+  @sys.unset_env_var("COGNA_REGISTRY_STORE_DIR")
+  @sys.unset_env_var("COGNA_REGISTRY_BASE_URL")
+  @sys.unset_env_var("COGNA_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
+  @sys.unset_env_var("COGNA_REGISTRY_REMOTE_UPLOAD_RESPONSE_JSON")
+  @sys.unset_env_var("COGNA_REGISTRY_IF_NONE_MATCH")
+  @sys.unset_env_var("COGNA_REGISTRY_HEADER_If-None-Match")
+  @sys.unset_env_var("COGNA_SIGNATURE_STATUS")
+  @sys.unset_env_var("COGNA_SIGNATURE_KEY_ID")
+  @sys.unset_env_var("COGNA_SIGNATURE_VALUE")
+  @sys.unset_env_var("COGNA_SIGNATURE_PUBLIC_KEY_FILE")
+  @sys.unset_env_var("COGNA_REGISTRY_ALLOW_INSECURE_HTTP")
   @sys.unset_env_var("CODEIQ_REGISTRY_STORE_DIR")
   @sys.unset_env_var("CODEIQ_REGISTRY_BASE_URL")
   @sys.unset_env_var("CODEIQ_REGISTRY_REMOTE_DOWNLOAD_RESPONSE_JSON")
@@ -60,7 +80,7 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
 
 ///|
 fn tmp_publish_repo(name : String) -> String {
-  "/tmp/codeiq-publish-\{name}"
+  "/tmp/cogna-publish-\{name}"
 }
 
 ///|
@@ -83,7 +103,7 @@ test "publish generates local publish receipt" {
 
   inspect(
     result.display(),
-    content="Generated publish receipt at /tmp/codeiq-publish-repo/dist/publish.json",
+    content="Generated publish receipt at /tmp/cogna-publish-repo/dist/publish.json",
   )
 
   let receipt = @fs.read_file_to_string("\{repo}/dist/publish.json") catch {
@@ -94,7 +114,7 @@ test "publish generates local publish receipt" {
     }
   }
   assert_true(
-    receipt.contains("\"schemaVersion\": \"codeiq-publish-receipt/v1\""),
+    receipt.contains("\"schemaVersion\": \"cogna-publish-receipt/v1\""),
   )
   assert_true(receipt.contains("\"publishId\":"))
   assert_true(receipt.contains("\"bundleType\": \"ciq-bundle\""))
@@ -149,11 +169,11 @@ test "publish aggregates dependency bundle receipts when config enables dependen
     #|  includeDependencies: true
     #|registry:
     #|  port: 8787
-    #|  storeDir: .codeiq/cache/registry
+    #|  storeDir: .cogna/cache/registry
     #|mcp:
     #|  port: 3000
     #|
-  let config_out = try? @fs.write_string_to_file("\{repo}/codeiq.yml", config)
+  let config_out = try? @fs.write_string_to_file("\{repo}/cogna.yml", config)
   guard config_out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("failed to write config")
@@ -174,11 +194,6 @@ test "publish aggregates dependency bundle receipts when config enables dependen
         "schemaVersion": "ciq-bundle/v1",
         "purl": "pkg:openapi/acme/payment-api@2026.03.01",
         "profile": "openapi-spec",
-        "declarationSchema": {
-          "version": "ciq-declarations/v1",
-          "format": "ndjson",
-          "model": "signature + shape + language_specific tagged union",
-        },
         "source": {
           "repo": "https://github.com/acme/payment-api",
           "ref": "main",
@@ -206,11 +221,6 @@ test "publish aggregates dependency bundle receipts when config enables dependen
         "schemaVersion": "ciq-bundle/v1",
         "purl": "pkg:npm/react@18.2.0",
         "profile": "openapi-spec",
-        "declarationSchema": {
-          "version": "ciq-declarations/v1",
-          "format": "ndjson",
-          "model": "dependency-files-only",
-        },
         "source": {
           "repo": "local-package-cache",
           "ref": "installed",
@@ -299,9 +309,9 @@ test "publish returns already-exists receipt when etag matches" {
     fail("first receipt should contain bundleId")
   }
 
-  @sys.set_env_var("CODEIQ_REGISTRY_IF_NONE_MATCH", "\"\{bundle_id}\"")
+  @sys.set_env_var("COGNA_REGISTRY_IF_NONE_MATCH", "\"\{bundle_id}\"")
   let second_out = run({ bundle_file: bundle_path })
-  @sys.unset_env_var("CODEIQ_REGISTRY_IF_NONE_MATCH")
+  @sys.unset_env_var("COGNA_REGISTRY_IF_NONE_MATCH")
   guard second_out is Ok(_) else {
     cleanup_tmp_repo(repo)
     fail("second publish should succeed with etag")
@@ -345,7 +355,7 @@ test "publish receipt uses shared local registry cache path" {
     }
   }
   assert_true(receipt.contains("\"source\": \"local-registry\""))
-  assert_true(receipt.contains("local://.codeiq/cache/registry/bundles/"))
+  assert_true(receipt.contains("local://.cogna/cache/registry/bundles/"))
 
   cleanup_tmp_repo(repo)
 }
@@ -362,9 +372,9 @@ test "publish receipt includes signature metadata from local registry response" 
     _ => abort("failed to write bundle fixture")
   }
 
-  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
-  @sys.set_env_var("CODEIQ_SIGNATURE_VALUE", "ZmFrZS1zaWduYXR1cmU=")
+  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
+  @sys.set_env_var("COGNA_SIGNATURE_VALUE", "ZmFrZS1zaWduYXR1cmU=")
   let out = run({ bundle_file: bundle_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
@@ -398,8 +408,8 @@ test "publish preserves verified signature without trust downgrade" {
     _ => abort("failed to write bundle fixture")
   }
 
-  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "acme-main")
+  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
+  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
   let out = run({ bundle_file: bundle_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)
@@ -432,8 +442,8 @@ test "publish allows untrusted signature metadata in local-only mode" {
     _ => abort("failed to write bundle fixture")
   }
 
-  @sys.set_env_var("CODEIQ_SIGNATURE_STATUS", "untrusted")
-  @sys.set_env_var("CODEIQ_SIGNATURE_KEY_ID", "unknown-key")
+  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "untrusted")
+  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "unknown-key")
   let out = run({ bundle_file: bundle_path })
   guard out is Ok(_) else {
     cleanup_tmp_repo(repo)

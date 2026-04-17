@@ -1,5 +1,4 @@
 import {
   "moonbitlang/core/string" @string,
   "moonbitlang/x/fs" @fs,
-  "yufeiminds/codeiq/lib/json-schema" @json_schema,
 }

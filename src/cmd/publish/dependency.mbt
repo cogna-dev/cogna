@@ -39,14 +39,5 @@ fn aggregate_receipt(
     repr="\{dependency_receipts.length()}",
   )
   aggregated["dependencyReceipts"] = Json::array(dependency_receipts)
-  let result = Json::object(aggregated)
-  let valid = @schema.validate_codeiq_publish_receipt_v1(result)
-  guard valid is Ok(_) else {
-    return Err(
-      publish_error(
-        "aggregated publish receipt does not satisfy codeiq-publish-receipt/v1 schema: \{valid.unwrap_err().to_string()}",
-      ),
-    )
-  }
-  Ok(result)
+  Ok(Json::object(aggregated))
 }

@@ -11,11 +11,6 @@ test "registry run_download_bundle materializes local download into output direc
     "schemaVersion": "ciq-bundle/v1",
     "purl": purl,
     "profile": "openapi-spec",
-    "declarationSchema": {
-      "version": "ciq-declarations/v1",
-      "format": "ndjson",
-      "model": "signature + shape + language_specific tagged union",
-    },
     "source": {
       "repo": "https://github.com/acme/demo",
       "ref": "main",
@@ -46,7 +41,7 @@ test "registry run_download_bundle materializes local download into output direc
   }
 
   let request : Json = {
-    "schemaVersion": "codeiq-registry-upload/v1",
+    "schemaVersion": "cogna-registry-upload/v1",
     "endpoint": "POST /api/v1/bundles",
     "bundleFile": bundle_path,
     "bundleType": "ciq-bundle",

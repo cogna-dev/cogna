@@ -1,12 +1,15 @@
 import {
+  "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,
-  "moonbitlang/x/sys" @sys,
+  "moonbitlang/async" @mbasync,
+  "moonbitlang/async/http" @http,
+  "moonbitlang/async/socket" @socket,
   "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
-  "cogna-dev/cogna/cmd/registry" @registry,
+  "cogna-dev/mapi/lib" @mapi,
   "cogna-dev/cogna/registry/client" @client,
   "cogna-dev/cogna/cli" @cli,
-  "cogna-dev/cogna/config" @config,
 }
 
 supported_targets = "native"

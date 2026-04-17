@@ -13,39 +13,25 @@ fn has_disallowed_input_path(paths : Array[String]) -> Bool {
 }
 
 ///|
-fn schema_error_message(error : @json_schema.SchemaError) -> String {
-  match error {
-    @json_schema.SchemaParseError(message) => "schema parse error: \{message}"
-    @json_schema.InvalidSchema(message) => "invalid schema: \{message}"
-    @json_schema.ValidationFailed(issues) =>
-      if issues.length() == 0 {
-        "validation failed"
-      } else {
-        let first = issues[0]
-        "\{first.path}: \{first.message}"
-      }
-  }
-}
-
-///|
 pub fn validate(config : Config, path : String) -> Result[Config, ConfigError] {
-  let instance = config_to_json(config)
-  let schema = match config.schema_version {
-    "ciq-config/v1" => ciq_config_v1_schema()
-    "ciq-config/v2" => ciq_config_v2_schema()
-    _ =>
-      return Err(
-        ConfigError::ValidationError(
-          path~,
-          "schemaVersion must be ciq-config/v1 or ciq-config/v2",
-        ),
-      )
-  }
-  let schema_out = @json_schema.validate_json(schema, instance)
-  if schema_out is Err(error) {
-    Err(ConfigError::ValidationError(path~, schema_error_message(error)))
+  if config.schema_version != "ciq-config/v1" &&
+    config.schema_version != "ciq-config/v2" {
+    Err(
+      ConfigError::ValidationError(
+        path~,
+        "schemaVersion must be ciq-config/v1 or ciq-config/v2",
+      ),
+    )
+  } else if config.purl == "" {
+    Err(ConfigError::ValidationError(path~, "purl must not be empty"))
   } else if !config.purl.has_prefix("pkg:") {
     Err(ConfigError::ValidationError(path~, "purl must start with pkg:"))
+  } else if config.source.repo == "" {
+    Err(ConfigError::ValidationError(path~, "source.repo must not be empty"))
+  } else if config.source.source_ref == "" {
+    Err(ConfigError::ValidationError(path~, "source.ref must not be empty"))
+  } else if config.inputs.include_paths.is_empty() {
+    Err(ConfigError::ValidationError(path~, "inputs.include must not be empty"))
   } else if has_disallowed_input_path(config.inputs.include_paths) {
     Err(
       ConfigError::ValidationError(
@@ -57,6 +43,8 @@ pub fn validate(config : Config, path : String) -> Result[Config, ConfigError] {
     Err(ConfigError::ValidationError(path~, "checks.format must be sarif"))
   } else if config.checks.policy == "" {
     Err(ConfigError::ValidationError(path~, "checks.policy must not be empty"))
+  } else if config.validation != "none" && config.validation != "lsp" {
+    Err(ConfigError::ValidationError(path~, "validation must be none or lsp"))
   } else if config.schema_version == "ciq-config/v2" &&
     config.sbom.format != "spdx" {
     Err(ConfigError::ValidationError(path~, "sbom.format must be spdx"))

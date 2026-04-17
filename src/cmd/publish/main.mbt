@@ -48,21 +48,17 @@ fn trust_enforcement_required() -> Bool {
 
 ///|
 fn signature_from_env() -> Json {
-  @registry_lib.signature_json(@registry_lib.load_signature_status_from_env())
+  @client.signature_json(@client.load_signature_status_from_env())
 }
 
 ///|
 fn signature_from_download(download : Map[String, Json]) -> Json {
-  @registry_lib.signature_json(
-    @registry_lib.signature_status_from_download(download),
-  )
+  @client.signature_json(@client.signature_status_from_download(download))
 }
 
 ///|
 fn signature_from_receipt(receipt : Map[String, Json]) -> Json {
-  @registry_lib.signature_json(
-    @registry_lib.signature_status_from_receipt(receipt),
-  )
+  @client.signature_json(@client.signature_status_from_receipt(receipt))
 }
 
 ///|
@@ -74,7 +70,7 @@ fn ensure_signature_status_allowed(
     return Err(publish_error("invalid signature metadata shape"))
   }
   let status = match signature_object.get("status") {
-    Some(String(value)) => @registry_lib.parse_signature_status(value)
+    Some(String(value)) => @client.parse_signature_status(value)
     _ => "unsigned"
   }
   if enforce_trust && status == "untrusted" {
@@ -182,7 +178,7 @@ fn upload_request(bundle_file : String) -> Result[Json, @cli.CliError] {
   let digest = "sha256:\{@sha256.sha256_hexdigest(bytes)}"
   let signature = signature_from_env()
   let request : Json = {
-    "schemaVersion": "codeiq-registry-upload/v1",
+    "schemaVersion": "cogna-registry-upload/v1",
     "endpoint": "POST /api/v1/bundles",
     "bundleFile": bundle_file,
     "bundleType": detect_bundle_type(bundle_file),
@@ -190,14 +186,6 @@ fn upload_request(bundle_file : String) -> Result[Json, @cli.CliError] {
     "digest": digest,
     "size": bytes.length(),
     "signature": signature,
-  }
-  let valid = @schema.validate_codeiq_registry_upload_v1(request)
-  guard valid is Ok(_) else {
-    return Err(
-      publish_error(
-        "generated upload request does not satisfy codeiq-registry-upload/v1 schema: \{valid.unwrap_err().to_string()}",
-      ),
-    )
   }
   Ok(request)
 }
@@ -224,15 +212,15 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
     _ => "ciq-bundle"
   }
   let enforce_trust = trust_enforcement_required()
-  let if_none_match = @sys.get_env_var("CODEIQ_REGISTRY_IF_NONE_MATCH")
+  let if_none_match = @sys.get_env_var("COGNA_REGISTRY_IF_NONE_MATCH")
   if download_purl != "" {
     match if_none_match {
       Some(value) if value != "" =>
-        @sys.set_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match", value)
-      _ => @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
+        @sys.set_env_var("COGNA_REGISTRY_HEADER_If-None-Match", value)
+      _ => @sys.unset_env_var("COGNA_REGISTRY_HEADER_If-None-Match")
     }
     let download_out = @registry.download_by_purl(download_purl)
-    @sys.unset_env_var("CODEIQ_REGISTRY_HEADER_If-None-Match")
+    @sys.unset_env_var("COGNA_REGISTRY_HEADER_If-None-Match")
     if download_out is Err(error) {
       let message = error.to_string()
       if should_fail_on_download_error(message) {
@@ -281,7 +269,7 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
             return Err(signature_out.unwrap_err())
           }
           let receipt : Json = {
-            "schemaVersion": "codeiq-publish-receipt/v1",
+            "schemaVersion": "cogna-publish-receipt/v1",
             "publishId": "pub_existing_\{bundle_id}",
             "bundleId": bundle_id,
             "purl": download_purl,
@@ -295,14 +283,6 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
               "etag": response_etag,
               "signature": verified_signature,
             },
-          }
-          let valid = @schema.validate_codeiq_publish_receipt_v1(receipt)
-          guard valid is Ok(_) else {
-            return Err(
-              publish_error(
-                "registry response does not satisfy codeiq-publish-receipt/v1 schema: \{valid.unwrap_err().to_string()}",
-              ),
-            )
           }
           return Ok(receipt)
         }
@@ -350,14 +330,6 @@ fn publish_receipt(bundle_file : String) -> Result[Json, @cli.CliError] {
   match receipt_object.get("provenance") {
     Some(Object(provenance)) => provenance["signature"] = verified_signature
     _ => ()
-  }
-  let valid = @schema.validate_codeiq_publish_receipt_v1(receipt)
-  guard valid is Ok(_) else {
-    return Err(
-      publish_error(
-        "registry response does not satisfy codeiq-publish-receipt/v1 schema: \{valid.unwrap_err().to_string()}",
-      ),
-    )
   }
   Ok(receipt)
 }

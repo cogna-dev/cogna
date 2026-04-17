@@ -197,7 +197,7 @@ fn registry_error(message : String) -> @cli.CliError {
 ///|
 pub fn upload_local(
   upload_request : Json,
-) -> Result[@registry_lib.UploadResult, @cli.CliError] {
+) -> Result[@client.UploadResult, @cli.CliError] {
   @registry_impl.upload_local(upload_request)
 }
 
@@ -214,14 +214,14 @@ pub fn download_by_purl(purl : String) -> Result[Json, @cli.CliError] {
 ///|
 pub fn upload(
   upload_request : Json,
-) -> Result[@registry_lib.UploadResult, @cli.CliError] {
+) -> Result[@client.UploadResult, @cli.CliError] {
   @registry_impl.upload(upload_request)
 }
 
 ///|
 pub fn api_upload(
   upload_request : Json,
-) -> Result[@registry_lib.RegistryApiResponse, @cli.CliError] {
+) -> Result[@client.RegistryApiResponse, @cli.CliError] {
   @registry_impl.api_upload(upload_request)
 }
 
@@ -229,7 +229,7 @@ pub fn api_upload(
 pub fn api_resolve(
   purl : String,
   if_none_match : String?,
-) -> Result[@registry_lib.RegistryApiResponse, @cli.CliError] {
+) -> Result[@client.RegistryApiResponse, @cli.CliError] {
   @registry_impl.api_resolve(purl, if_none_match)
 }
 
@@ -243,7 +243,7 @@ pub fn ensure_sha256_digest(
 
 ///|
 pub fn registry_health_path() -> String {
-  @registry_lib.health_path()
+  @client.health_path()
 }
 
 ///|
@@ -279,8 +279,8 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
 ///|
 fn registry_server_info(port : Int) -> Json {
   {
-    "schemaVersion": "codeiq-registry-descriptor/v1",
-    "name": "codeiq-registry",
+    "schemaVersion": "cogna-registry-descriptor/v1",
+    "name": "cogna-registry",
     "transport": "http",
     "port": port,
     "pid": Json::null(),
@@ -309,9 +309,10 @@ fn write_registry_info(
   info : Json,
 ) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
-    err => return Err(
-      registry_error("cannot write descriptor \{path}: \{err.to_string()}"),
-    )
+    err =>
+      return Err(
+        registry_error("cannot write descriptor \{path}: \{err.to_string()}"),
+      )
   }
   Ok(())
 }
@@ -321,9 +322,10 @@ fn read_registry_info(
   path : String,
 ) -> Result[RegistryDescriptor, @cli.CliError] {
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err(
-      registry_error("cannot read descriptor \{path}: \{err.to_string()}"),
-    )
+    err =>
+      return Err(
+        registry_error("cannot read descriptor \{path}: \{err.to_string()}"),
+      )
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(info) else {
@@ -372,17 +374,17 @@ fn wait_for_health(
   sleep_ms? : Int = 100,
 ) -> Bool {
   for _ in 0..<attempts {
-    let request_out = @host_async.http_request(
+    let request_out = @client.http_request(
       "GET",
       url,
       {},
-      @host_async.HttpBody::Empty,
+      @client.HttpBody::Empty,
     )
     match request_out {
       Ok(result) => if result.status == 200 { return true }
       Err(_) => ()
     }
-    @host_async.sleep_ms(sleep_ms)
+    @process.sleep_ms(sleep_ms)
   }
   false
 }

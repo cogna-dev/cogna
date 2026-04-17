@@ -142,11 +142,11 @@ pub fn resolve_project_path(root_dir : String, path : String) -> String {
 ///|
 pub fn find_config_path(root_dir : String) -> String? {
   let base = if root_dir == "" { "." } else { root_dir }
-  let preferred = join_path(base, "codeiq.yml")
+  let preferred = join_path(base, "cogna.yml")
   if @fs.path_exists(preferred) {
     return Some(preferred)
   }
-  let fallback = join_path(base, "codeiq.yaml")
+  let fallback = join_path(base, "cogna.yaml")
   if @fs.path_exists(fallback) {
     Some(fallback)
   } else {
@@ -167,7 +167,7 @@ pub fn resolve(root_dir : String) -> Result[ResolvedConfig, ConfigError] {
       Err(
         ConfigError::FileReadError(
           path=base,
-          "config file not found (tried codeiq.yml, codeiq.yaml)",
+          "config file not found (tried cogna.yml, cogna.yaml)",
         ),
       )
   }
