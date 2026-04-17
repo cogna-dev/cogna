@@ -1,0 +1,119 @@
+name: 'Setup Cogna'
+description: 'Install the Cogna CLI from this repository source and add it to PATH'
+author: 'cogna-dev'
+
+inputs:
+  working-directory:
+    description: 'Optional Cogna source root override. Defaults to the action repository root.'
+    required: false
+    default: ''
+  install-dir:
+    description: 'Optional directory to install the CLI into. Defaults to RUNNER_TEMP/cogna/bin.'
+    required: false
+    default: ''
+  binary-name:
+    description: 'Final executable name exposed on PATH.'
+    required: false
+    default: 'cogna'
+
+outputs:
+  cogna-path:
+    description: 'The installed Cogna executable path'
+    value: ${{ steps.metadata.outputs.cogna-path }}
+  cogna-version:
+    description: 'The Cogna version from moon.mod.json'
+    value: ${{ steps.metadata.outputs.cogna-version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Cogna (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        source_root="${{ inputs.working-directory }}"
+        if [ -z "$source_root" ]; then
+          source_root="${{ github.action_path }}/../../.."
+        fi
+        install_dir="${{ inputs.install-dir }}"
+        if [ -z "$install_dir" ]; then
+          install_dir="${RUNNER_TEMP}/cogna/bin"
+        fi
+        binary_name="${{ inputs.binary-name }}"
+        mkdir -p "$install_dir"
+        cd "$source_root"
+        bash integrations/cli/install.sh "$install_dir" "$binary_name"
+        main_path="$install_dir/main"
+        if [ ! -x "$main_path" ]; then
+          echo "Expected MoonBit install to create $main_path" >&2
+          exit 1
+        fi
+        cogna_path="$install_dir/$binary_name"
+        if [ "$binary_name" = "main" ]; then
+          cogna_path="$main_path"
+        fi
+        smoke_dir="${RUNNER_TEMP}/cogna-smoke"
+        mkdir -p "$smoke_dir"
+        "$cogna_path" init --output "$smoke_dir/cogna.yml"
+        if [ ! -f "$smoke_dir/cogna.yml" ]; then
+          echo "Cogna smoke verification failed: expected $smoke_dir/cogna.yml" >&2
+          exit 1
+        fi
+        version="$(python3 -c 'import json; print(json.load(open("moon.mod.json", encoding="utf-8"))["version"])')"
+        printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
+        printf 'COGNA_PATH=%s\n' "$cogna_path" >> "$GITHUB_ENV"
+        printf 'COGNA_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+
+    - name: Install Cogna (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $sourceRoot = "${{ inputs.working-directory }}"
+        if ([string]::IsNullOrWhiteSpace($sourceRoot)) {
+          $sourceRoot = Join-Path "${{ github.action_path }}" "..\..\.."
+        }
+        $installDir = "${{ inputs.install-dir }}"
+        if ([string]::IsNullOrWhiteSpace($installDir)) {
+          $installDir = Join-Path $env:RUNNER_TEMP "cogna\bin"
+        }
+        $binaryName = "${{ inputs.binary-name }}"
+        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+        Push-Location $sourceRoot
+        & pwsh -File "integrations/cli/install.ps1" -InstallDir "$installDir" -BinaryName "$binaryName"
+        $mainPath = Join-Path $installDir "main.exe"
+        if (-not (Test-Path $mainPath)) {
+          $mainPath = Join-Path $installDir "main"
+        }
+        if (-not (Test-Path $mainPath)) {
+          throw "Expected MoonBit install to create main(.exe) in $installDir"
+        }
+        if ($binaryName -eq "main") {
+          $cognaPath = $mainPath
+        } else {
+          $extension = [System.IO.Path]::GetExtension($mainPath)
+          $cognaPath = Join-Path $installDir ($binaryName + $extension)
+        }
+        $smokeDir = Join-Path $env:RUNNER_TEMP "cogna-smoke"
+        New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+        & $cognaPath init --output (Join-Path $smokeDir "cogna.yml")
+        if (-not (Test-Path (Join-Path $smokeDir "cogna.yml"))) {
+          throw "Cogna smoke verification failed: expected $(Join-Path $smokeDir 'cogna.yml')"
+        }
+        $version = (Get-Content "moon.mod.json" -Raw | ConvertFrom-Json).version
+        Pop-Location
+        $installDir | Out-File -FilePath $env:GITHUB_PATH -Append
+        "COGNA_PATH=$cognaPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+        "COGNA_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    - name: Export Cogna metadata
+      id: metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "cogna-path=${COGNA_PATH}" >> "$GITHUB_OUTPUT"
+        echo "cogna-version=${COGNA_VERSION}" >> "$GITHUB_OUTPUT"
+
+branding:
+  icon: 'terminal'
+  color: 'purple'

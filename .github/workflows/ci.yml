@@ -17,8 +17,8 @@ jobs:
       - name: Setup MoonBit
         uses: ./integrations/actions/setup-moonbit
 
-      - name: Setup CodeIQ
-        uses: ./integrations/actions/setup-codeiq
+      - name: Setup Cogna
+        uses: ./integrations/actions/setup-cogna
 
       - name: Check
         run: moon check
@@ -29,8 +29,64 @@ jobs:
       - name: Build
         run: moon build
 
-      - name: Smoke test run-codeiq action
-        uses: ./integrations/actions/run-codeiq
+      - name: Smoke test run-cogna action
+        uses: ./integrations/actions/run-cogna
         with:
           command: init
-          args: --output /tmp/codeiq-ci-smoke.yml
+          args: --output /tmp/cogna-ci-smoke.yml
+
+  pre-release-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: ./integrations/actions/setup-moonbit
+
+      - name: Verify moon.mod.json version is well-formed semver
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json; print(json.load(open("moon.mod.json"))["version"])')
+          if ! echo "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::moon.mod.json version '$version' is not valid semver (X.Y.Z)"
+            exit 1
+          fi
+          echo "Version format OK: $version"
+
+      - name: Dry-run SDK publish
+        run: moon publish --dry-run
+
+  sdk-check:
+    name: JS SDK checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: integrations/sdk/node/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm --filter @cogna-dev/sdk install
+
+      - name: Typecheck
+        run: pnpm --filter @cogna-dev/sdk run typecheck
+
+      - name: Lint
+        run: pnpm --filter @cogna-dev/sdk run lint
+
+      - name: Test
+        run: pnpm --filter @cogna-dev/sdk run test

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package xaclabs.cogna.v1;
+
+import "xaclabs/cogna/v1/build.proto";
+import "xaclabs/cogna/v1/diff.proto";
+import "xaclabs/cogna/v1/query.proto";
+
+service CognaService {
+  rpc Build(BuildRequest) returns (BuildResponse);
+  rpc Diff(DiffRequest) returns (DiffResponse);
+  rpc FetchPackages(FetchPackagesRequest) returns (FetchPackagesResponse);
+  rpc QueryOutlines(QueryOutlinesRequest) returns (QueryOutlinesResponse);
+  rpc Query(QueryRequest) returns (QueryResponse);
+}

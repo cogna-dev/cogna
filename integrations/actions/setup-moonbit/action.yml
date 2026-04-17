@@ -1,6 +1,6 @@
 name: 'Setup MoonBit'
 description: 'Install the MoonBit programming language toolchain (moon, moonc, moonrun)'
-author: 'yufeiminds'
+author: 'cogna-dev'
 
 inputs:
   version:

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package xaclabs.cogna.v1;
+
+import "xaclabs/cogna/v1/types.proto";
+
+message DiffRequest {
+  optional string base = 1;
+  optional string target = 2;
+  optional bool include_test_changes = 3;
+}
+
+message DiffResponse {
+  DiffChangeSummary summary = 1;
+  repeated DiffChange changes = 2;
+  repeated DiffChange test_changes = 3;
+}

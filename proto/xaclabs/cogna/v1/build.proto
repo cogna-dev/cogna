@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package xaclabs.cogna.v1;
+
+message BuildRequest {}
+
+message BuildResponse {
+  bool success = 1;
+}

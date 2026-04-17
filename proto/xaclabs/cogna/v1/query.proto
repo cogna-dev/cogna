@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package xaclabs.cogna.v1;
+
+import "xaclabs/cogna/v1/types.proto";
+
+message FetchPackagesRequest {}
+
+message FetchPackagesResponse {
+  PackageNode root = 1;
+}
+
+message QueryOutlinesRequest {
+  string package = 1;
+}
+
+message QueryOutlinesResponse {
+  string package = 1;
+  repeated Outline outlines = 2;
+}
+
+message QueryRequest {
+  string package = 1;
+  optional string exact_id = 2;
+  optional string exact_symbol = 3;
+  optional string text = 4;
+  optional int32 limit = 5;
+  optional string cursor = 6;
+}
+
+message QueryResponse {
+  string package = 1;
+  string mode = 2;
+  repeated QueryMatch matches = 3;
+  optional string cursor = 4;
+}

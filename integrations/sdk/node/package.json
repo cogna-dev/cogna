@@ -1,45 +1,37 @@
 {
-  "name": "@codeiq/sdk",
+  "name": "@cogna-dev/sdk",
   "version": "0.1.0",
-  "description": "CodeIQ local index/query SDK for Node.js",
-  "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": false,
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./generated": {
-      "import": "./dist/generated/index.js",
-      "types": "./dist/generated/index.d.ts"
+      "types": "./dist/generated/index.d.ts",
+      "import": "./dist/generated/index.js"
     },
-    "./contracts": {
-      "import": "./dist/contracts.js",
-      "types": "./dist/contracts.d.ts"
+    "./generated/*": {
+      "types": "./dist/generated/*.d.ts",
+      "import": "./dist/generated/*.js"
     },
-    "./index": {
-      "import": "./dist/index-api.js",
-      "types": "./dist/index-api.d.ts"
-    },
-    "./query": {
-      "import": "./dist/query.js",
-      "types": "./dist/query.d.ts"
-    }
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "node ./scripts/build.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "check": "npm run build && npm run typecheck",
-    "prepublishOnly": "npm run check"
+    "build": "tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --declarationMap --outDir dist && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
-  },
-  "engines": {
-    "node": ">=20"
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.9"
   }
 }

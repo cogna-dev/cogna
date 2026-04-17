@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package xaclabs.cogna.v1;
+
+// SourceLocation identifies a position in a source file.
+message SourceLocation {
+  string uri = 1;
+  int32 start_line = 2;
+  int32 end_line = 3;
+}
+
+// PackageNode represents a node in the package dependency tree.
+message PackageNode {
+  string name = 1;
+  optional string version = 2;
+  optional string ecosystem = 3;
+  // Relation to the current project: root / workspace / direct / transitive.
+  string relation = 4;
+  optional string summary = 5;
+  repeated PackageNode children = 6;
+}
+
+// Outline is a single public declaration summary returned by QueryOutlines.
+message Outline {
+  string id = 1;
+  string symbol = 2;
+  // Declaration kind: function / method / type / operation / etc.
+  string kind = 3;
+  optional string summary = 4;
+  bool deprecated = 5;
+  optional SourceLocation location = 6;
+}
+
+// QueryMatch is a single result item returned by Query.
+message QueryMatch {
+  string id = 1;
+  string symbol = 2;
+  string kind = 3;
+  optional string signature = 4;
+  optional string summary = 5;
+  optional string docs = 6;
+  optional double score = 7;
+  optional SourceLocation location = 8;
+}
+
+// DiffChangeSummary aggregates counts of each change kind.
+message DiffChangeSummary {
+  int32 added = 1;
+  int32 removed = 2;
+  int32 changed = 3;
+  int32 deprecated = 4;
+}
+
+// DiffChange describes a single public-API change.
+message DiffChange {
+  // kind: added / removed / changed / deprecated
+  string kind = 1;
+  string id = 2;
+  string symbol = 3;
+  // level: note / warning / error / breaking
+  string level = 4;
+  string message = 5;
+}

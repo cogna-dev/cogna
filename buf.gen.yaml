@@ -2,14 +2,14 @@ version: v2
 inputs:
   - directory: proto
 plugins:
-  - local: tools/protoc-gen-codeiq/protoc-gen-codeiq
-    out: .
+  - local: proto/protoc-gen-cogna/protoc-gen-cogna
+    out: src/sdk
     opt:
       - target=moonbit
     include_imports: false
     include_wkt: false
-  - local: tools/protoc-gen-codeiq/protoc-gen-codeiq
-    out: .
+  - local: proto/protoc-gen-cogna/protoc-gen-cogna
+    out: integrations/sdk
     opt:
       - target=node-ts
     include_imports: false

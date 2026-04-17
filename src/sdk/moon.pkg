@@ -1,0 +1,20 @@
+import {
+  "moonbitlang/core/json" @json,
+  "cogna-dev/cogna/core/api" @core,
+}
+
+options(
+  link: {
+    "js": {
+      "exports": [
+        "build_js:build",
+        "diff_js:diff",
+        "fetch_packages_js:fetch_packages",
+        "query_outlines_js:query_outlines",
+        "query_js:query",
+      ],
+      "format": "esm",
+    },
+  },
+  targets: { "js.mbt": [ "js" ] },
+)
