@@ -12,7 +12,7 @@ const sampleSarif = JSON.stringify({
           rules: [
             {
               id: "compat.core.removed-declaration",
-              helpUri: "https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+              helpUri: "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
             },
           ],
         },
@@ -28,6 +28,6 @@ test("parseSarif keeps runs and indexes rules", () => {
   assert.equal(rules.size, 1)
   assert.equal(
     helpUriForRule(report, "compat.core.removed-declaration"),
-    "https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+    "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
   )
 })

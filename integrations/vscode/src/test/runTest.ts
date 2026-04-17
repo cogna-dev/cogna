@@ -46,15 +46,15 @@ publish:
   includeDependencies: true
 registry:
   port: 8787
-  storeDir: .codeiq/cache/registry
+  storeDir: .cogna/cache/registry
 mcp:
   port: 3000
 `
-  await fs.writeFile(path.join(workspaceDir, "codeiq.yml"), content, "utf8")
+  await fs.writeFile(path.join(workspaceDir, "cogna.yml"), content, "utf8")
 }
 
 async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: string; cliPath: string }> {
-  const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "codeiq-vscode-workspace-"))
+  const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "cogna-vscode-workspace-"))
   const openapiDir = path.join(workspaceDir, "openapi")
   const distDir = path.join(workspaceDir, "dist")
   await fs.mkdir(openapiDir, { recursive: true })
@@ -77,7 +77,7 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
                 rules: [
                   {
                     id: "compat.core.removed-declaration",
-                    helpUri: "https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+                    helpUri: "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
                   },
                 ],
               },
@@ -108,19 +108,19 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
     "utf8",
   )
 
-  const installDir = path.join(workspaceDir, ".codeiq-bin")
+  const installDir = path.join(workspaceDir, ".cogna-bin")
   await fs.mkdir(installDir, { recursive: true })
   if (process.platform === "win32") {
-    await run("pwsh", ["-File", "integrations/cli/install.ps1", "-InstallDir", installDir, "-BinaryName", "codeiq"], repoRoot)
+    await run("pwsh", ["-File", "integrations/cli/install.ps1", "-InstallDir", installDir, "-BinaryName", "cogna"], repoRoot)
   } else {
-    await run("bash", ["integrations/cli/install.sh", installDir, "codeiq"], repoRoot)
+    await run("bash", ["integrations/cli/install.sh", installDir, "cogna"], repoRoot)
   }
   const mainPath = path.join(installDir, process.platform === "win32" ? "main.exe" : "main")
-  const codeiqPath = path.join(installDir, process.platform === "win32" ? "codeiq.exe" : "codeiq")
+  const cognaPath = path.join(installDir, process.platform === "win32" ? "cogna.exe" : "cogna")
   await fs.access(mainPath)
-  await fs.access(codeiqPath)
+  await fs.access(cognaPath)
 
-  await run(codeiqPath, ["build"], workspaceDir)
+  await run(cognaPath, ["build"], workspaceDir)
   const baseDir = path.join(distDir, "base")
   const targetDir = path.join(distDir, "target")
   await fs.mkdir(baseDir, { recursive: true })
@@ -136,7 +136,7 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
   manifest.purl = "pkg:openapi/acme/payment-api@2026.04.01"
   await fs.writeFile(path.join(targetDir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8")
 
-  return { workspaceDir, cliPath: codeiqPath }
+  return { workspaceDir, cliPath: cognaPath }
 }
 
 async function main() {
@@ -145,10 +145,10 @@ async function main() {
   const repoRoot = path.resolve(process.cwd(), "..", "..")
   const { workspaceDir, cliPath } = await prepareWorkspace(repoRoot)
 
-  process.env.CODEIQ_TEST_WORKSPACE = workspaceDir
-  process.env.CODEIQ_TEST_CLI = cliPath
-  process.env.CODEIQ_TEST_DISABLE_EXTERNAL_OPEN = "true"
-  process.env.CODEIQ_OPA_EVAL_JSON = JSON.stringify({
+  process.env.COGNA_TEST_WORKSPACE = workspaceDir
+  process.env.COGNA_TEST_CLI = cliPath
+  process.env.COGNA_TEST_DISABLE_EXTERNAL_OPEN = "true"
+  process.env.COGNA_OPA_EVAL_JSON = JSON.stringify({
     result: [
       {
         expressions: [
@@ -159,7 +159,7 @@ async function main() {
                 level: "error",
                 message: "Public API removal blocked by policy",
                 path: "openapi/payment.yaml",
-                docs: "https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+                docs: "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
               },
             ],
           },

@@ -22,13 +22,13 @@ export interface AnalysisResult {
   sarifPath: string
 }
 
-export class CodeIQCommandError extends Error {
+export class CognaCommandError extends Error {
   readonly result: CommandResult
   readonly completedSteps: CommandResult[]
 
   constructor(message: string, result: CommandResult, completedSteps: CommandResult[]) {
     super(message)
-    this.name = "CodeIQCommandError"
+    this.name = "CognaCommandError"
     this.result = result
     this.completedSteps = completedSteps
   }
@@ -58,7 +58,7 @@ export function resolveWorkingDirectory(
 export function resolveCliPath(configured: string | undefined, workspaceDir?: string): string {
   const trimmed = configured?.trim()
   if (!trimmed) {
-    return "codeiq"
+    return "cogna"
   }
   if (path.isAbsolute(trimmed)) {
     return trimmed
@@ -137,8 +137,8 @@ export async function runAnalysis(
     const result = await runCommand(cliPath, workingDirectory, subcommand, [], env)
     steps.push(result)
     if (result.exitCode !== 0) {
-      throw new CodeIQCommandError(
-        `codeiq ${subcommand} failed with exit code ${result.exitCode}`,
+      throw new CognaCommandError(
+        `cogna ${subcommand} failed with exit code ${result.exitCode}`,
         result,
         steps,
       )

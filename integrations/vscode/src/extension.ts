@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 
 import {
-  CodeIQCommandError,
+  CognaCommandError,
   fileExists,
   readTextFile,
   resolveCliPath,
@@ -13,9 +13,9 @@ import { collectDiagnosticItems, type DiagnosticItem } from "./diagnostics"
 import { openDocumentation } from "./docs"
 import { parseSarif } from "./sarif"
 
-export const RUN_ANALYSIS_COMMAND = "codeiq.runAnalysis"
-export const REFRESH_DIAGNOSTICS_COMMAND = "codeiq.refreshDiagnostics"
-export const OPEN_RULE_DOCUMENTATION_COMMAND = "codeiq.openRuleDocumentation"
+export const RUN_ANALYSIS_COMMAND = "cogna.runAnalysis"
+export const REFRESH_DIAGNOSTICS_COMMAND = "cogna.refreshDiagnostics"
+export const OPEN_RULE_DOCUMENTATION_COMMAND = "cogna.openRuleDocumentation"
 
 interface ExtensionDependencies {
   openExternal(target: vscode.Uri): Thenable<boolean>
@@ -23,7 +23,7 @@ interface ExtensionDependencies {
 
 const defaultDependencies: ExtensionDependencies = {
   openExternal(target: vscode.Uri) {
-    if (process.env.CODEIQ_TEST_DISABLE_EXTERNAL_OPEN === "true") {
+    if (process.env.COGNA_TEST_DISABLE_EXTERNAL_OPEN === "true") {
       return Promise.resolve(true)
     }
     return vscode.env.openExternal(target)
@@ -31,7 +31,7 @@ const defaultDependencies: ExtensionDependencies = {
 }
 
 function configuration() {
-  const config = vscode.workspace.getConfiguration("codeiq")
+  const config = vscode.workspace.getConfiguration("cogna")
   return {
     cliPath: config.get<string>("cliPath"),
     workingDirectory: config.get<string>("workingDirectory"),
@@ -58,7 +58,7 @@ function diagnosticsAtCursor(editor: vscode.TextEditor | undefined): vscode.Diag
   const line = editor.selection.active.line
   return vscode.languages
     .getDiagnostics(editor.document.uri)
-    .filter((diagnostic) => diagnostic.source === "codeiq")
+    .filter((diagnostic) => diagnostic.source === "cogna")
     .filter((diagnostic) => diagnostic.range.start.line <= line && diagnostic.range.end.line >= line)
 }
 
@@ -101,7 +101,7 @@ async function applyDiagnostics(
       0,
     )
     const diagnostic = new vscode.Diagnostic(range, item.message, toSeverity(item.severity))
-    diagnostic.source = "codeiq"
+    diagnostic.source = "cogna"
     diagnostic.code = item.ruleId
     if (item.helpUri) {
       diagnostic.relatedInformation = [
@@ -119,7 +119,7 @@ async function applyDiagnostics(
   for (const [filePath, fileDiagnostics] of grouped.entries()) {
     collection.set(vscode.Uri.file(filePath), fileDiagnostics)
   }
-  output.appendLine(`Loaded ${items.length} CodeIQ diagnostics from ${sarifPath}`)
+  output.appendLine(`Loaded ${items.length} Cogna diagnostics from ${sarifPath}`)
   return items
 }
 
@@ -129,26 +129,26 @@ function registerCodeActions(context: vscode.ExtensionContext) {
       { scheme: "file" },
       {
         provideCodeActions: (_document, _range, codeActionContext, _token) => {
-          const codeiqDiagnostics = codeActionContext.diagnostics.filter(
-            (diagnostic) => diagnostic.source === "codeiq",
+          const cognaDiagnostics = codeActionContext.diagnostics.filter(
+            (diagnostic) => diagnostic.source === "cogna",
           )
-          if (codeiqDiagnostics.length === 0) {
+          if (cognaDiagnostics.length === 0) {
             return []
           }
 
           const actions: vscode.Command[] = []
-          const [firstHelpUri] = uniqueHelpUris(codeiqDiagnostics)
+          const [firstHelpUri] = uniqueHelpUris(cognaDiagnostics)
           if (firstHelpUri) {
             actions.push({
               command: OPEN_RULE_DOCUMENTATION_COMMAND,
-              title: "CodeIQ: Open Rule Documentation",
+              title: "Cogna: Open Rule Documentation",
               arguments: [firstHelpUri],
             })
           }
 
           actions.push({
             command: REFRESH_DIAGNOSTICS_COMMAND,
-            title: "CodeIQ: Refresh Diagnostics",
+            title: "Cogna: Refresh Diagnostics",
           })
           return actions
         },
@@ -161,8 +161,8 @@ export async function activateWithDependencies(
   context: vscode.ExtensionContext,
   dependencies: ExtensionDependencies,
 ) {
-  const output = vscode.window.createOutputChannel("CodeIQ")
-  const collection = vscode.languages.createDiagnosticCollection("codeiq")
+  const output = vscode.window.createOutputChannel("Cogna")
+  const collection = vscode.languages.createDiagnosticCollection("cogna")
   context.subscriptions.push(output, collection)
 
   let running = false
@@ -171,7 +171,7 @@ export async function activateWithDependencies(
     const config = configuration()
     const workingDirectory = resolveWorkingDirectory(vscode.workspace.workspaceFolders, config.workingDirectory)
     if (!workingDirectory) {
-      throw new Error("No workspace folder or CodeIQ working directory configured")
+      throw new Error("No workspace folder or Cogna working directory configured")
     }
     const items = await applyDiagnostics(collection, workingDirectory, output)
     return {
@@ -182,7 +182,7 @@ export async function activateWithDependencies(
 
   const runAnalysisCommand = async (): Promise<{ diagnosticCount: number; sarifPath: string }> => {
     if (running) {
-      throw new Error("CodeIQ analysis is already running")
+      throw new Error("Cogna analysis is already running")
     }
     running = true
     output.show(true)
@@ -190,10 +190,10 @@ export async function activateWithDependencies(
       const config = configuration()
       const workingDirectory = resolveWorkingDirectory(vscode.workspace.workspaceFolders, config.workingDirectory)
       if (!workingDirectory) {
-        throw new Error("No workspace folder or CodeIQ working directory configured")
+        throw new Error("No workspace folder or Cogna working directory configured")
       }
       const cliPath = resolveCliPath(config.cliPath, workingDirectory)
-      output.appendLine(`Running CodeIQ analysis in ${workingDirectory}`)
+      output.appendLine(`Running Cogna analysis in ${workingDirectory}`)
       const analysis = await runAnalysis(cliPath, workingDirectory)
       for (const step of analysis.steps) {
         output.appendLine(`$ ${[step.command, ...step.args].join(" ")}`)
@@ -214,7 +214,7 @@ export async function activateWithDependencies(
       }
       return refreshed
     } catch (error) {
-      if (error instanceof CodeIQCommandError) {
+      if (error instanceof CognaCommandError) {
         output.appendLine(error.message)
         if (error.result.stdout.trim()) {
           output.appendLine(error.result.stdout.trim())

@@ -13,7 +13,9 @@
     "paths": {
       "@renderer/*": [
         "src/renderer/src/*"
-      ]
+      ],
+      "@cogna/ui": ["../ui/src/index.ts"],
+      "@cogna/ui/*": ["../ui/src/*"]
     }
   }
 }

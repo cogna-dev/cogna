@@ -9,20 +9,20 @@ import {
   RUN_ANALYSIS_COMMAND,
 } from "../../extension"
 
-const extensionId = "yufeiminds.codeiq"
+const extensionId = "cogna-dev.cogna"
 
-suite("CodeIQ extension", () => {
+suite("Cogna extension", () => {
   suiteSetup(async () => {
     const extension = vscode.extensions.getExtension(extensionId)
     assert.ok(extension, `Missing extension ${extensionId}`)
     await extension.activate()
 
-    const workspaceDir = process.env.CODEIQ_TEST_WORKSPACE
-    const cliPath = process.env.CODEIQ_TEST_CLI
-    assert.ok(workspaceDir, "CODEIQ_TEST_WORKSPACE must be set")
-    assert.ok(cliPath, "CODEIQ_TEST_CLI must be set")
+    const workspaceDir = process.env.COGNA_TEST_WORKSPACE
+    const cliPath = process.env.COGNA_TEST_CLI
+    assert.ok(workspaceDir, "COGNA_TEST_WORKSPACE must be set")
+    assert.ok(cliPath, "COGNA_TEST_CLI must be set")
 
-    const config = vscode.workspace.getConfiguration("codeiq")
+    const config = vscode.workspace.getConfiguration("cogna")
     await config.update("workingDirectory", workspaceDir, vscode.ConfigurationTarget.Workspace)
     await config.update("cliPath", cliPath, vscode.ConfigurationTarget.Workspace)
     await config.update("runOnSave", false, vscode.ConfigurationTarget.Workspace)
@@ -32,7 +32,7 @@ suite("CodeIQ extension", () => {
     await vscode.window.showTextDocument(document)
   })
 
-  test("registers CodeIQ commands", async () => {
+  test("registers Cogna commands", async () => {
     const commands = await vscode.commands.getCommands(true)
     assert.ok(commands.includes(RUN_ANALYSIS_COMMAND))
     assert.ok(commands.includes(REFRESH_DIAGNOSTICS_COMMAND))
@@ -51,7 +51,7 @@ suite("CodeIQ extension", () => {
     assert.ok(editor)
     const diagnostics = vscode.languages.getDiagnostics(editor.document.uri)
     assert.equal(diagnostics.length, 1)
-    assert.equal(diagnostics[0]?.source, "codeiq")
+    assert.equal(diagnostics[0]?.source, "cogna")
   })
 
   test("open rule documentation returns help uri from diagnostics", async () => {
@@ -59,7 +59,7 @@ suite("CodeIQ extension", () => {
     const opened = await vscode.commands.executeCommand<string>(OPEN_RULE_DOCUMENTATION_COMMAND)
     assert.equal(
       opened,
-      "https://codeiq.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+      "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
     )
   })
 

@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-install_dir="${1:-${CODEIQ_INSTALL_DIR:-${HOME}/.moon/bin}}"
-binary_name="${2:-codeiq}"
+install_dir="${1:-${COGNA_INSTALL_DIR:-${HOME}/.moon/bin}}"
+binary_name="${2:-cogna}"
 
 mkdir -p "$install_dir"
 moon install --bin "$install_dir" --path src/cmd/main

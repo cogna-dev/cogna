@@ -53,7 +53,7 @@ export function collectDiagnosticItems(log: SarifLog, workingDirectory: string):
       }
       const startLine = Math.max(location?.region?.startLine ?? 1, 1)
       const endLine = Math.max(location?.region?.endLine ?? startLine, startLine)
-      const ruleId = result.ruleId ?? "codeiq.unknown"
+      const ruleId = result.ruleId ?? "cogna.unknown"
       out.push({
         filePath,
         startLine,

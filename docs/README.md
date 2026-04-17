@@ -1,6 +1,6 @@
-# CodeIQ Docs
+# Cogna Docs
 
-这是 CodeIQ 的文档站工程。
+这是 Cogna 的文档站工程。
 
 ## 本地运行
 

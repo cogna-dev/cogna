@@ -19,3 +19,4 @@ integrations/vscode/.vscode-test/
 src/scripts/gendoc/tmp_docs_output/
 
 node_modules/
+integrations/web/

@@ -1,4 +1,4 @@
-export const POLICY_INDEX_URL = "https://codeiq.xaclabs.dev/docs/policies"
+export const POLICY_INDEX_URL = "https://cogna.xaclabs.dev/docs/policies"
 
 export function resolveDocumentationUrl(helpUri?: string): string {
   const trimmed = helpUri?.trim()

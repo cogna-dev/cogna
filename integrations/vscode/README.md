@@ -1,19 +1,19 @@
-# CodeIQ VSCode Extension
+# Cogna VSCode Extension
 
-This extension shells out to the local `codeiq` CLI, reads `dist/check.sarif.json`, turns SARIF results into diagnostics, and opens rule documentation through stable `helpUri` links.
+This extension shells out to the local `cogna` CLI, reads `dist/check.sarif.json`, turns SARIF results into diagnostics, and opens rule documentation through stable `helpUri` links.
 
 ## Commands
 
-- `CodeIQ: Run Analysis`
-- `CodeIQ: Refresh Diagnostics`
-- `CodeIQ: Open Rule Documentation`
+- `Cogna: Run Analysis`
+- `Cogna: Refresh Diagnostics`
+- `Cogna: Open Rule Documentation`
 
 ## Settings
 
-- `codeiq.cliPath`
-- `codeiq.workingDirectory`
-- `codeiq.runOnSave`
-- `codeiq.autoOpenPolicyDocs`
+- `cogna.cliPath`
+- `cogna.workingDirectory`
+- `cogna.runOnSave`
+- `cogna.autoOpenPolicyDocs`
 
 ## Local verification
 

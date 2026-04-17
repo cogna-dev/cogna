@@ -1,14 +1,14 @@
 param(
   [string]$InstallDir = "",
-  [string]$BinaryName = "codeiq"
+  [string]$BinaryName = "cogna"
 )
 
 $resolvedInstallDir = $InstallDir
 if ([string]::IsNullOrWhiteSpace($resolvedInstallDir)) {
-  if ([string]::IsNullOrWhiteSpace($env:CODEIQ_INSTALL_DIR)) {
+  if ([string]::IsNullOrWhiteSpace($env:COGNA_INSTALL_DIR)) {
     $resolvedInstallDir = Join-Path $HOME ".moon/bin"
   } else {
-    $resolvedInstallDir = $env:CODEIQ_INSTALL_DIR
+    $resolvedInstallDir = $env:COGNA_INSTALL_DIR
   }
 }
 
@@ -25,6 +25,6 @@ if (-not (Test-Path $mainPath)) {
 
 if ($BinaryName -ne "main") {
   $extension = [System.IO.Path]::GetExtension($mainPath)
-  $codeiqPath = Join-Path $resolvedInstallDir ($BinaryName + $extension)
-  Copy-Item $mainPath $codeiqPath -Force
+  $cognaPath = Join-Path $resolvedInstallDir ($BinaryName + $extension)
+  Copy-Item $mainPath $cognaPath -Force
 }

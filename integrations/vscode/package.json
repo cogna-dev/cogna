@@ -1,8 +1,8 @@
 {
-  "name": "codeiq",
-  "displayName": "CodeIQ",
-  "publisher": "yufeiminds",
-  "description": "Run CodeIQ analysis, surface SARIF diagnostics, and open policy documentation from VSCode.",
+  "name": "cogna",
+  "displayName": "Cogna",
+  "publisher": "cogna-dev",
+  "description": "Run Cogna analysis, surface SARIF diagnostics, and open policy documentation from VSCode.",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "engines": {
@@ -12,47 +12,47 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:codeiq.runAnalysis",
-    "onCommand:codeiq.refreshDiagnostics",
-    "onCommand:codeiq.openRuleDocumentation",
-    "workspaceContains:codeiq.yml",
-    "workspaceContains:codeiq.yaml"
+    "onCommand:cogna.runAnalysis",
+    "onCommand:cogna.refreshDiagnostics",
+    "onCommand:cogna.openRuleDocumentation",
+    "workspaceContains:cogna.yml",
+    "workspaceContains:cogna.yaml"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "codeiq.runAnalysis",
-        "title": "CodeIQ: Run Analysis"
+        "command": "cogna.runAnalysis",
+        "title": "Cogna: Run Analysis"
       },
       {
-        "command": "codeiq.refreshDiagnostics",
-        "title": "CodeIQ: Refresh Diagnostics"
+        "command": "cogna.refreshDiagnostics",
+        "title": "Cogna: Refresh Diagnostics"
       },
       {
-        "command": "codeiq.openRuleDocumentation",
-        "title": "CodeIQ: Open Rule Documentation"
+        "command": "cogna.openRuleDocumentation",
+        "title": "Cogna: Open Rule Documentation"
       }
     ],
     "configuration": {
-      "title": "CodeIQ",
+      "title": "Cogna",
       "properties": {
-        "codeiq.cliPath": {
+        "cogna.cliPath": {
           "type": "string",
-          "default": "codeiq",
-          "description": "Path to the CodeIQ CLI executable. Relative paths resolve from the workspace root."
+          "default": "cogna",
+          "description": "Path to the Cogna CLI executable. Relative paths resolve from the workspace root."
         },
-        "codeiq.workingDirectory": {
+        "cogna.workingDirectory": {
           "type": "string",
           "default": "",
-          "description": "Workspace-relative or absolute directory where CodeIQ commands should run. Defaults to the first workspace folder."
+          "description": "Workspace-relative or absolute directory where Cogna commands should run. Defaults to the first workspace folder."
         },
-        "codeiq.runOnSave": {
+        "cogna.runOnSave": {
           "type": "boolean",
           "default": false,
-          "description": "Run CodeIQ analysis after saving a file in the active workspace."
+          "description": "Run Cogna analysis after saving a file in the active workspace."
         },
-        "codeiq.autoOpenPolicyDocs": {
+        "cogna.autoOpenPolicyDocs": {
           "type": "boolean",
           "default": false,
           "description": "Automatically open the first matching policy documentation link after a successful analysis refresh."

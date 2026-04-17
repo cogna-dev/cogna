@@ -11,9 +11,9 @@ test("resolve working directory prefers config and resolves relative paths", () 
 })
 
 test("resolve cli path keeps PATH lookups and resolves relative binaries", () => {
-  assert.equal(resolveCliPath(undefined, "/workspace/demo"), "codeiq")
-  assert.equal(resolveCliPath("codeiq", "/workspace/demo"), "codeiq")
-  assert.equal(resolveCliPath(".moon/bin/codeiq", "/workspace/demo"), "/workspace/demo/.moon/bin/codeiq")
+  assert.equal(resolveCliPath(undefined, "/workspace/demo"), "cogna")
+  assert.equal(resolveCliPath("cogna", "/workspace/demo"), "cogna")
+  assert.equal(resolveCliPath(".moon/bin/cogna", "/workspace/demo"), "/workspace/demo/.moon/bin/cogna")
 })
 
 test("resolve sarif path is relative to working directory by default", () => {
