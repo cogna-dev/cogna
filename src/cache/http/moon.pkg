@@ -1,0 +1,11 @@
+import {
+  "cogna-dev/cogna/cache" @cache,
+  "cogna-dev/cogna/cache/http/generated" @generated,
+  "cogna-dev/mapi/lib" @mapi,
+  "moonbitlang/async" @mbasync,
+  "moonbitlang/async/http" @async_http,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "shu-kitamura/sha256" @sha256,
+}
+
+supported_targets = "native"

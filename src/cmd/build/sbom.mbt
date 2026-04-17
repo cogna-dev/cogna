@@ -1,19 +1,11 @@
 ///|
-priv struct BuildComponentHash {
-  alg : String
-  content : String
-}
-
-///|
 priv struct BuildSoftwareComponent {
   id : String
   name : String
   version : String?
   purl : String?
-  component_type : String
   scope : String
   evidence_path : String
-  hashes : Array[BuildComponentHash]
   pkg : @sbom_types.Package?
 }
 
@@ -38,38 +30,36 @@ fn build_sbom_string_json(value : String?) -> Json {
 }
 
 ///|
-fn build_sbom_hash_json(hash : BuildComponentHash) -> Json {
-  { "alg": hash.alg, "content": hash.content }
-}
-
-///|
-fn build_component_signature(component : BuildSoftwareComponent) -> String {
-  let version = match component.version {
-    Some(value) if value != "" => "@\{value}"
-    _ => ""
+fn ecosystem_from_purl(purl : String?) -> String {
+  match purl {
+    Some(p) => {
+      let trimmed = if p.has_prefix("pkg:") { p[4:].to_string() } else { p }
+      match trimmed.find("/") {
+        Some(idx) => trimmed[0:idx].to_string()
+        None =>
+          match trimmed.find("@") {
+            Some(idx) => trimmed[0:idx].to_string()
+            None => trimmed
+          }
+      }
+    }
+    None => ""
   }
-  "\{component.component_type} \{component.name}\{version}"
 }
 
 ///|
 fn build_component_record_json(component : BuildSoftwareComponent) -> Json {
-  let hashes : Array[Json] = []
-  for i in 0..<component.hashes.length() {
-    hashes.push(build_sbom_hash_json(component.hashes[i]))
-  }
-  {
-    "id": component.id,
-    "kind": "component",
-    "path": component.evidence_path,
-    "signature": build_component_signature(component),
+  let eco = ecosystem_from_purl(component.purl)
+  let record : Map[String, Json] = {
     "name": component.name,
-    "componentType": component.component_type,
     "scope": component.scope,
     "version": build_sbom_string_json(component.version),
     "purl": build_sbom_string_json(component.purl),
-    "hashes": Json::array(hashes),
-    "location": { "uri": component.evidence_path, "startLine": 1, "endLine": 1 },
   }
+  if eco != "" {
+    record["ecosystem"] = Json::string(eco)
+  }
+  Json::object(record)
 }
 
 ///|
@@ -142,26 +132,14 @@ fn sbom_purl_version(purl : String) -> String? {
 }
 
 ///|
-fn sbom_profile_component_type(profile : String) -> String {
-  match profile {
-    "openapi-spec" => "application"
-    "terraform-module" => "library"
-    "policy-bundle" => "application"
-    _ => "library"
-  }
-}
-
-///|
 fn build_root_component(config : @config.Config) -> BuildSoftwareComponent {
   {
     id: config.purl,
     name: sbom_purl_name(config.purl),
     version: sbom_purl_version(config.purl),
     purl: Some(config.purl),
-    component_type: sbom_profile_component_type(config.profile),
     scope: "local",
     evidence_path: "cogna.yml",
-    hashes: [],
     pkg: None,
   }
 }
@@ -270,49 +248,32 @@ fn build_resolve_input_files(
 
 ///|
 fn build_file_component(
-  repo : String,
+  _repo : String,
   relative_path : String,
 ) -> Result[BuildSoftwareComponent, String] {
-  let absolute_path = "\{repo}/\{relative_path}"
-  let bytes = @fs.read_file_to_bytes(absolute_path) catch {
-    err =>
-      return Err("cannot read source file \{absolute_path}: \{err.to_string()}")
-  }
   Ok({
     id: "component:file:\{relative_path}",
     name: relative_path,
     version: None,
     purl: None,
-    component_type: "file",
     scope: "source-file",
     evidence_path: relative_path,
-    hashes: [{ alg: "SHA-256", content: @sha256.sha256_hexdigest(bytes) }],
     pkg: None,
   })
-}
-
-///|
-fn build_dependency_hashes(
-  content_digest : String,
-) -> Array[BuildComponentHash] {
-  [{ alg: "SHA-256", content: content_digest }]
 }
 
 ///|
 fn build_dependency_component(
   pkg : @sbom_types.Package,
   evidence_path : String,
-  hashes : Array[BuildComponentHash],
 ) -> BuildSoftwareComponent {
   {
     id: pkg.id(),
     name: pkg.name,
     version: Some(pkg.version()),
     purl: Some(pkg.to_purl()),
-    component_type: "library",
     scope: pkg.group.to_string(),
     evidence_path,
-    hashes,
     pkg: Some(pkg),
   }
 }
@@ -543,7 +504,6 @@ fn build_append_package_json_deps(
                 build_dependency_component(
                   pkg,
                   resolved.evidence_path,
-                  build_dependency_hashes(resolved.content_digest),
                 ),
               )
             } else if require_local_packages {
@@ -780,13 +740,11 @@ fn build_component_from_root(
   root_path : String,
 ) -> Result[BuildSoftwareComponent, String] {
   let snapshot_out = @sbom_snapshot.snapshot_files(root_path)
-  guard snapshot_out is Ok(files) else { return Err(snapshot_out.unwrap_err()) }
-  let digest = @sbom_snapshot.snapshot_digest(files)
+  guard snapshot_out is Ok(_files) else { return Err(snapshot_out.unwrap_err()) }
   Ok(
     build_dependency_component(
       pkg,
       @sbom_snapshot.display_path(repo, root_path),
-      build_dependency_hashes(digest),
     ),
   )
 }

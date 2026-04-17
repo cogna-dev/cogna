@@ -1,0 +1,4 @@
+import {
+  "cogna-dev/cogna/cache/http/generated" @generated,
+  "cogna-dev/mapi/lib" @lib,
+}

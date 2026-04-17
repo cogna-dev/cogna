@@ -19,7 +19,7 @@
 Cogna is a declaration-focused CLI for API and third-party dependency governance.
 It helps you build package snapshots, compare versions, run policy checks, and query APIs from one machine.
 
-Current scope is local-only: CLI, Local Registry, and MCP share one local bundle store.
+Current scope is local-first: CLI, local cache, cache proxy, and MCP share one workspace-centered bundle store.
 
 ## What you can do with Cogna
 
@@ -31,7 +31,7 @@ Current scope is local-only: CLI, Local Registry, and MCP share one local bundle
 ## Typical flow
 
 ```text
-init -> build -> diff -> check -> query -> publish
+init -> build -> diff -> check -> query
 ```
 
 ## Links

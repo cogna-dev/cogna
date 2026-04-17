@@ -150,14 +150,6 @@ fn artifact_records(root : String) -> Result[Array[Json], @cli.CliError] {
   }
   guard decl_out is Ok(declarations) else { return Err(decl_out.unwrap_err()) }
 
-  let symbol_path_plain = "\{root}/symbols.ndjson"
-  let symbol_out = if @fs.path_exists(symbol_path_plain) {
-    read_ndjson(symbol_path_plain)
-  } else {
-    Err(diff_error("cannot read ndjson \{symbol_path_plain}"))
-  }
-  guard symbol_out is Ok(symbols) else { return Err(symbol_out.unwrap_err()) }
-
   let component_path_plain = "\{root}/software-components.ndjson"
   let component_out = if @fs.path_exists(component_path_plain) {
     read_ndjson(component_path_plain)
@@ -171,9 +163,6 @@ fn artifact_records(root : String) -> Result[Array[Json], @cli.CliError] {
   let records : Array[Json] = []
   for i in 0..<declarations.length() {
     records.push(declarations[i])
-  }
-  for i in 0..<symbols.length() {
-    records.push(symbols[i])
   }
   for i in 0..<components.length() {
     records.push(components[i])

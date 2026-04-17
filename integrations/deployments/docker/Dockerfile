@@ -16,8 +16,8 @@ WORKDIR /app
 COPY --from=build /app/_build/native/release/build/cmd/main/main.exe /usr/local/bin/codeiq
 
 EXPOSE 8787
-VOLUME ["/data/registry"]
+VOLUME ["/data/cache"]
 
-ENV CODEIQ_REGISTRY_STORE_DIR=/data/registry
+ENV COGNA_CACHE_STORE_DIR=/data/cache
 
-ENTRYPOINT ["/usr/local/bin/codeiq", "registry", "serve", "--port", "8787"]
+ENTRYPOINT ["/usr/local/bin/codeiq", "serve", "--port", "8787"]

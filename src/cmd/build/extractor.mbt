@@ -1,11 +1,9 @@
 ///|
 priv struct ExtractOutput {
   declarations_text : String
-  symbols_text : String
   mode : String
   fallback : Bool
   declaration_count : Int
-  symbol_count : Int
   diagnostic_files : Int
   commit : String
 }
@@ -68,14 +66,6 @@ fn first_token(text : String) -> String {
     end = end + 1
   }
   trimmed[0:end].to_string()
-}
-
-///|
-fn segment_after(value : String, marker : String) -> String? {
-  match value.find(marker) {
-    Some(idx) => Some(value[idx + marker.length():].to_string())
-    None => None
-  }
 }
 
 ///|
@@ -220,70 +210,7 @@ fn profile_mode(profile : String) -> (String, String) {
 
 ///|
 fn resolve_backend_override() -> String {
-  match @sys.get_env_var("COGNA_EXTRACTOR_BACKEND") {
-    Some("native") => "native"
-    Some("lsp") => "lsp"
-    Some("canonical") => "canonical"
-    Some("none") => "canonical"
-    _ => "canonical"
-  }
-}
-
-///|
-fn resolve_validation_mode(config : @config.Config) -> String {
-  match @sys.get_env_var("COGNA_EXTRACTOR_BACKEND") {
-    Some("lsp") => "lsp"
-    Some("native") => "none"
-    Some("none") => "none"
-    _ => config.validation
-  }
-}
-
-///|
-fn shell_escape(value : String) -> String {
-  let escaped = value.replace_all(old="'", new="'\"'\"'")
-  "'\{escaped}'"
-}
-
-///|
-fn lsp_probe(server : String, version_arg : String) -> (String, Bool) {
-  if server == "none" || server == "opa" {
-    return ("none", false)
-  }
-  let command = "\{shell_escape(server)} \{version_arg}"
-  let (exit_code, stdout, stderr) = @build_shell.run_command_capture(command)
-  if exit_code != 0 {
-    let details = if stderr != "" { stderr } else { stdout }
-    let normalized = trim_spaces(details)
-    let final_details = if normalized == "" {
-      "command exited with \{exit_code}"
-    } else {
-      normalized
-    }
-    return ("missing:\{final_details}", true)
-  }
-  let text = trim_spaces(stdout)
-  if text == "" {
-    ("available", false)
-  } else {
-    (text, false)
-  }
-}
-
-///|
-fn lsp_runtime_probe(
-  profile : String,
-  configured_server : String,
-) -> (String, Bool) {
-  if @sys.get_env_var("COGNA_TEST_FORCE_LSP_FALLBACK") is Some("true") &&
-    (profile == "go-module" || profile == "rust-crate") {
-    return ("missing:forced-by-test", true)
-  }
-  match profile {
-    "go-module" => lsp_probe(configured_server, "version")
-    "rust-crate" => lsp_probe(configured_server, "--version")
-    _ => ("none", false)
-  }
+  "canonical"
 }
 
 ///|
@@ -296,22 +223,6 @@ fn last_code_unit_index(value : String, target : UInt16) -> Int? {
     }
   }
   None
-}
-
-///|
-fn substring_between(
-  value : String,
-  start_marker : String,
-  end_marker : String,
-) -> String? {
-  match segment_after(value, start_marker) {
-    Some(rest) =>
-      match rest.find(end_marker) {
-        Some(idx) => Some(rest[0:idx].to_string())
-        None => None
-      }
-    None => None
-  }
 }
 
 ///|
@@ -390,255 +301,6 @@ fn inventory_validation_path_allowed(profile : String, path : String) -> Bool {
 }
 
 ///|
-fn inventory_validation_declarations(
-  profile : String,
-  declarations : Array[Json],
-) -> Array[Json] {
-  let filtered : Array[Json] = []
-  for i in 0..<declarations.length() {
-    if inventory_validation_path_allowed(
-        profile,
-        @extract.field_string(declarations[i], "path"),
-      ) {
-      filtered.push(declarations[i])
-    }
-  }
-  filtered
-}
-
-///|
-fn inventory_keys_from_declarations(
-  profile : String,
-  declarations : Array[Json],
-) -> Array[String] {
-  let keys : Array[String] = []
-  for i in 0..<declarations.length() {
-    match
-      inventory_key(
-        profile,
-        @extract.field_string(declarations[i], "kind"),
-        @extract.field_string(declarations[i], "name"),
-      ) {
-      Some(key) => @extract.append_unique_string(keys, key)
-      None => ()
-    }
-  }
-  keys.sort()
-  keys
-}
-
-///|
-fn go_symbol_kind(kind : String) -> String? {
-  match kind {
-    "Function" => Some("callable")
-    "Method" => Some("callable")
-    "Struct" => Some("struct")
-    "Interface" => Some("interface")
-    "Constant" => Some("const")
-    "Variable" => Some("var")
-    "Class" => Some("type_alias")
-    _ => None
-  }
-}
-
-///|
-fn rust_symbol_kind(kind : String) -> String? {
-  match kind {
-    "Function" => Some("callable")
-    "Method" => Some("callable")
-    "Struct" => Some("struct")
-    "Enum" => Some("enum")
-    "Union" => Some("union")
-    "Trait" => Some("trait")
-    "TypeAlias" => Some("type_alias")
-    "Const" => Some("const")
-    "Static" => Some("static")
-    "Module" => Some("module")
-    "Macro" => Some("macro")
-    _ => None
-  }
-}
-
-///|
-fn collect_go_lsp_inventory(
-  profile : String,
-  files : Array[String],
-  repo : String,
-) -> Result[Array[String], @cli.CliError] {
-  let keys : Array[String] = []
-  for i in 0..<files.length() {
-    let relative_path = files[i]
-    if !relative_path.has_suffix(".go") {
-      continue
-    }
-    let absolute_path = "\{repo}/\{relative_path}"
-    let command = "gopls symbols \{shell_escape(absolute_path)}"
-    let (exit_code, stdout, stderr) = @build_shell.run_command_capture(command)
-    if exit_code != 0 {
-      let details = if stderr != "" {
-        trim_spaces(stderr)
-      } else {
-        trim_spaces(stdout)
-      }
-      let message_details = if details == "" {
-        "command failed"
-      } else {
-        details
-      }
-      return Err(
-        extractor_error(
-          "gopls symbols failed for \{relative_path}: \{message_details}",
-        ),
-      )
-    }
-    for raw_line in stdout.split("\n") {
-      let line = raw_line.to_string()
-      if line.has_prefix("\t") {
-        continue
-      }
-      let trimmed = trim_spaces(line)
-      if trimmed == "" {
-        continue
-      }
-      guard last_code_unit_index(trimmed, ' ') is Some(last_space) else {
-        continue
-      }
-      let before_range = trimmed[0:last_space].to_string()
-      guard last_code_unit_index(before_range, ' ') is Some(kind_space) else {
-        continue
-      }
-      let raw_name = trim_spaces(before_range[0:kind_space].to_string())
-      let raw_kind = trim_spaces(before_range[kind_space + 1:].to_string())
-      match go_symbol_kind(raw_kind) {
-        Some(kind) =>
-          match inventory_key(profile, kind, raw_name) {
-            Some(key) => @extract.append_unique_string(keys, key)
-            None => ()
-          }
-        None => ()
-      }
-    }
-  }
-  keys.sort()
-  Ok(keys)
-}
-
-///|
-fn collect_rust_lsp_inventory(
-  profile : String,
-  files : Array[String],
-  repo : String,
-) -> Result[Array[String], @cli.CliError] {
-  let keys : Array[String] = []
-  for i in 0..<files.length() {
-    let relative_path = files[i]
-    if !relative_path.has_suffix(".rs") {
-      continue
-    }
-    let absolute_path = "\{repo}/\{relative_path}"
-    let command = "rust-analyzer symbols < \{shell_escape(absolute_path)}"
-    let (exit_code, stdout, stderr) = @build_shell.run_command_capture(command)
-    if exit_code != 0 {
-      let details = if stderr != "" {
-        trim_spaces(stderr)
-      } else {
-        trim_spaces(stdout)
-      }
-      let message_details = if details == "" {
-        "command failed"
-      } else {
-        details
-      }
-      return Err(
-        extractor_error(
-          "rust-analyzer symbols failed for \{relative_path}: \{message_details}",
-        ),
-      )
-    }
-    for raw_line in stdout.split("\n") {
-      let line = trim_spaces(raw_line.to_string())
-      if line == "" {
-        continue
-      }
-      guard substring_between(line, "label: \"", "\"") is Some(raw_name) else {
-        continue
-      }
-      guard substring_between(line, "kind: SymbolKind(", ")") is Some(raw_kind) else {
-        continue
-      }
-      match rust_symbol_kind(raw_kind) {
-        Some(kind) =>
-          match inventory_key(profile, kind, raw_name) {
-            Some(key) => @extract.append_unique_string(keys, key)
-            None => ()
-          }
-        None => ()
-      }
-    }
-  }
-  keys.sort()
-  Ok(keys)
-}
-
-///|
-fn collect_lsp_inventory(
-  config : @config.Config,
-  repo : String,
-  files : Array[String],
-) -> Result[Array[String], @cli.CliError] {
-  match config.profile {
-    "go-module" => collect_go_lsp_inventory(config.profile, files, repo)
-    "rust-crate" => collect_rust_lsp_inventory(config.profile, files, repo)
-    _ => Ok([])
-  }
-}
-
-///|
-fn missing_inventory_keys(
-  expected : Array[String],
-  actual : Array[String],
-) -> Array[String] {
-  let actual_set : Map[String, Bool] = {}
-  for i in 0..<actual.length() {
-    actual_set[actual[i]] = true
-  }
-  let missing : Array[String] = []
-  for i in 0..<expected.length() {
-    if !actual_set.contains(expected[i]) {
-      missing.push(expected[i])
-    }
-  }
-  missing
-}
-
-///|
-fn validate_backend_inventory(
-  profile : String,
-  backend : String,
-  inventory_keys : Array[String],
-  declarations : Array[Json],
-) -> Result[Unit, @cli.CliError] {
-  let canonical_keys = inventory_keys_from_declarations(
-    profile,
-    inventory_validation_declarations(profile, declarations),
-  )
-  let missing = missing_inventory_keys(canonical_keys, inventory_keys)
-  if missing.is_empty() {
-    return Ok(())
-  }
-  let sample = if missing.length() > 6 {
-    missing.view(end=6).to_array().join(", ") + ", ..."
-  } else {
-    missing.join(", ")
-  }
-  Err(
-    extractor_error(
-      "\{backend} inventory missed canonical API items for profile '\{profile}': \{sample}",
-    ),
-  )
-}
-
-///|
 fn profile_language(profile : String) -> String {
   match profile {
     "go-module" => "go"
@@ -665,7 +327,7 @@ fn enrich_declaration_metadata(record : Json) -> Unit {
 ///|
 fn push_record(
   declarations : Array[Json],
-  symbols : Array[Json],
+  _symbols : Array[Json],
   profile : String,
   server : String,
   language : String,
@@ -684,16 +346,8 @@ fn push_record(
       profile, server, language, path, line_no, kind, name, signature, docs,
     ),
   )
-  guard @extract.last_record(declarations) is Some(record) else {
-    symbols.push(
-      @extract.make_symbol(profile, path, line_no, kind, name, signature),
-    )
-    return
-  }
+  guard @extract.last_record(declarations) is Some(record) else { return }
   enrich_declaration_metadata(record)
-  symbols.push(
-    @extract.make_symbol(profile, path, line_no, kind, name, signature),
-  )
 }
 
 ///|
@@ -905,73 +559,6 @@ fn resolve_git_commit(repo : String) -> String {
 }
 
 ///|
-fn extract_lsp_baseline(
-  config : @config.Config,
-  repo : String,
-) -> Result[ExtractOutput, @cli.CliError] {
-  let files_out = resolve_input_files(config, repo)
-  guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
-
-  let (_, server) = profile_mode(config.profile)
-  let mode = match config.profile {
-    "go-module" => "lsp-assisted"
-    "rust-crate" => "lsp-assisted"
-    _ => "parser-first"
-  }
-  let (server_version, probe_failed) = lsp_runtime_probe(config.profile, server)
-  let force_lsp_hardfail = @sys.get_env_var("COGNA_TEST_FORCE_LSP_FALLBACK")
-    is Some("true")
-  if probe_failed &&
-    (config.profile == "go-module" || config.profile == "rust-crate") &&
-    force_lsp_hardfail {
-    return Err(
-      extractor_error(
-        "LSP server '\{server}' is required for profile '\{config.profile}' but could not be started: \{server_version}",
-      ),
-    )
-  }
-  let fallback = probe_failed
-  let inventory_out = if probe_failed {
-    Ok([])
-  } else {
-    collect_lsp_inventory(config, repo, files)
-  }
-  guard inventory_out is Ok(inventory_keys) else {
-    return Err(inventory_out.unwrap_err())
-  }
-  let records_out = collect_records(config, repo, files, server)
-  guard records_out is Ok((declarations, symbols)) else {
-    return Err(records_out.unwrap_err())
-  }
-
-  ensure_non_empty(declarations, symbols, config.profile, server)
-  let final_declarations = @extract.sort_and_dedup(declarations, "id")
-  let final_symbols = @extract.sort_and_dedup(symbols, "id")
-  if !fallback {
-    let inventory_check = validate_backend_inventory(
-      config.profile,
-      "lsp",
-      inventory_keys,
-      final_declarations,
-    )
-    guard inventory_check is Ok(_) else {
-      return Err(inventory_check.unwrap_err())
-    }
-  }
-
-  Ok({
-    declarations_text: @extract.to_ndjson(final_declarations),
-    symbols_text: @extract.to_ndjson(final_symbols),
-    mode,
-    fallback,
-    declaration_count: final_declarations.length(),
-    symbol_count: final_symbols.length(),
-    diagnostic_files: 0,
-    commit: resolve_git_commit(repo),
-  })
-}
-
-///|
 fn extract_canonical(
   config : @config.Config,
   repo : String,
@@ -982,32 +569,12 @@ fn extract_canonical(
   }
   Ok({
     declarations_text: sdk_out.declarations_text,
-    symbols_text: sdk_out.symbols_text,
     mode: sdk_out.mode,
     fallback: sdk_out.fallback,
     declaration_count: sdk_out.declaration_count,
-    symbol_count: sdk_out.symbol_count,
     diagnostic_files: sdk_out.diagnostic_files,
     commit: sdk_out.commit,
   })
-}
-
-///|
-fn validate_with_lsp(config : @config.Config) -> Result[Unit, @cli.CliError] {
-  let (_, server) = profile_mode(config.profile)
-  let (server_version, probe_failed) = lsp_runtime_probe(config.profile, server)
-  let force_lsp_hardfail = @sys.get_env_var("COGNA_TEST_FORCE_LSP_FALLBACK")
-    is Some("true")
-  if probe_failed &&
-    (config.profile == "go-module" || config.profile == "rust-crate") &&
-    force_lsp_hardfail {
-    return Err(
-      extractor_error(
-        "LSP server '\{server}' is required for profile '\{config.profile}' but could not be started: \{server_version}",
-      ),
-    )
-  }
-  Ok(())
 }
 
 ///|
@@ -1023,11 +590,9 @@ fn extract_native(
   }
   Ok({
     declarations_text: sdk_out.declarations_text,
-    symbols_text: sdk_out.symbols_text,
     mode: sdk_out.mode,
     fallback: sdk_out.fallback,
     declaration_count: sdk_out.declaration_count,
-    symbol_count: sdk_out.symbol_count,
     diagnostic_files: sdk_out.diagnostic_files,
     commit: sdk_out.commit,
   })
@@ -1035,7 +600,7 @@ fn extract_native(
 
 ///|
 /// extract_build is the shared extractor entry for build.
-/// S3 keeps backend selection internal and only returns canonical output metadata.
+/// Backend selection is internal and only returns canonical output metadata.
 fn extract_build(
   config : @config.Config,
   repo : String,
@@ -1043,15 +608,8 @@ fn extract_build(
   let backend = resolve_backend_override()
   let extract_out = match backend {
     "native" => extract_native(config, repo)
-    "lsp" => extract_lsp_baseline(config, repo)
     _ => extract_canonical(config, repo)
   }
   guard extract_out is Ok(extract) else { return Err(extract_out.unwrap_err()) }
-  if backend == "canonical" && resolve_validation_mode(config) == "lsp" {
-    let validation_out = validate_with_lsp(config)
-    guard validation_out is Ok(_) else {
-      return Err(validation_out.unwrap_err())
-    }
-  }
   Ok(extract)
 }

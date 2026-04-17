@@ -7,7 +7,7 @@ import { HomeHero } from "@/components/home/home-hero"
 const homeHero = {
   title: "CodeIQ",
   description:
-    "从代码与规格文件提取公开声明，生成 Bundle，比较版本，执行本地 policy check，并把结果交给 CLI、Local Registry 和 MCP 复用。",
+    "从代码与规格文件提取公开声明，生成 Bundle，比较版本，执行本地 policy check，并把结果交给 CLI、cache proxy 和 MCP 复用。",
   actions: [
     {
       title: "快速开始",
@@ -54,9 +54,9 @@ const homeFeature = {
       span: 1 as const,
     },
     {
-      title: "Local Registry",
+      title: "Cache Proxy",
       description:
-        "`publish`、`registry download-local`、`registry download`、`registry serve` 让 CLI、脚本和 MCP 在同一台机器上复用同一份 bundle store。",
+        "`serve` 与 `cache list/add/remove` 让 CLI、脚本和 MCP 在同一台机器上复用同一份 local/http cache。",
       cover: "/images/feature-accessible.svg",
       action: { title: "查看共享 Bundle", href: "/docs/bundle-sharing" },
       span: 1 as const,

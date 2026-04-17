@@ -6,7 +6,7 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/cli" @cli,
-  "cogna-dev/cogna/core/api" @query_core,
+  "cogna-dev/cogna/sdk" @query_core,
 }
 
 supported_targets = "native"

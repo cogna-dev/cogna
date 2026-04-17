@@ -2,7 +2,7 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/cli" @cli,
-  "cogna-dev/cogna/core/api" @core,
+  "cogna-dev/cogna/sdk" @core,
 }
 
 import {

@@ -2,7 +2,16 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import type { Outline, PackageNode, QueryMatch, QueryMode } from '@cogna/ui'
-import { buildCommand, diffCommand, mockData, queryModes, runMockQuery, PackageTree, DiffView } from '@cogna/ui'
+import {
+  buildCommand,
+  createMockWorkspaceData,
+  diffCommand,
+  mockData,
+  queryModes,
+  runMockQuery,
+  PackageTree,
+  DiffView
+} from '@cogna/ui'
 import {
   CommandDialog,
   CommandInput,
@@ -45,9 +54,10 @@ function isQueryMatch(item: DetailItem): item is QueryMatch {
 type AppView = 'explorer' | 'diff'
 
 function App(): React.JSX.Element {
-  const packageList = useMemo(() => flattenPackages(mockData.packages.root), [])
+  const [workspaceData, setWorkspaceData] = useState(() => mockData)
+  const packageList = useMemo(() => flattenPackages(workspaceData.packages.root), [workspaceData])
   const [selectedPackageName, setSelectedPackageName] = useState(
-    packageList[0]?.name ?? 'workspace-app'
+    packageList[0]?.name ?? workspaceData.packages.root.name
   )
   const [tab, setTab] = useState<ExplorerTab>('outlines')
   const [queryMode, setQueryMode] = useState<QueryMode>('fuzzy-text')
@@ -58,17 +68,20 @@ function App(): React.JSX.Element {
   const [commandOpen, setCommandOpen] = useState(false)
 
   const selectedPackage = useMemo(
-    () => packageList.find((item) => item.name === selectedPackageName) ?? packageList[0],
-    [packageList, selectedPackageName]
+    () =>
+      packageList.find((item) => item.name === selectedPackageName) ??
+      packageList[0] ??
+      workspaceData.packages.root,
+    [packageList, selectedPackageName, workspaceData]
   )
 
   const outlines = useMemo(
-    () => mockData.outlines[selectedPackage.name] ?? [],
-    [selectedPackage.name]
+    () => workspaceData.outlines[selectedPackage.name] ?? [],
+    [selectedPackage.name, workspaceData]
   )
   const queryResponse = useMemo(
-    () => runMockQuery(selectedPackage.name, queryMode, queryText),
-    [queryMode, queryText, selectedPackage.name]
+    () => runMockQuery(workspaceData, selectedPackage.name, queryMode, queryText),
+    [queryMode, queryText, selectedPackage.name, workspaceData]
   )
 
   const activeDetail = useMemo<DetailItem | null>(() => {
@@ -94,6 +107,33 @@ function App(): React.JSX.Element {
     return () => document.removeEventListener('keydown', down)
   }, [])
 
+  useEffect(() => {
+    let active = true
+    void window.api.workspace
+      .getState()
+      .then((state) => {
+        if (!active) {
+          return
+        }
+        setWorkspaceData(createMockWorkspaceData(state.folderPath))
+      })
+      .catch(() => undefined)
+
+    const dispose = window.api.workspace.onDidChange((state) => {
+      setWorkspaceData(createMockWorkspaceData(state.folderPath))
+    })
+
+    return () => {
+      active = false
+      dispose()
+    }
+  }, [])
+
+  useEffect(() => {
+    setSelectedPackageName(workspaceData.packages.root.name)
+    setSelectedDetailId(null)
+  }, [workspaceData])
+
   const isMac = useMemo(() => window.navigator.platform.toUpperCase().indexOf('MAC') >= 0, [])
 
   return (
@@ -104,7 +144,14 @@ function App(): React.JSX.Element {
           className={`h-[38px] grid items-center border-b border-border flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 ${isMac ? 'pl-[72px]' : 'pl-4'}`}
           style={{ WebkitAppRegion: 'drag', gridTemplateColumns: '1fr auto 1fr' } as React.CSSProperties}
         >
-          <div />
+          <div className="min-w-0 px-4 flex flex-col justify-center">
+            <span className="text-xs font-semibold text-foreground truncate">
+              {workspaceData.workspace.displayName}
+            </span>
+            <span className="text-[10px] text-muted-foreground truncate">
+              {workspaceData.workspace.folderPath || workspaceData.workspace.contextSummary}
+            </span>
+          </div>
 
           <div className="flex bg-muted p-0.5 rounded-lg" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <button
@@ -183,7 +230,7 @@ function App(): React.JSX.Element {
             <ScrollArea className="flex-1">
               <div className="p-3">
                 <PackageTree
-                  node={mockData.packages.root}
+                  node={workspaceData.packages.root}
                   selected={selectedPackage.name}
                   onSelect={(name) => {
                     setSelectedPackageName(name)

@@ -52,7 +52,7 @@ cogna --help
 | `install-vscode` | Build and install the VSCode extension | — |
 | `run [ARGS...]` | Run cogna in-repo without installing | — |
 | `gen-proto` | Regenerate protobuf bindings (requires `go`, `buf`) | — |
-| `gen-registry` | Regenerate registry stubs from `openapi.json` (mapi ≥ 0.1.1) | — |
+| `gen-openapi` | Regenerate API stubs from `openapi.json` (mapi ≥ 0.1.1) | — |
 | `test-sdk` | Run JS SDK tests (vitest) | — |
 | `release-dry` | Dry-run SDK publish to mooncakes.io | — |
 | `clean` | Remove all build artifacts (`moon clean`) | — |

@@ -322,7 +322,7 @@ fn json_ok(summary : String, payload : Json) -> @mcp_types.ToolResult {
 
 ///|
 fn run_fetch_packages_tool(_args : Json?) -> @mcp_types.ToolResult {
-  let payload = @query_core.fetch_packages()
+  let payload = @query_core.fetch_packages_json()
   json_ok("Fetched package tree for the current project.", payload)
 }
 

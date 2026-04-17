@@ -188,13 +188,6 @@ pub fn read_bundle_declarations(repo : String) -> Result[Array[Json], String] {
 }
 
 ///|
-pub fn read_bundle_symbols(repo : String) -> Result[Array[Json], String] {
-  let path_out = bundle_ndjson_path(repo, "symbols")
-  guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
-  read_ndjson(path)
-}
-
-///|
 pub fn read_bundle_components(repo : String) -> Result[Array[Json], String] {
   let path_out = bundle_ndjson_path(repo, "software-components")
   guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
@@ -323,9 +316,6 @@ pub fn materialize_bundle_tar_gz(
   }
   if !entries.contains("declarations.ndjson") {
     return Err("bundle missing required entry declarations.ndjson")
-  }
-  if !entries.contains("symbols.ndjson") {
-    return Err("bundle missing required entry symbols.ndjson")
   }
 
   for name, content in entries {

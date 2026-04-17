@@ -20,11 +20,13 @@ pub fn default_config_yaml() -> String {
     #|  format: spdx
     #|  dependencyBundles: true
     #|  requireLocalPackages: true
-    #|publish:
-    #|  includeDependencies: true
-    #|registry:
-    #|  port: 8787
-    #|  storeDir: .cogna/cache/registry
+    #|cache:
+    #|  type: local
+    #|  local:
+    #|    storeDir: .cogna/cache
+    #|  http:
+    #|    baseUrl:
+    #|    timeoutMs: 10000
     #|mcp:
     #|  port: 3000
     #|

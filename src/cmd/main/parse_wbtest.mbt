@@ -22,34 +22,67 @@ test "parse invocation supports query positional file" {
 }
 
 ///|
-test "parse invocation supports config-driven publish defaults" {
-  let argv = ["cogna", "publish"]
+test "parse invocation supports open positional folder" {
+  let argv = ["cogna", "open", "./workspace"]
   let out = parse_cli_args(argv)
-  guard out is Ok(Publish(params)) else {
-    fail("expected publish invocation to parse")
+  guard out is Ok(Open(params)) else {
+    fail("expected open invocation to parse")
   }
 
-  inspect(params.bundle_file, content="")
+  inspect(params.folder, content="./workspace")
 }
 
 ///|
-test "parse invocation supports registry serve with custom port" {
-  let argv = ["cogna", "registry", "serve", "--port", "8788"]
+test "parse invocation supports serve with custom port" {
+  let argv = ["cogna", "serve", "--port", "8788"]
   let out = parse_cli_args(argv)
-  guard out is Ok(RegistryServe(params)) else {
-    fail("expected registry serve invocation to parse")
+  guard out is Ok(Serve(params)) else {
+    fail("expected serve invocation to parse")
   }
 
   inspect(params.port, content="8788")
 }
 
 ///|
-test "parse invocation supports registry status" {
-  let argv = ["cogna", "registry", "status"]
+test "parse invocation supports cache list" {
+  let argv = ["cogna", "cache", "list", "--prefix", "blob/"]
   let out = parse_cli_args(argv)
-  guard out is Ok(RegistryStatus) else {
-    fail("expected registry status invocation to parse")
+  guard out is Ok(CacheList(params)) else {
+    fail("expected cache list invocation to parse")
   }
+
+  inspect(params.prefix, content="blob/")
+}
+
+///|
+test "parse invocation supports cache add" {
+  let argv = [
+    "cogna",
+    "cache",
+    "add",
+    "--key",
+    "blob/sha256/abc",
+    "--file",
+    "./dist/out.bin",
+  ]
+  let out = parse_cli_args(argv)
+  guard out is Ok(CacheAdd(params)) else {
+    fail("expected cache add invocation to parse")
+  }
+
+  inspect(params.key, content="blob/sha256/abc")
+  inspect(params.file_path, content="./dist/out.bin")
+}
+
+///|
+test "parse invocation supports cache remove" {
+  let argv = ["cogna", "cache", "remove", "--key", "blob/sha256/abc"]
+  let out = parse_cli_args(argv)
+  guard out is Ok(CacheRemove(params)) else {
+    fail("expected cache remove invocation to parse")
+  }
+
+  inspect(params.key, content="blob/sha256/abc")
 }
 
 ///|

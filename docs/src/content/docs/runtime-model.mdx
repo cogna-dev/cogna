@@ -1,12 +1,12 @@
 ---
 title: 工作方式
-description: 解释 Cogna 现在的本地运行模型：bundle、registry、MCP、SPDX 与 dependency bundles 如何协同。
+description: 解释 Cogna 现在的本地运行模型：bundle、cache、MCP、SPDX 与 dependency bundles 如何协同。
 order: 10
 ---
 
 # 工作方式
 
-Cogna 当前仍然是**单机闭环**：你在本地仓库里构建 bundle，本地 registry 负责按 PURL 存储和分发，MCP 负责把这些 bundle 暴露给 AI / Agent。
+Cogna 当前仍然是**local-first**：你在本地仓库里构建 bundle，本地 cache 负责保存和复用对象，`cogna serve` 把 cache 暴露成 HTTP proxy，MCP 负责把这些 bundle 暴露给 AI / Agent。
 
 ---
 
@@ -27,12 +27,12 @@ flowchart LR
     end
 
     subgraph SHARE["3. 共享"]
-        C -->|"cogna publish"| F["Local Registry"]
-        C3 -->|"publish.includeDependencies"| F
+        C -->|"写入 local cache"| F["Local Cache"]
+        C3 -->|"remote read-through / local mirror"| F
     end
 
     subgraph QUERY["4. 查询"]
-        F -->|"cogna registry serve"| G["HTTP Registry API"]
+        F -->|"cogna serve"| G["HTTP Cache Proxy"]
         C -->|"cogna query"| H["CLI 单次查询"]
         F -->|"cogna mcp serve"| I["AI / Agent MCP 接口"]
     end
@@ -55,15 +55,14 @@ flowchart LR
 
 不再生成 CycloneDX 文件。
 
-### 3. Registry 和 Publish 会复用同一套本地 store
+### 3. Cache 负责本地复用，HTTP cache 负责远端 read-through
 
-store 目录优先级：
+默认 local cache 根目录是：
 
-1. `COGNA_REGISTRY_STORE_DIR`
-2. `cogna.yml -> registry.storeDir`
-3. `.cogna/cache/registry`
+1. `cogna.yml -> cache.local.storeDir`
+2. `.cogna/cache`
 
-这让本地开发、CI、容器运行都能复用相同语义。
+当 `cache.type=http` 时，build 会按 `local miss -> http hit -> 回填 local` 的顺序复用依赖结果。
 
 ### 4. MCP 命令面已经收口
 
@@ -76,21 +75,20 @@ store 目录优先级：
 
 ---
 
-## Registry 与 Docker
+## Cache Proxy 与 Docker
 
-如果你要把 registry 作为容器运行，推荐方式是：
+如果你要把 cache proxy 作为容器运行，推荐方式是：
 
 ```bash
-docker build -f integrations/deployments/docker/Dockerfile -t cogna-registry:local .
+docker build -f integrations/deployments/docker/Dockerfile -t cogna-cache-proxy:local .
 
 docker run --rm \
   -p 8787:8787 \
-  -e COGNA_REGISTRY_STORE_DIR=/data/registry \
-  -v "$PWD/.cogna-docker-registry:/data/registry" \
-  cogna-registry:local
+  -v "$PWD/.cogna-docker-cache:/data/cache" \
+  cogna-cache-proxy:local
 ```
 
-这样容器里的 registry 数据会直接持久化到挂载目录。
+这样容器里的 cache 数据会直接持久化到挂载目录。
 
 ---
 
@@ -98,7 +96,7 @@ docker run --rm \
 
 因为 Cogna 现在最强调的是：
 
-- 本地仓库即可完成 build → diff → check → publish → query
+- 本地仓库即可完成 build → diff → check → query
 - 不需要云端账号或托管控制面
 - AI 查询直接基于本机真实 bundle，而不是依赖源码猜测
 
@@ -107,5 +105,5 @@ docker run --rm \
 ## 下一步
 
 - 看命令面与默认值：[CLI 参考](/docs/cli)
-- 看 registry / MCP 接口细节：[MCP / Registry 参考](/docs/runtime-reference)
+- 看 cache / MCP 接口细节：[MCP / Cache 参考](/docs/runtime-reference)
 - 看 bundle 产物结构：[Bundle 与结果文件参考](/docs/indexing)

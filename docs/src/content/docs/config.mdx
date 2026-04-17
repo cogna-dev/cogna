@@ -1,6 +1,6 @@
 ---
 title: 配置与 PURL
-description: cogna.yml 的 v2 字段说明、默认值，以及 registry / publish / SBOM 的配置优先级。
+description: cogna.yml 的 v2 字段说明、默认值，以及 cache / SBOM / MCP 的配置方式。
 order: 7
 ---
 
@@ -29,11 +29,13 @@ sbom:
   format: spdx
   dependencyBundles: true
   requireLocalPackages: true
-publish:
-  includeDependencies: true
-registry:
-  port: 8787
-  storeDir: .cogna/cache/registry
+cache:
+  type: local
+  local:
+    storeDir: .cogna/cache
+  http:
+    baseUrl: http://127.0.0.1:8787
+    timeoutMs: 10000
 mcp:
   port: 3000
 ```
@@ -54,25 +56,27 @@ mcp:
 | `sbom.format` | 否 | 当前仅支持 `spdx` |
 | `sbom.dependencyBundles` | 否 | 是否为可解析的本地依赖额外产出 dependency bundle |
 | `sbom.requireLocalPackages` | 否 | 本地依赖无法解析时是否直接失败 |
-| `publish.includeDependencies` | 否 | `cogna publish` 是否同时发布 dependency bundles |
-| `registry.port` | 否 | `cogna registry serve` 默认端口 |
-| `registry.storeDir` | 否 | 本地 registry 存储目录 |
+| `cache.type` | 否 | `local` 或 `http`；默认 `local` |
+| `cache.local.storeDir` | 否 | 本地 cache 根目录 |
+| `cache.http.baseUrl` | 否 | 远端 HTTP cache / proxy 地址 |
+| `cache.http.timeoutMs` | 否 | HTTP cache 请求超时（毫秒） |
 | `mcp.port` | 否 | `cogna mcp serve` 默认端口 |
 
 ## 配置优先级
 
-### Registry store 目录
+### Local cache 目录
 
-本地 registry 存储目录按下面顺序决定：
+本地 cache 存储目录按下面顺序决定：
 
-1. 环境变量 `COGNA_REGISTRY_STORE_DIR`
-2. `cogna.yml` 中的 `registry.storeDir`
-3. 默认值 `.cogna/cache/registry`
+1. `cogna.yml` 中的 `cache.local.storeDir`
+2. 默认值 `.cogna/cache`
 
-这意味着你可以在容器或 CI 里直接覆盖存储目录，而不必改仓库配置：
+### `cache.type=http` 的行为
+
+当 `cache.type` 设置为 `http` 时，`cogna build` 会先检查本地 cache；如果本地 miss，就从 `cache.http.baseUrl` 指向的 HTTP cache 拉取对象并回填到本地 cache，再物化到 `dist/`。这让依赖结果可以通过远端复用，而不必重新构建。
 
 ```bash
-COGNA_REGISTRY_STORE_DIR=/data/registry cogna registry serve --port 8787
+cogna serve --port 8787
 ```
 
 ## 支持的 profile
@@ -87,7 +91,7 @@ COGNA_REGISTRY_STORE_DIR=/data/registry cogna registry serve --port 8787
 
 ## 什么是 PURL？
 
-PURL（Package URL）是 Cogna 用来标识 bundle、diff 基线和 registry 记录的标准格式：
+PURL（Package URL）是 Cogna 用来标识 bundle、diff 基线和 cache 索引记录的标准格式：
 
 ```text
 pkg:<type>/<namespace>/<name>@<version>
@@ -107,4 +111,4 @@ pkg:generic/acme/compat-policy@2026.03.27
 
 - 初始化并生成配置文件：[快速开始](/docs/quickstart)
 - 查看命令面与当前 reality：[CLI 参考](/docs/cli)
-- 理解 bundle / registry / MCP 如何串起来：[工作方式](/docs/runtime-model)
+- 理解 bundle / cache / MCP 如何串起来：[工作方式](/docs/runtime-model)

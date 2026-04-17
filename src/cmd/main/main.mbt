@@ -1,13 +1,15 @@
 ///|
 pub(all) enum CliInvocation {
   Init(@init_cmd.InitParams)
+  Open(@open_cmd.OpenParams)
   Build(@build_cmd.BuildParams)
   Diff(@diff_cmd.DiffParams)
   Check(@check_cmd.CheckParams)
   Query(@query_cmd.QueryParams)
-  Publish(@publish_cmd.PublishParams)
-  RegistryServe(@registry_cmd.RegistryServeParams)
-  RegistryStatus
+  Serve(@serve_cmd.ServeParams)
+  CacheList(@cache_cmd.CacheListParams)
+  CacheAdd(@cache_cmd.CacheAddParams)
+  CacheRemove(@cache_cmd.CacheRemoveParams)
   McpServe(@mcp_core.McpServeParams)
   McpStatus
 } derive(Eq)
@@ -17,6 +19,11 @@ pub impl Show for CliInvocation with output(self, logger) {
   match self {
     Init(params) => {
       logger.write_string("Init(")
+      logger.write_object(params)
+      logger.write_char(')')
+    }
+    Open(params) => {
+      logger.write_string("Open(")
       logger.write_object(params)
       logger.write_char(')')
     }
@@ -40,17 +47,26 @@ pub impl Show for CliInvocation with output(self, logger) {
       logger.write_object(params)
       logger.write_char(')')
     }
-    Publish(params) => {
-      logger.write_string("Publish(")
+    Serve(params) => {
+      logger.write_string("Serve(")
       logger.write_object(params)
       logger.write_char(')')
     }
-    RegistryServe(params) => {
-      logger.write_string("RegistryServe(")
+    CacheList(params) => {
+      logger.write_string("CacheList(")
       logger.write_object(params)
       logger.write_char(')')
     }
-    RegistryStatus => logger.write_string("RegistryStatus")
+    CacheAdd(params) => {
+      logger.write_string("CacheAdd(")
+      logger.write_object(params)
+      logger.write_char(')')
+    }
+    CacheRemove(params) => {
+      logger.write_string("CacheRemove(")
+      logger.write_object(params)
+      logger.write_char(')')
+    }
     McpServe(params) => {
       logger.write_string("McpServe(")
       logger.write_object(params)
@@ -64,12 +80,13 @@ pub impl Show for CliInvocation with output(self, logger) {
 fn is_known_subcommand(name : String) -> Bool {
   match name {
     "init"
+    | "open"
     | "build"
     | "diff"
     | "check"
     | "query"
-    | "publish"
-    | "registry"
+    | "serve"
+    | "cache"
     | "mcp"
     | "help" => true
     _ => false
@@ -95,15 +112,17 @@ fn grouped_help() -> String {
     #|
     #|Core
     #|  init                Initialize cogna.yml
+    #|  open <folder>       Open workspace in desktop app
     #|  build               Build CIQ bundle
     #|  diff                Compute CIQ diff
     #|  check               Run policy checks
     #|  query <query-file>  Query CIQ bundle
     #|
-    #|Remote
-    #|  publish             Publish CIQ bundle
-    #|  registry serve      Run local registry HTTP server
-    #|  registry status     Show registry server status
+    #|Cache
+    #|  serve               Run cache proxy command
+    #|  cache list          List local cache entries
+    #|  cache add           Add object to local cache
+    #|  cache remove        Remove object from local cache
     #|
     #|AI
     #|  mcp serve           Run MCP agent foreground loop
@@ -136,6 +155,12 @@ fn parse_invocation(
           default_values=["./cogna.yml"],
         ),
       ]),
+      @argparse.Command::new("open", about="Open workspace in desktop app", positionals=[
+        @argparse.PositionArg::new(
+          "folder",
+          num_args=@argparse.ValueRange::single(),
+        ),
+      ]),
       @argparse.Command::new("build", about="Build CIQ bundle"),
       @argparse.Command::new("diff", about="Compute CIQ diff"),
       @argparse.Command::new("check", about="Run policy checks"),
@@ -145,24 +170,64 @@ fn parse_invocation(
           num_args=@argparse.ValueRange::single(),
         ),
       ]),
-      @argparse.Command::new("publish", about="Publish CIQ bundle"),
       @argparse.Command::new(
-        "registry",
-        about="Run local registry operations",
+        "serve",
+        about="Run cache proxy command",
+        options=[
+          @argparse.OptionArg::new(
+            "port",
+            long="port",
+            action=@argparse.OptionAction::Set,
+            default_values=["8787"],
+          ),
+        ],
+      ),
+      @argparse.Command::new(
+        "cache",
+        about="Manage local cache objects",
         subcommands=[
           @argparse.Command::new(
-            "serve",
-            about="Run local registry HTTP server",
+            "list",
+            about="List local cache entries",
             options=[
               @argparse.OptionArg::new(
-                "port",
-                long="port",
+                "prefix",
+                long="prefix",
                 action=@argparse.OptionAction::Set,
-                default_values=["8787"],
+                default_values=[""],
               ),
             ],
           ),
-          @argparse.Command::new("status", about="Show registry server status"),
+          @argparse.Command::new(
+            "add",
+            about="Add object to local cache",
+            options=[
+              @argparse.OptionArg::new(
+                "key",
+                long="key",
+                action=@argparse.OptionAction::Set,
+                default_values=[""],
+              ),
+              @argparse.OptionArg::new(
+                "file",
+                long="file",
+                action=@argparse.OptionAction::Set,
+                default_values=[""],
+              ),
+            ],
+          ),
+          @argparse.Command::new(
+            "remove",
+            about="Remove object from local cache",
+            options=[
+              @argparse.OptionArg::new(
+                "key",
+                long="key",
+                action=@argparse.OptionAction::Set,
+                default_values=[""],
+              ),
+            ],
+          ),
         ],
         subcommand_required=true,
       ),
@@ -197,6 +262,10 @@ fn parse_invocation(
       let output_path = output_values[0]
       Ok(Init(@init_cmd.InitParams::{ output_path, }))
     }
+    Some(("open", open_matches)) => {
+      let folder_values = open_matches.values["folder"]
+      Ok(Open(@open_cmd.OpenParams::{ folder: folder_values[0], }))
+    }
     Some(("build", build_matches)) => {
       ignore(build_matches)
       Ok(Build(@build_cmd.BuildParams::{ repo: "" }))
@@ -220,21 +289,43 @@ fn parse_invocation(
       let query_file = query_values[0]
       Ok(Query(@query_cmd.QueryParams::{ query_file, }))
     }
-    Some(("publish", publish_matches)) => {
-      ignore(publish_matches)
-      Ok(Publish(@publish_cmd.PublishParams::{ bundle_file: "" }))
+    Some(("serve", serve_matches)) => {
+      let port_values = serve_matches.values["port"]
+      let parsed_port = try? @string.parse_int(port_values[0])
+      guard parsed_port is Ok(port) else {
+        return Err(usage_error(message="--port must be an integer"))
+      }
+      Ok(Serve(@serve_cmd.ServeParams::{ port, }))
     }
-    Some(("registry", registry_matches)) =>
-      match registry_matches.subcommand {
-        Some(("serve", serve_matches)) => {
-          let port_values = serve_matches.values["port"]
-          let parsed_port = try? @string.parse_int(port_values[0])
-          guard parsed_port is Ok(port) else {
-            return Err(usage_error(message="--port must be an integer"))
-          }
-          Ok(RegistryServe(@registry_cmd.RegistryServeParams::{ port, }))
+    Some(("cache", cache_matches)) =>
+      match cache_matches.subcommand {
+        Some(("list", list_matches)) => {
+          let prefix_values = list_matches.values["prefix"]
+          Ok(CacheList(@cache_cmd.CacheListParams::{ prefix: prefix_values[0], }))
         }
-        Some(("status", _)) => Ok(RegistryStatus)
+        Some(("add", add_matches)) => {
+          let key_values = add_matches.values["key"]
+          let file_values = add_matches.values["file"]
+          if key_values[0] == "" {
+            return Err(usage_error(message="cache add requires --key"))
+          }
+          if file_values[0] == "" {
+            return Err(usage_error(message="cache add requires --file"))
+          }
+          Ok(
+            CacheAdd(@cache_cmd.CacheAddParams::{
+              key: key_values[0],
+              file_path: file_values[0],
+            }),
+          )
+        }
+        Some(("remove", remove_matches)) => {
+          let key_values = remove_matches.values["key"]
+          if key_values[0] == "" {
+            return Err(usage_error(message="cache remove requires --key"))
+          }
+          Ok(CacheRemove(@cache_cmd.CacheRemoveParams::{ key: key_values[0], }))
+        }
         _ => Err(usage_error())
       }
     Some(("mcp", mcp_matches)) =>
@@ -269,6 +360,11 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
+    Open(params) =>
+      match @open_cmd.run(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
     Build(params) =>
       match @build_cmd.run(params) {
         Ok(result) => Ok(@cli.display(result))
@@ -289,18 +385,23 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
-    Publish(params) =>
-      match @publish_cmd.run(params) {
+    Serve(params) =>
+      match @serve_cmd.run(params) {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
-    RegistryServe(params) =>
-      match @registry_cmd.run_serve(params) {
+    CacheList(params) =>
+      match @cache_cmd.run_list(params) {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }
-    RegistryStatus =>
-      match @registry_cmd.run_status() {
+    CacheAdd(params) =>
+      match @cache_cmd.run_add(params) {
+        Ok(result) => Ok(@cli.display(result))
+        Err(error) => Err(error)
+      }
+    CacheRemove(params) =>
+      match @cache_cmd.run_remove(params) {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }

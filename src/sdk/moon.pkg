@@ -1,6 +1,11 @@
 import {
   "moonbitlang/core/json" @json,
-  "cogna-dev/cogna/core/api" @core,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/x/fs" @fs,
+  "cogna-dev/cogna/sdk/generated" @generated,
+  "cogna-dev/cogna/core/config" @config,
+  "cogna-dev/cogna/cmd/build" @build,
 }
 
 options(
@@ -16,5 +21,5 @@ options(
       "format": "esm",
     },
   },
-  targets: { "js.mbt": [ "js" ] },
+  targets: { "js.mbt": ["js"], "build.mbt": ["native"] },
 )

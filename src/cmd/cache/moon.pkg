@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/x/fs" @fs,
+  "cogna-dev/cogna/cache/local" @local_cache,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/core/config" @config,
+}
+
+supported_targets = "native"

@@ -11,21 +11,21 @@
 /// --- Build ---
 test "build: fixture input parses into BuildRequest" {
   let input : Json = {}
-  let req = BuildRequest::from_json(input)
+  let req = @generated.BuildRequest::from_json(input)
   assert_true(req is Some(_))
 }
 
 ///|
 test "build: fixture output parses into BuildResponse" {
   let output : Json = { "success": true }
-  let resp = BuildResponse::from_json(output)
+  let resp = @generated.BuildResponse::from_json(output)
   guard resp is Some(r) else { fail("BuildResponse should parse") }
   assert_true(r.success)
 }
 
 ///|
 test "build: api returns success response" {
-  let req = BuildRequest::{  }
+  let req = @generated.BuildRequest::{  }
   let resp = build(req)
   assert_true(resp.success)
 }
@@ -38,7 +38,7 @@ test "diff: fixture input parses into DiffRequest" {
     "target": "working-tree",
     "include_test_changes": false,
   }
-  let req = DiffRequest::from_json(input)
+  let req = @generated.DiffRequest::from_json(input)
   guard req is Some(r) else { fail("DiffRequest should parse") }
   inspect(r.base, content="Some(\"v0.0.1\")")
   inspect(r.target, content="Some(\"working-tree\")")
@@ -60,7 +60,7 @@ test "diff: fixture output parses into DiffResponse" {
     ],
     "test_changes": [],
   }
-  let resp = DiffResponse::from_json(output)
+  let resp = @generated.DiffResponse::from_json(output)
   guard resp is Some(r) else { fail("DiffResponse should parse") }
   guard r.summary is Some(s) else { fail("summary should be present") }
   inspect(s.added, content="4")
@@ -70,7 +70,7 @@ test "diff: fixture output parses into DiffResponse" {
 
 ///|
 test "diff: api returns structurally valid DiffResponse" {
-  let req : DiffRequest = {
+  let req : @generated.DiffRequest = {
     base: Some("v0.0.1"),
     target: Some("working-tree"),
     include_test_changes: Some(false),
@@ -91,7 +91,7 @@ test "diff: api returns structurally valid DiffResponse" {
 /// --- FetchPackages ---
 test "fetch_packages: fixture input parses into FetchPackagesRequest" {
   let input : Json = {}
-  let req = FetchPackagesRequest::from_json(input)
+  let req = @generated.FetchPackagesRequest::from_json(input)
   assert_true(req is Some(_))
 }
 
@@ -129,7 +129,7 @@ test "fetch_packages: fixture output parses into FetchPackagesResponse" {
       ],
     },
   }
-  let resp = FetchPackagesResponse::from_json(output)
+  let resp = @generated.FetchPackagesResponse::from_json(output)
   guard resp is Some(r) else { fail("FetchPackagesResponse should parse") }
   guard r.root is Some(root) else { fail("root should be present") }
   inspect(root.name, content="example/sdkacceptance")
@@ -142,7 +142,7 @@ test "fetch_packages: fixture output parses into FetchPackagesResponse" {
 
 ///|
 test "fetch_packages: api returns structurally valid FetchPackagesResponse" {
-  let req = FetchPackagesRequest::{  }
+  let req = @generated.FetchPackagesRequest::{  }
   let resp = fetch_packages(req)
   // @core.fetch_packages is a TODO stub; verify structure only
   guard resp is Some(r) else { fail("fetch_packages should return Some") }
@@ -157,7 +157,7 @@ test "fetch_packages: api returns structurally valid FetchPackagesResponse" {
 /// --- QueryOutlines ---
 test "query_outlines: fixture input parses into QueryOutlinesRequest" {
   let input : Json = { "package": "example/sdkacceptance" }
-  let req = QueryOutlinesRequest::from_json(input)
+  let req = @generated.QueryOutlinesRequest::from_json(input)
   guard req is Some(r) else { fail("QueryOutlinesRequest should parse") }
   inspect(r.package, content="example/sdkacceptance")
 }
@@ -201,7 +201,7 @@ test "query_outlines: fixture output parses into QueryOutlinesResponse" {
       },
     ],
   }
-  let resp = QueryOutlinesResponse::from_json(output)
+  let resp = @generated.QueryOutlinesResponse::from_json(output)
   guard resp is Some(r) else { fail("QueryOutlinesResponse should parse") }
   inspect(r.package, content="example/sdkacceptance")
   inspect(r.outlines.length(), content="4")
@@ -216,7 +216,7 @@ test "query_outlines: fixture output parses into QueryOutlinesResponse" {
 
 ///|
 test "query_outlines: api returns real outlines from ndjson" {
-  let req : QueryOutlinesRequest = { package: "example/sdkacceptance" }
+  let req : @generated.QueryOutlinesRequest = { package: "example/sdkacceptance" }
   let resp = query_outlines(req)
   guard resp is Some(r) else { fail("query_outlines should return Some") }
   inspect(r.package, content="example/sdkacceptance")
@@ -239,7 +239,7 @@ test "query exact-id: fixture input parses into QueryRequest" {
     "package": "example/sdkacceptance",
     "exact_id": "decl:go:example/sdkacceptance.Greeter",
   }
-  let req = QueryRequest::from_json(input)
+  let req = @generated.QueryRequest::from_json(input)
   guard req is Some(r) else { fail("QueryRequest should parse") }
   inspect(r.package, content="example/sdkacceptance")
   inspect(r.exact_id, content="Some(\"decl:go:example/sdkacceptance.Greeter\")")
@@ -266,7 +266,7 @@ test "query exact-id: fixture output parses into QueryResponse" {
     ],
     "cursor": null,
   }
-  let resp = QueryResponse::from_json(output)
+  let resp = @generated.QueryResponse::from_json(output)
   guard resp is Some(r) else { fail("QueryResponse should parse") }
   inspect(r.package, content="example/sdkacceptance")
   inspect(r.mode, content="exact-id")
@@ -277,7 +277,7 @@ test "query exact-id: fixture output parses into QueryResponse" {
 
 ///|
 test "query exact-id: api routes to exact-id mode and returns Greeter match" {
-  let req : QueryRequest = {
+  let req : @generated.QueryRequest = {
     package: "example/sdkacceptance",
     exact_id: Some("decl:go:example/sdkacceptance.Greeter"),
     exact_symbol: None,
@@ -302,7 +302,7 @@ test "query exact-symbol: fixture input parses into QueryRequest" {
     "package": "example/sdkacceptance",
     "exact_symbol": "Greeter.Greet",
   }
-  let req = QueryRequest::from_json(input)
+  let req = @generated.QueryRequest::from_json(input)
   guard req is Some(r) else { fail("QueryRequest should parse") }
   inspect(r.package, content="example/sdkacceptance")
   assert_true(r.exact_id is None)
@@ -328,7 +328,7 @@ test "query exact-symbol: fixture output parses into QueryResponse" {
     ],
     "cursor": null,
   }
-  let resp = QueryResponse::from_json(output)
+  let resp = @generated.QueryResponse::from_json(output)
   guard resp is Some(r) else { fail("QueryResponse should parse") }
   inspect(r.mode, content="exact-symbol")
   inspect(r.matches[0].kind, content="method")
@@ -336,7 +336,7 @@ test "query exact-symbol: fixture output parses into QueryResponse" {
 
 ///|
 test "query exact-symbol: api routes to exact-symbol mode and returns Greeter.Greet" {
-  let req : QueryRequest = {
+  let req : @generated.QueryRequest = {
     package: "example/sdkacceptance",
     exact_id: None,
     exact_symbol: Some("Greeter.Greet"),
@@ -360,7 +360,7 @@ test "query fuzzy-text: fixture input parses into QueryRequest" {
     "text": "label",
     "limit": 5,
   }
-  let req = QueryRequest::from_json(input)
+  let req = @generated.QueryRequest::from_json(input)
   guard req is Some(r) else { fail("QueryRequest should parse") }
   inspect(r.package, content="example/sdkacceptance")
   inspect(r.text, content="Some(\"label\")")
@@ -398,7 +398,7 @@ test "query fuzzy-text: fixture output parses into QueryResponse" {
     ],
     "cursor": null,
   }
-  let resp = QueryResponse::from_json(output)
+  let resp = @generated.QueryResponse::from_json(output)
   guard resp is Some(r) else { fail("QueryResponse should parse") }
   inspect(r.mode, content="fuzzy-text")
   inspect(r.matches.length(), content="2")
@@ -408,7 +408,7 @@ test "query fuzzy-text: fixture output parses into QueryResponse" {
 
 ///|
 test "query fuzzy-text: api routes to fuzzy-text mode and matches BuildLabels" {
-  let req : QueryRequest = {
+  let req : @generated.QueryRequest = {
     package: "example/sdkacceptance",
     exact_id: None,
     exact_symbol: None,

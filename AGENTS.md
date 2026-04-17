@@ -5,6 +5,37 @@
 - Keep `src/cmd/main/main.mbt` as thin entry + dispatch.
 - Keep e2e tests under `src/e2e/*`.
 
+# cogna-dev Library Rules
+
+## HTTP Server Development
+- **Always use `cogna-dev/mapi/lib` for HTTP server logic** — routes, handlers, middleware, request/response envelopes.
+- **Always derive the server from `openapi.json`** — run `mapi generate` to regenerate the `generated/` layer; implement handlers in a separate `handlers/` package that mapi never overwrites.
+- **Never use `moonbitlang/async` (or any native async package) directly** for HTTP server code. The `cogna-dev/mapi/lib` runtime is zero-I/O; adapt it to the host only at the outermost boundary (e.g. `moonbitlang/async/http` server bootstrap in `main.mbt`), and keep all business logic inside mapi handlers.
+- HTTP handler signatures: `fn(ctx : @lib.RequestContext, input : SomeInput) -> Result[SomeResponse, @lib.AppError]`.
+- Wire handlers to app via the generated `make_app(api_handlers)` call, not manual route registration.
+
+## cogna-dev Packages in this project (`moon.mod.json` deps)
+
+| Package | Purpose | Import alias |
+|---------|---------|-------------|
+| `cogna-dev/mapi/lib` | HTTP framework — App, Router, RequestEnvelope, ResponseEnvelope, middleware | `@lib` |
+| `cogna-dev/x` | General utilities for cogna | `@x` |
+| `cogna-dev/parkit` | Package registry / workspace tooling | `@parkit` |
+| `cogna-dev/sbom` | SBOM generation and parsing | `@sbom` |
+| `cogna-dev/mcp-sdk` | MCP (Model Context Protocol) SDK | `@mcp_sdk` |
+
+## Key mapi types (quick reference)
+```
+@lib.HttpMethod       – Get | Post | Put | Patch | Delete | Head | Options
+@lib.RequestEnvelope  – { http_method, path, query, headers, body: Bytes? }
+@lib.ResponseEnvelope – { status: Int, headers, body: Bytes? }
+@lib.RequestContext   – { request_id, matched_operation }
+@lib.AppError         – NotFound | BadRequest | Unauthorized | Forbidden | Internal
+@lib.App              – App::new(router) · app.serve(req) · app.use_middleware(m)
+@lib.Router           – Router::new() · router.add(route) · router.dispatch(req)
+@lib.InMemoryHost     – for unit-testing handlers without a real HTTP server
+```
+
 # Style Rules (must be extremely concise)
 
 - Keep module cohesion: when a feature has only a few related functions, keep them in one file instead of splitting one function per file.

@@ -1,0 +1,55 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cogna Cache Proxy API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Cache proxy healthy"
+          }
+        }
+      }
+    },
+    "/cache/v1/object": {
+      "get": {
+        "operationId": "getObject",
+        "summary": "Get cache object by key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Cache object returned" },
+          "400": { "description": "Missing key" },
+          "404": { "description": "Cache object not found" }
+        }
+      },
+      "put": {
+        "operationId": "putObject",
+        "summary": "Store cache object by key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Cache object stored" },
+          "400": { "description": "Missing key" }
+        }
+      }
+    }
+  }
+}

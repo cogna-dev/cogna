@@ -115,27 +115,19 @@ fn runtime_signature_from_env() -> Json {
 fn manifest_json(
   config : @config.Config,
   declarations_sha : String,
-  symbols_sha : String,
   components_sha : String?,
-  spdx_sha : String?,
   commit : String,
   opa_bundle_sha : String?,
   policy_rules_sha : String?,
 ) -> Json {
   let base_artifacts : Array[Json] = [
     artifact_with_sha("declarations.ndjson", "none", declarations_sha),
-    artifact_with_sha("symbols.ndjson", "none", symbols_sha),
   ]
   match components_sha {
     Some(sha) =>
       base_artifacts.push(
         artifact_with_sha("software-components.ndjson", "none", sha),
       )
-    None => ()
-  }
-  match spdx_sha {
-    Some(sha) =>
-      base_artifacts.push(artifact_with_sha("sbom.spdx.json", "none", sha))
     None => ()
   }
   if config.profile == "policy-bundle" {
@@ -203,7 +195,6 @@ fn metadata_json(config : @config.Config, extract : ExtractOutput) -> Json {
       "timingMs": { "initialize": 1, "extract": 1, "normalize": 1, "total": 3 },
       "stats": {
         "declarations": extract.declaration_count,
-        "symbols": extract.symbol_count,
         "diagnosticFiles": extract.diagnostic_files,
       },
     },
@@ -214,23 +205,16 @@ fn metadata_json(config : @config.Config, extract : ExtractOutput) -> Json {
 fn checksums_text(
   manifest_sha : String,
   declarations_sha : String,
-  symbols_sha : String,
   components_sha : String?,
-  spdx_sha : String?,
   metadata_sha : String,
   opa_bundle_sha : String?,
   policy_rules_sha : String?,
 ) -> String {
   let mut base = "manifest.json  \{manifest_sha}\n" +
     "declarations.ndjson  \{declarations_sha}\n" +
-    "symbols.ndjson  \{symbols_sha}\n" +
     "metadata.json  \{metadata_sha}\n"
   match components_sha {
     Some(sha) => base = base + "software-components.ndjson  \{sha}\n"
-    None => ()
-  }
-  match spdx_sha {
-    Some(sha) => base = base + "sbom.spdx.json  \{sha}\n"
     None => ()
   }
   let with_opa = match opa_bundle_sha {
@@ -399,9 +383,7 @@ fn tar_archive(entries : Array[(String, Bytes)]) -> Bytes {
 fn build_tar_payload(
   manifest_text : String,
   declarations_artifact : Bytes,
-  symbols_artifact : Bytes,
   components_artifact : Bytes?,
-  spdx_artifact : Bytes?,
   metadata_text : String,
   checksums : String,
   opa_bundle : Bytes?,
@@ -410,16 +392,11 @@ fn build_tar_payload(
   let entries : Array[(String, Bytes)] = [
     ("manifest.json", utf8_bytes(manifest_text)),
     ("declarations.ndjson", declarations_artifact),
-    ("symbols.ndjson", symbols_artifact),
     ("metadata.json", utf8_bytes(metadata_text)),
     ("checksums.txt", utf8_bytes(checksums)),
   ]
   match components_artifact {
     Some(content) => entries.push(("software-components.ndjson", content))
-    None => ()
-  }
-  match spdx_artifact {
-    Some(content) => entries.push(("sbom.spdx.json", content))
     None => ()
   }
   match opa_bundle {
@@ -782,10 +759,7 @@ fn write_bundle_skeleton(
   guard extract_out is Ok(extract) else { return Err(extract_out.unwrap_err()) }
 
   let declarations_artifact = utf8_bytes(extract.declarations_text)
-  let symbols_artifact = utf8_bytes(extract.symbols_text)
-
   let declarations_sha = sha256_hex(declarations_artifact)
-  let symbols_sha = sha256_hex(symbols_artifact)
   let sbom_scan_out = collect_sbom_components(config, repo)
   guard sbom_scan_out is Ok(sbom_scan) else {
     return Err(build_error(sbom_scan_out.unwrap_err()))
@@ -794,9 +768,7 @@ fn write_bundle_skeleton(
   let components_ndjson_text = sbom_artifacts.components_ndjson
   let spdx_json_text = sbom_artifacts.spdx_json
   let components_artifact = utf8_bytes(components_ndjson_text)
-  let spdx_artifact = utf8_bytes(spdx_json_text)
   let components_sha = sha256_hex(components_artifact)
-  let spdx_sha = sha256_hex(spdx_artifact)
   let mut policy_rules_out : String? = None
   let opa_bundle_out = if config.profile == "policy-bundle" {
     let built = build_opa_bundle_tar_gz(config, repo)
@@ -821,9 +793,7 @@ fn write_bundle_skeleton(
   let manifest_object = manifest_json(
     config,
     declarations_sha,
-    symbols_sha,
     Some(components_sha),
-    Some(spdx_sha),
     extract.commit,
     opa_bundle_sha,
     policy_rules_sha,
@@ -835,9 +805,7 @@ fn write_bundle_skeleton(
   let checksums = checksums_text(
     manifest_sha,
     declarations_sha,
-    symbols_sha,
     Some(components_sha),
-    Some(spdx_sha),
     metadata_sha,
     opa_bundle_sha,
     policy_rules_sha,
@@ -853,14 +821,16 @@ fn write_bundle_skeleton(
     declarations_artifact,
   )
   guard decl_out is Ok(_) else { return Err(decl_out.unwrap_err()) }
-  let symbols_out = write_bytes("\{dist_dir}/symbols.ndjson", symbols_artifact)
-  guard symbols_out is Ok(_) else { return Err(symbols_out.unwrap_err()) }
   let components_out = write_bytes(
     "\{dist_dir}/software-components.ndjson",
     components_artifact,
   )
   guard components_out is Ok(_) else { return Err(components_out.unwrap_err()) }
-  let spdx_out = write_bytes("\{dist_dir}/sbom.spdx.json", spdx_artifact)
+  // Write SBOM to project .cogna directory (not bundled)
+  let cogna_dir = "\{repo}/.cogna"
+  let cogna_dir_out = ensure_dir(cogna_dir)
+  guard cogna_dir_out is Ok(_) else { return Err(cogna_dir_out.unwrap_err()) }
+  let spdx_out = write_text("\{cogna_dir}/sbom.spdx.json", spdx_json_text)
   guard spdx_out is Ok(_) else { return Err(spdx_out.unwrap_err()) }
   let metadata_out = write_text("\{dist_dir}/metadata.json", metadata)
   guard metadata_out is Ok(_) else { return Err(metadata_out.unwrap_err()) }
@@ -878,9 +848,7 @@ fn write_bundle_skeleton(
   let tar_payload = build_tar_payload(
     manifest,
     declarations_artifact,
-    symbols_artifact,
     Some(components_artifact),
-    Some(spdx_artifact),
     metadata,
     checksums,
     opa_bundle_out,
@@ -917,6 +885,133 @@ fn write_bundle_skeleton(
 }
 
 ///|
+fn build_cache_key(config : @config.Config, repo : String) -> Result[String, @cli.CliError] {
+  let files_out = resolve_input_files(config, repo)
+  guard files_out is Ok(files) else { return Err(files_out.unwrap_err()) }
+  let parts : Array[String] = [
+    "schema=\{config.schema_version}",
+    "profile=\{config.profile}",
+    "purl=\{config.purl}",
+    "source.repo=\{config.source.repo}",
+    "source.ref=\{config.source.source_ref}",
+  ]
+  for i in 0..<files.length() {
+    let relative_path = files[i]
+    let absolute_path = "\{repo}/\{relative_path}"
+    let bytes = @fs.read_file_to_bytes(absolute_path) catch {
+      err =>
+        return Err(
+          build_error("cannot read build input \{absolute_path}: \{err.to_string()}")
+        )
+    }
+    parts.push(
+      "\{relative_path} \{@sha256.sha256_hexdigest(bytes)} \{bytes.length()}"
+    )
+  }
+  let digest = @sha256.sha256_hexdigest(@utf8.encode(parts.join("\n")))
+  Ok("build/\{config.purl}/\{digest}/bundle.ciq.tgz")
+}
+
+///|
+fn cache_root_dir(config : @config.Config, root_dir : String) -> String {
+  @config.resolve_project_path(root_dir, config.cache.local_store.store_dir)
+}
+
+///|
+fn materialize_cached_bundle(
+  dist_dir : String,
+  bundle_bytes : Bytes,
+) -> Result[Unit, @cli.CliError] {
+  let dist_out = ensure_dir(dist_dir)
+  guard dist_out is Ok(_) else { return Err(dist_out.unwrap_err()) }
+  let bundle_path = "\{dist_dir}/bundle.ciq.tgz"
+  let bundle_out = write_bytes(bundle_path, bundle_bytes)
+  guard bundle_out is Ok(_) else { return Err(bundle_out.unwrap_err()) }
+  let materialize_out = @bundle.materialize_bundle_tar_gz(bundle_path, dist_dir)
+  guard materialize_out is Ok(_) else {
+    return Err(build_error(materialize_out.unwrap_err()))
+  }
+  Ok(())
+}
+
+///|
+fn restore_bundle_from_local_cache(
+  config : @config.Config,
+  root_dir : String,
+  cache_key : String,
+  dist_dir : String,
+) -> Result[Bool, @cli.CliError] {
+  let cache_root = cache_root_dir(config, root_dir)
+  let cached_out = @local_cache.get(cache_root, cache_key)
+  guard cached_out is Ok(cached) else {
+    return Err(build_error(cached_out.unwrap_err()))
+  }
+  match cached {
+    Some(object) => {
+      let materialize_out = materialize_cached_bundle(dist_dir, object.body)
+      guard materialize_out is Ok(_) else { return Err(materialize_out.unwrap_err()) }
+      Ok(true)
+    }
+    None => Ok(false)
+  }
+}
+
+///|
+fn restore_bundle_from_http_cache(
+  config : @config.Config,
+  root_dir : String,
+  cache_key : String,
+  dist_dir : String,
+) -> Result[Bool, @cli.CliError] {
+  if config.cache.type_ != "http" {
+    return Ok(false)
+  }
+  let cached_out = @http_cache.get(config.cache.http.base_url, cache_key)
+  guard cached_out is Ok(cached) else {
+    return Err(build_error(cached_out.unwrap_err()))
+  }
+  match cached {
+    Some(object) => {
+      let cache_root = cache_root_dir(config, root_dir)
+      let put_out = @local_cache.put(
+        cache_root,
+        cache_key,
+        object.body,
+        content_type=object.content_type,
+      )
+      guard put_out is Ok(_) else { return Err(build_error(put_out.unwrap_err())) }
+      let materialize_out = materialize_cached_bundle(dist_dir, object.body)
+      guard materialize_out is Ok(_) else { return Err(materialize_out.unwrap_err()) }
+      Ok(true)
+    }
+    None => Ok(false)
+  }
+}
+
+///|
+fn store_bundle_in_local_cache(
+  config : @config.Config,
+  root_dir : String,
+  cache_key : String,
+  dist_dir : String,
+) -> Result[Unit, @cli.CliError] {
+  let bundle_path = "\{dist_dir}/bundle.ciq.tgz"
+  let bundle_bytes = @fs.read_file_to_bytes(bundle_path) catch {
+    err =>
+      return Err(build_error("cannot read bundle file \{bundle_path}: \{err.to_string()}"))
+  }
+  let cache_root = cache_root_dir(config, root_dir)
+  let put_out = @local_cache.put(
+    cache_root,
+    cache_key,
+    bundle_bytes,
+    content_type="application/gzip",
+  )
+  guard put_out is Ok(_) else { return Err(build_error(put_out.unwrap_err())) }
+  Ok(())
+}
+
+///|
 pub fn run(params : BuildParams) -> @cli.CliResult[BuildResult, @cli.CliError] {
   let lookup_root = if params.repo == "" { "." } else { params.repo }
   let resolved_out = @config.resolve(lookup_root)
@@ -927,8 +1022,42 @@ pub fn run(params : BuildParams) -> @cli.CliResult[BuildResult, @cli.CliError] {
   let root_dir = resolved.root_dir
 
   let dist_dir = "\{root_dir}/dist"
+  let cache_key_out = build_cache_key(config, root_dir)
+  guard cache_key_out is Ok(cache_key) else { return Err(cache_key_out.unwrap_err()) }
+  let restore_local_out = restore_bundle_from_local_cache(
+    config,
+    root_dir,
+    cache_key,
+    dist_dir,
+  )
+  guard restore_local_out is Ok(restored_local) else {
+    return Err(restore_local_out.unwrap_err())
+  }
+  if restored_local {
+    return Ok({
+      repo: root_dir,
+      summary: "Restored CIQ bundle skeleton from local cache at \{dist_dir}",
+    })
+  }
+  let restore_http_out = restore_bundle_from_http_cache(
+    config,
+    root_dir,
+    cache_key,
+    dist_dir,
+  )
+  guard restore_http_out is Ok(restored_http) else {
+    return Err(restore_http_out.unwrap_err())
+  }
+  if restored_http {
+    return Ok({
+      repo: root_dir,
+      summary: "Restored CIQ bundle skeleton from http cache at \{dist_dir}",
+    })
+  }
   let write_out = write_bundle_skeleton(config, root_dir, dist_dir)
   guard write_out is Ok(_) else { return Err(write_out.unwrap_err()) }
+  let cache_store_out = store_bundle_in_local_cache(config, root_dir, cache_key, dist_dir)
+  guard cache_store_out is Ok(_) else { return Err(cache_store_out.unwrap_err()) }
 
   Ok({ repo: root_dir, summary: "Generated CIQ bundle skeleton at \{dist_dir}" })
 }

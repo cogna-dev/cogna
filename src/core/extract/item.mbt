@@ -376,8 +376,8 @@ pub fn declaration_relations_v2(
 ///|
 pub fn make_declaration(
   profile : String,
-  server : String,
-  language : String,
+  _server : String,
+  _language : String,
   path : String,
   line_no : Int,
   kind : String,
@@ -385,23 +385,15 @@ pub fn make_declaration(
   signature : String,
   docs : String,
 ) -> Json {
-  let canonical = canonical_name(profile, path, name)
+  let symbol = canonical_name(profile, path, name)
   {
-    "id": "decl:\{profile}:\{canonical}",
+    "id": "decl:\{profile}:\{symbol}",
     "kind": kind,
-    "name": name,
-    "canonical_name": canonical,
-    "path": path,
+    "symbol": symbol,
     "signature": signature,
-    "shape": declaration_shape(kind, signature),
-    "visibility": "public",
     "docs": docs,
-    "baselineRole": "baseline",
-    "language": language,
-    "source_refs": [{ "uri": path, "startLine": line_no, "endLine": line_no }],
-    "relations": declaration_relations_v2(profile, path, kind, name, signature),
+    "deprecated": false,
     "location": { "uri": path, "startLine": line_no, "endLine": line_no },
-    "language_specific": { "profile": profile, "server": server },
   }
 }
 

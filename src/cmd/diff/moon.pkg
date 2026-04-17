@@ -3,7 +3,7 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/cli" @cli,
-  "cogna-dev/cogna/config" @config,
+  "cogna-dev/cogna/core/config" @config,
 }
 
 options(

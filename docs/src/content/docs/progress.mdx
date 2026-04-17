@@ -6,13 +6,13 @@ order: 12
 
 # 开发进度
 
-> 最后更新时间：2026-04-17（本轮新增：`cogna-dev/mapi` 升级至 0.1.1，`justfile` 补充 `check-sdk` / `test-sdk` / `fmt-sdk` / `gen-registry` recipes 并更新 `ci` 依赖，`ci.yml` 新增 `sdk-check` job，`CONTRIBUTING.md` 能力矩阵同步更新。Asia/Manila，当前 active stage：A004 Stage C~E proto-first codegen integration。**本轮新增 build-release pipeline**：`.github/workflows/release.yml` 已创建，支持 push tag `v*` 自动触发多平台 CLI 构建（x86_64/aarch64 × Linux/macOS + x86_64-Windows）并挂载到 GitHub Release，SDK 同步通过 `cogna-dev/moonbit-actions/publish@v0` 发布到 mooncakes.io；`ci.yml` 新增 `pre-release-check` job（semver 格式校验 + `moon publish --dry-run`）；`justfile` 已重整为统一动词前缀风格（`build-*` / `test-*` / `check-*` / `install-*` / `gen-*` / `release-*`），包含能力矩阵注释与依赖图；`CONTRIBUTING.md` 已同步更新为基于 justfile 的完整贡献者指引；`integrations/actions/setup-moonbit/action.yml` 已恢复（此前被误删）。**本轮新增 registry transport / layout cleanup**：`src/async/` 已删除并由新的 `src/shell/` package 取代，原先分散在 `src/async` 的 process/http-client helper 现统一收口为 native-only shell adapter；registry 逻辑也已完全并回 `src/registry/` vertical，其中 `src/lib/registry/` 已删除、`src/registry/` 根目录不再保留 loose `.mbt` entry，仅保留 `client/` 与 `server/` 两个子 package；registry server 侧已切换为 `cogna-dev/mapi` router/app contract + 内联 HTTP accept loop，command packages 对共享 transport/registry import 也已同步改到 `@shell` / `@client`；仓库根目录新增 `openapi.json`，显式描述 `/health`、bundle upload/resolve/detail/download 与 package versions 共 6 条公开 registry API 路由。此前的 parser cleanup 也仍成立：`src/lib/parsec` 已删除；原先被其承载的轻量 string/signature helper 已收口到 `src/extractors/`，`src/lib/hcl` 现已改为**优先使用外部 `cogna-dev/x/hcl` 的 typed `Document` AST**，并在本地做 compatibility adapter，把结果恢复成 `HclFile` / `HclBlock` / `HclAttr` 供 Terraform extractor 继续消费；对于 `cogna-dev/x/hcl` 当前尚不接受的 Terraform 扩展表达式，仍保留 fallback 路径以维持既有行为。与此同时，`src/cmd/build/extractor.mbt` 中原本散落的 Terraform / OpenAPI 解析逻辑已分别迁入 `src/extractors/terraform/` 与 `src/extractors/openapi/`，`cmd/build` 只保留 orchestration / dispatch。`parse_hcl_file(lines)` 与 `HclFile` / `HclBlock` / `HclAttr` public API 仍保持不变，现有 HCL compatibility tests、extractor tests 与 build snapshot tests 已通过。此前的 schema cleanup 也仍成立：仓库内手写 `json-schema` / `ciq-schema` runtime 路线已删除，manifest 不再携带 `declarationSchema`，command/core/registry 的 trusted path 已改为轻量 shape check；未来如需格式校验，唯一方向收口为由 proto-gen 直接生成 validator/helper，而不是继续维护 JSON Schema 资产。另：已根据 `spec/api.md` 新增 `spec/ui.md`，并在 `integrations/desktop/` 实现基于 Electron + React 的全功能桌面 demo，本轮已完成 **二期 UI 升级**：无边框窗口（`frame: false` + `titleBarStyle: hidden` + macOS traffic-light 定位）、自定义 App Menubar（`-webkit-app-region: drag`）、Tailwind CSS v4 + Shadcn UI 组件替换原始 CSS、Command palette（⌘K / Ctrl+K，基于 Shadcn `CommandDialog`），以及完整的三栏 App 布局（sidebar + explorer + detail）；当前因 `integrations/sdk/node/src/moonbit.ts` 仍依赖 monorepo `_build/js/debug/build/sdk/sdk.js` 路径，desktop 侧保持 mock-first 数据层，同时保留 `Build` / `Diff` 的 CLI guidance 卡片。`pnpm typecheck`、`pnpm lint` 与 `pnpm build` 已通过。）
+> 最后更新时间：2026-04-17（本轮：继续推进 A005 cache-first architecture redesign。`spec/cache.md` 已从旧的 `manifest + blob` 方案重写为 **package-atomic bundle cache**：`get/put` 的原子单位现在明确为“一个 package 的完整 `bundle.ciq.tgz`”，并将 `storeDir` 上提为 `cache.storeDir`；`src/http/` 已抽出 shared HTTP/query helper，`src/cache/http/` 与 `src/cmd/serve/` 已切到新 helper；`src/cmd/serve/main_wbtest.mbt` 与 `src/cmd/build/local_index.mbt` 已修正为 cache-first config shape；legacy `src/cmd/publish/`、`src/cmd/registry/` 与 `src/registry/` 已删除；发布流程现已新增 Electron 桌面端安装包构建：`release.yml` 会在 tag release 时并行产出 Windows x64/arm64、macOS x64/arm64 与 Linux x64 的 installer artifacts，并与 CLI archives 一并挂到 GitHub Release；同时已补充 release integrity 收口：桌面包版本会在 workflow 中同步到 release tag，GitHub Actions 已固定到 commit SHA，checkout 只允许真实 tag ref，Electron 下载改回官方源；本轮还新增了 `cogna open <folder>` 命令与 Electron deep-link / single-instance workspace wake flow，桌面 app identity 已收口为 `dev.xaclabs.cogna`，并补充了 `spec/desktop.md` 统一定义 docs site、CLI、desktop 与 cache-first runtime 的整体关系；另外已新增 `spec/review.md`，把 `./e2e/repo/` 固定为本地人工验收基线，用于围绕 repo 联合验收 CLI 与 Desktop 的用户可见行为。当前 active stage：A005 cache-first architecture redesign。）
 >
 > 本页是唯一的 progress source of truth。`/contrib/progress` 仅保留兼容入口，不再维护独立事实。
 
 ## 当前产品状态
 
-Cogna 当前仍以 **local-only / config-driven** 方式工作：围绕 `cogna.yml`、本地 bundle、本地 registry store、MCP 与 SARIF 输出形成单机闭环。A003 的 benchmark / parity 与 boundary cleanup 已完成，native-only async 收口也已经落地；A004 的 JS SDK/CLI 边界第一批实现也已落地：`src/sdk/contracts/`、`src/sdk/index/`、`src/sdk/query/` 已创建，`cmd/query` / `cmd/build` / `cmd/mcp/core` 已完成对 SDK core 的薄封装或委托，`integrations/sdk/node/` 也已收口为带稳定 wrapper API 的 `@cogna/sdk`，同时 repo 根目录已补 `pnpm-workspace.yaml`，公开 TS 类型已从大量 `unknown` 收紧为 CIQ/local-index 相关结构。在此基础上，当前主线工作已切到：#strong[A004 proto-only 丰富 contract review]。本轮继续在五文件布局内重构 proto：共享文件保持为 `bundle.proto`，而 `query.proto` 已开始从旧的 selector/result 模型转向“Bundle 虚拟二维表 + SQL”模型，用 `BuiltinTable`、`TableSchema`、`ColumnSchema`、`QueryValue`、`QueryResultSet` 和 `QueryCatalog` 来定义可查询的关系视图，减少后续继续堆叠 `List/Get` 接口的需要。
+Cogna 当前以 **local-first / cache-driven** 方式工作：围绕 `cogna.yml`、本地 bundle、本地 cache、HTTP cache proxy、MCP 与 SARIF 输出形成单机闭环。A005 的设计冻结已经更新为 **package-atomic bundle cache**：`get/put` 的语义单位是完整 package bundle，而不是 manifest + 多 blob；build 在 `cache.type=http` 时采用 `local miss -> http hit -> 回填 local` 的 read-through 路径复用依赖结果。当前剩余工作主要是继续把代码、文档与辅助集成全面对齐到这份新设计真相源。
 
 | 能力 | 当前状态 |
 |------|----------|
@@ -31,8 +31,9 @@ Cogna 当前仍以 **local-only / config-driven** 方式工作：围绕 `cogna.y
 - `cogna diff`
 - `cogna check`
 - `cogna query <query-file>`
-- `cogna publish`
-- `cogna registry serve|status`
+- `cogna serve`
+- `cogna open <folder>`
+- `cogna cache list|add|remove`
 - `cogna mcp serve|status`
 
 ## 当前 cleanup 计划对账总览
@@ -69,23 +70,27 @@ Cogna 当前仍以 **local-only / config-driven** 方式工作：围绕 `cogna.y
 
 ## 当前 active stage
 
-当前 active stage 是 #strong[`A004 proto-first codegen integration（Stage E SDK runtime facade 收口）`]。proto-only 五文件 contract 已基本稳定，当前重点已从“继续改 proto 形状”转向“把自定义 Go plugin 生成链路接入真实构建/发布面”：`buf.gen.yaml` 作为唯一生成入口，`src/sdk/proto/xaclabs/cogna/v1` 作为 MoonBit DTO 包，`integrations/sdk/node/dist/generated/*` 作为 npm 发布物中的 proto DTO/JSON helper 子路径；同时本轮已把 Node SDK 从 String→String JSON wrapper 改为直接绑定编译后的 MoonBit JS export，并通过 TS facade 复用 `generated/*.ts` 类型定义，实现无 JSON 序列化的强类型调用。配套地，旧的手写 schema/runtime schema 路线已经删除，后续若需要结构校验，应直接从 proto 生成 validator/helper。
+当前 active stage 是 #strong[`A005 cache-first architecture redesign（Stage A 设计冻结）`]。当前主线工作已从上一轮 proto-first / SDK surface 收口切到下一轮存储与分发模型重构：目标是废弃 `publish` / `registry` / registry-style bundle 工作流，把远程复用统一收口到 `cache.get` / `cache.put` 两个核心动作，并明确 `get/put` 的原子单位是**一个 package 的完整 `bundle.ciq.tgz`**；build 在默认 local cache 上运行，并在 `cache.type=http` 时采用“remote read-through -> local mirror”的方式复用依赖结果，而不是重新构建。为此，本轮已完成现状盘点，并重写 `spec/cache.md` 作为新的设计真相源。
 
 ### 当前阶段目标
 
-收口 Stage C（MoonBit target）、Stage D（Node TS target）与 Stage E（Packaging / SDK surface integration）的已实现部分：确保主 `buf.gen.yaml` 直接驱动本地 plugin；把 MoonBit DTO 包收口到 `src/sdk/proto/**`，让 Node build 把 `src/generated/*.ts` 编译为 `dist/generated/*.js` / `.d.ts`；并补一个带少量第三方依赖的标准 fixture 项目 `examples/sdk-acceptance/full/repo` 与 native e2e `src/e2e/native/sdk_test.mbt`，验证 MoonBit/Node SDK 集成面。
+冻结 registry -> cache 的目标形状，明确：
+
+1. 新的 config 应只保留 `cache`，且支持 `local` / `http` 两类 backend，并将本地落盘目录提升为 `cache.storeDir`；
+2. 新的命令面应删除 `cogna publish` 与 `cogna registry ...`，改为 `cogna serve` 与 `cogna cache list/add/remove`；
+3. `build` 对依赖的复用路径应改为 `local miss -> http hit -> 回填 local` 的 read-through 行为；
+4. 旧的 bundle upload / receipt / versions API 应退场，由“一个 package = 一个完整 bundle object”的 cache 模型替代。
 
 ### 当前阶段执行清单
 
-- [x] 已完成：`buf.gen.yaml` 继续作为唯一 codegen truth source，MoonBit DTO 保持在 `src/sdk/proto/**`，Node DTO 保持在 `integrations/sdk/node/src/generated/*.ts`；
-- [x] 已完成：`integrations/sdk/node/package.json` 已保留 `@cogna/sdk/generated` export，Node consumer 可直接获取 proto 生成的 DTO / parser / serializer；
-- [x] 已完成：MoonBit JS target 现已从 String→String JSON wrapper 收口为直接导出真实 SDK API（`build` / `diff` / `fetch_packages` / `query_outlines` / `query`）；`src/sdk/js.mbt` 与 `src/sdk/moon.pkg` 已改为 direct export，并通过 `moon check --target js` / `moon build --target js`；
-- [x] 已完成：`integrations/sdk/node/src/moonbit.ts` 现已改为 direct MoonBit runtime facade，不再执行 `JSON.stringify` / `JSON.parse`；Node 侧继续复用 `generated/*.ts` 的 TS 类型与 parse 函数作为结构化 guard；
-- [x] 已完成：Node SDK 测试已新增 direct facade 覆盖，验证编译后的 MoonBit JS export 可直接返回 typed object；`npm test` 当前为 35/35 通过，`npx tsc --noEmit` 通过；
-- [x] 已完成：MoonBit SDK native 测试仍保持通过，`moon test --target native -p cogna-dev/cogna/sdk` 当前 21/21 通过；
-- [x] 已完成：旧 `src/lib/json-schema/`、`src/lib/ciq-schema/`、`src/config/schema*.mbt` 与 proto `moonbit-schema` emitter 已删除；manifest fixture / snapshot 中的 `declarationSchema` 已同步移除，registry client 现改为轻量 shape predicate；
-- [x] 已完成：`spec/ui.md` 已新增桌面 UI 设计草案；`integrations/desktop/` 已实现 mock-first 的 Shadcn 风格 Electron demo，并通过 `pnpm typecheck`、`pnpm lint` 与 `pnpm build`；
-- [ ] 当前剩余 gap：`src/core/api/` 中的部分函数目前仍是 stub / partial stub，实现行为与 fixture 语义尚未完全对齐；direct JS facade 已打通，但底层业务逻辑尚未与 `src/cmd/` 的真实实现完全联通。
+- [x] 已完成：盘点 `src/cmd/main/main.mbt`，确认当前 CLI 仍包含 `publish`、`registry serve`、`registry status`，帮助文本与 dispatch 均仍以 registry/publish 为中心；
+- [x] 已完成：盘点 `src/config/types.mbt`、`src/config/defaults.mbt`、`src/config/load.mbt`、`src/config/validate.mbt` 与 `src/cmd/init/config.mbt`，确认当前配置模型仍内建 `PublishSettings` 与 `RegistrySettings`，且尚无 `cache` section；
+- [x] 已完成：盘点 `src/cmd/publish/`、`src/cmd/registry/`、`src/registry/client/`、`src/registry/server/` 与 `openapi.json`，确认当前远程 contract 仍深度耦合 bundle upload / resolve / receipt / bundleId / versions 语义；
+- [x] 已完成：盘点可复用实现，确认可复用 `src/registry/server/storage.mbt` 的 atomic write/lockdir 模式、`src/registry/client/http.mbt` 的 HTTP client、`src/registry/server/server.mbt` 的 router/server 模式，以及 `src/core/snapshot/main.mbt` 的 sha256/content digest helper；
+- [x] 已完成：重写 `spec/cache.md`，冻结 package-atomic cache-first 设计：核心 backend 接口仅 `get/put`，但原子单位为“一个 package 的完整 `bundle.ciq.tgz`”；`storeDir` 已提升为 `cache.storeDir`；`cogna serve` 改为 HTTP cache proxy，`cache list/add/remove` 先作为 local cache 管理面；
+- [x] 已完成：新增 `cogna open <folder>` command surface、Electron deep-link / single-instance workspace wake flow，以及 `spec/desktop.md` 的 docs/CLI/desktop 整体设计；
+- [x] 已完成：新增 `spec/review.md`，以 `./e2e/repo/` 为本地人工验收基线，明确 repo-centric 的 CLI / Desktop 手工验收步骤与失败判定；
+- [ ] 当前剩余 gap：需要继续清扫长尾文档与辅助集成里的旧 registry/publish 叙事，并做最终 targeted verification，确认 cache-first public surface 与实现完全一致。
 
 ## 其他阶段（summary-only）
 

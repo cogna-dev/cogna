@@ -1,6 +1,6 @@
 ---
 title: AI 查询（MCP）
-description: 如何通过 `cogna mcp serve` 把 bundle 暴露给 AI / Agent，并配合 registry 与 query 一起工作。
+description: 如何通过 `cogna mcp serve` 把 bundle 暴露给 AI / Agent，并配合 cache proxy 与 query 一起工作。
 order: 4
 ---
 
@@ -49,7 +49,7 @@ cogna mcp status
 
 ### `cogna.runtime.context`
 
-返回当前 runtime 看到的 bundle / registry 上下文，适合调试和确认加载状态。
+返回当前 runtime 看到的 bundle / cache 上下文，适合调试和确认加载状态。
 
 ---
 
@@ -64,21 +64,20 @@ flowchart LR
 
 ---
 
-## 与 Registry 的关系
+## 与 Cache 的关系
 
 MCP 自己不负责构建 bundle。常见做法是：
 
 1. `cogna build`
-2. `cogna publish`
-3. `cogna registry serve --port 8787`
-4. `cogna mcp serve --port 3000`
+2. `cogna serve --port 8787`
+3. `cogna mcp serve --port 3000`
 
-这样 CLI、registry、MCP 三者都围绕同一份本地 bundle / store 工作。
+这样 CLI、cache proxy、MCP 三者都围绕同一份本地 bundle / store 工作。
 
 ---
 
 ## 下一步
 
 - 查询文件格式与 ranked matching：[CLI 参考](/docs/cli)
-- registry 与 HTTP API：[MCP / Registry 参考](/docs/runtime-reference)
+- cache 与 HTTP API：[MCP / Cache 参考](/docs/runtime-reference)
 - 整体运行链路：[工作方式](/docs/runtime-model)

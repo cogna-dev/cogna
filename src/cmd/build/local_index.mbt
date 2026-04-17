@@ -3,16 +3,12 @@
 pub struct LocalIndexOutput {
   /// NDJSON text of all declarations.
   declarations_text : String
-  /// NDJSON text of all symbols.
-  symbols_text : String
   /// Extraction mode identifier (e.g. "parser-first", "native-assisted").
   mode : String
   /// Whether LSP fell back to parser-only mode.
   fallback : Bool
   /// Number of declaration records.
   declaration_count : Int
-  /// Number of symbol records.
-  symbol_count : Int
   /// Number of files with diagnostics (always 0 in SDK path).
   diagnostic_files : Int
   /// Git commit hash resolved from repo, or "unknown".
@@ -44,7 +40,7 @@ pub fn build_local_index_native(
 /// Returns all declarations, symbols, and software-components records.
 pub fn load_local_index(repo : String) -> Array[Json] {
   let records : Array[Json] = []
-  let names = ["declarations", "symbols", "software-components"]
+  let names = ["declarations", "software-components"]
   for name in names {
     let path = "\{repo}/dist/\{name}.ndjson"
     if !@fs.path_exists(path) {
@@ -87,8 +83,7 @@ fn sdk_local_index_config(
     checks: defaults.checks,
     diff: defaults.diff,
     sbom: defaults.sbom,
-    publish: defaults.publish,
-    registry: defaults.registry,
+    cache: defaults.cache,
     mcp: defaults.mcp,
   }
 }
@@ -97,11 +92,9 @@ fn sdk_local_index_config(
 fn local_index_output_json(output : LocalIndexOutput) -> Json {
   {
     "declarationsText": output.declarations_text,
-    "symbolsText": output.symbols_text,
     "mode": output.mode,
     "fallback": output.fallback,
     "declarationCount": output.declaration_count,
-    "symbolCount": output.symbol_count,
     "diagnosticFiles": output.diagnostic_files,
     "commit": output.commit,
   }
@@ -149,14 +142,12 @@ fn extract_canonical_inner(
   }
   ensure_non_empty(declarations, symbols, config.profile, server)
   let final_declarations = @extract.sort_and_dedup(declarations, "id")
-  let final_symbols = @extract.sort_and_dedup(symbols, "id")
+  let _ = @extract.sort_and_dedup(symbols, "id")
   Ok({
     declarations_text: @extract.to_ndjson(final_declarations),
-    symbols_text: @extract.to_ndjson(final_symbols),
     mode,
     fallback: false,
     declaration_count: final_declarations.length(),
-    symbol_count: final_symbols.length(),
     diagnostic_files: 0,
     commit: resolve_git_commit(repo),
   })
@@ -178,14 +169,12 @@ fn extract_native_inner(
   }
   ensure_non_empty(declarations, symbols, config.profile, server)
   let final_declarations = @extract.sort_and_dedup(declarations, "id")
-  let final_symbols = @extract.sort_and_dedup(symbols, "id")
+  let _ = @extract.sort_and_dedup(symbols, "id")
   Ok({
     declarations_text: @extract.to_ndjson(final_declarations),
-    symbols_text: @extract.to_ndjson(final_symbols),
     mode,
     fallback: false,
     declaration_count: final_declarations.length(),
-    symbol_count: final_symbols.length(),
     diagnostic_files: 0,
     commit: resolve_git_commit(repo),
   })

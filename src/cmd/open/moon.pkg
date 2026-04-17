@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/x/fs" @fs,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/core/config" @config,
+  "cogna-dev/cogna/process" @process,
+}
+
+supported_targets = "native"

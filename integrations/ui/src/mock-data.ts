@@ -43,6 +43,20 @@ export interface QueryResponse {
   cursor?: string
 }
 
+export interface WorkspaceContext {
+  folderPath: string
+  displayName: string
+  contextSummary: string
+  source: 'default' | 'deep-link' | 'renderer'
+}
+
+export interface WorkspaceMockData {
+  workspace: WorkspaceContext
+  packages: { root: PackageNode }
+  outlines: Record<string, Outline[]>
+  queryMatches: Record<string, QueryMatch[]>
+}
+
 const workspaceRoot: PackageNode = {
   name: 'workspace-app',
   version: '0.4.0',
@@ -102,7 +116,7 @@ const outlines: Record<string, Outline[]> = {
       kind: 'function',
       summary: 'Mock data provider that emulates the Query API response shape.',
       deprecated: false,
-      location: { uri: 'src/renderer/src/mock-data.ts', startLine: 136, endLine: 182 }
+      location: { uri: 'integrations/ui/src/mock-data.ts', startLine: 196, endLine: 401 }
     }
   ],
   '@cogna/sdk': [
@@ -190,7 +204,7 @@ const queryMatches: Record<string, QueryMatch[]> = {
         'Mocked Query implementation that keeps the desktop demo aligned with the public API contract.',
       docs: 'This demo intentionally mirrors exact-id, exact-symbol, and fuzzy-text without depending on the unstable SDK runtime path.',
       score: 0.94,
-      location: { uri: 'src/renderer/src/mock-data.ts', startLine: 136, endLine: 182 }
+      location: { uri: 'integrations/ui/src/mock-data.ts', startLine: 364, endLine: 401 }
     }
   ],
   '@cogna/sdk': [
@@ -273,10 +287,57 @@ const queryMatches: Record<string, QueryMatch[]> = {
   ]
 }
 
-export const mockData = {
-  packages: { root: workspaceRoot },
-  outlines
+function workspaceDisplayName(folderPath?: string | null): string {
+  if (!folderPath) {
+    return 'workspace-app'
+  }
+  const normalized = folderPath.replaceAll('\\', '/').replace(/\/+$/g, '')
+  if (normalized.length === 0) {
+    return 'workspace-app'
+  }
+  const parts = normalized.split('/').filter((part) => part.length > 0)
+  return parts.at(-1) ?? 'workspace-app'
 }
+
+function remapRootRecord<T>(source: Record<string, T>, rootName: string): Record<string, T> {
+  if (rootName === 'workspace-app') {
+    return { ...source }
+  }
+  const { 'workspace-app': rootEntry, ...rest } = source
+  return {
+    ...rest,
+    [rootName]: rootEntry
+  }
+}
+
+export function createMockWorkspaceData(folderPath?: string | null): WorkspaceMockData {
+  const normalizedFolder = folderPath ?? ''
+  const displayName = workspaceDisplayName(normalizedFolder)
+  const contextSummary =
+    normalizedFolder.length > 0
+      ? `Current project context loaded from ${normalizedFolder}.`
+      : 'Current project context resolved from cogna.yml and .cogna/sbom.spdx.json.'
+
+  return {
+    workspace: {
+      folderPath: normalizedFolder,
+      displayName,
+      contextSummary,
+      source: normalizedFolder.length > 0 ? 'deep-link' : 'default'
+    },
+    packages: {
+      root: {
+        ...workspaceRoot,
+        name: displayName,
+        summary: contextSummary
+      }
+    },
+    outlines: remapRootRecord(outlines, displayName),
+    queryMatches: remapRootRecord(queryMatches, displayName)
+  }
+}
+
+export const mockData = createMockWorkspaceData()
 
 export const queryModes = [
   {
@@ -300,9 +361,14 @@ export const buildCommand = 'pnpm exec cogna build'
 export const diffCommand =
   'pnpm exec cogna diff --base v1.1.0 --target working-tree --include-test-changes'
 
-export function runMockQuery(packageName: string, mode: QueryMode, input: string): QueryResponse {
+export function runMockQuery(
+  data: WorkspaceMockData,
+  packageName: string,
+  mode: QueryMode,
+  input: string
+): QueryResponse {
   const normalized = input.trim().toLowerCase()
-  const source = queryMatches[packageName] ?? []
+  const source = data.queryMatches[packageName] ?? []
 
   if (normalized.length === 0) {
     return {

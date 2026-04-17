@@ -6,24 +6,24 @@ import {
   "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
-  "cogna-dev/cogna/process" @build_shell,
   "cogna-dev/cogna/core/extract" @extract,
   "cogna-dev/cogna/extractors/go" @extract_go,
   "cogna-dev/cogna/extractors/openapi" @extract_openapi,
   "cogna-dev/cogna/extractors/rust" @extract_rust,
   "cogna-dev/cogna/extractors/terraform" @extract_terraform,
+  "cogna-dev/cogna/core/bundle" @bundle,
   "cogna-dev/cogna/core/snapshot" @sbom_snapshot,
   "cogna-dev/cogna/core/policy" @policy_rules,
+  "cogna-dev/cogna/cache/local" @local_cache,
+  "cogna-dev/cogna/cache/http" @http_cache,
   "cogna-dev/sbom/src/lib" @ext_sbom,
   "cogna-dev/sbom/src/types" @sbom_types,
   "cogna-dev/cogna/cli" @cli,
-  "cogna-dev/cogna/config" @config,
+  "cogna-dev/cogna/core/config" @config,
 }
 
 import {
-  "cogna-dev/cogna/process" @build_shell,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/json" @json,
+  "cogna-dev/cogna/cache/local" @local_cache,
 } for "test"
-
-supported_targets = "native"

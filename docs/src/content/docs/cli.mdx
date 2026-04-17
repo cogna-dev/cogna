@@ -6,7 +6,7 @@ order: 6
 
 # CLI 参考
 
-当前版本的 Cogna CLI 以 `cogna.yml` 为中心：`build`、`diff`、`check`、`publish`、`registry serve`、`mcp serve` 都优先读取当前工作目录对应仓库的配置，而不是要求你在命令行里重复传路径。
+当前版本的 Cogna CLI 以 `cogna.yml` 为中心：`build`、`diff`、`check`、`serve`、`cache ...`、`mcp serve` 都优先读取当前工作目录对应仓库的配置，而不是要求你在命令行里重复传路径。
 
 ---
 
@@ -114,51 +114,53 @@ cogna query <query-file>
 
 ---
 
-## `cogna publish`
+## `cogna serve`
 
-发布当前仓库 `dist/bundle.ciq.tgz` 到本地或远端 registry：
+启动本地 HTTP cache proxy：
 
 ```bash
-cogna publish
+cogna serve --port 8787
 ```
 
-输出文件：
+当前实现暴露两个 cache object 端点：
 
-```text
-dist/publish.json
-```
-
-如果 `publish.includeDependencies: true`，并且 `build` 阶段生成了 dependency bundles，publish receipt 还会聚合：
-
-- `dependencyCount`
-- `dependencyReceipts`
+- `GET /health`
+- `GET /cache/v1/object?key=...`
+- `PUT /cache/v1/object?key=...`
 
 ---
 
-## `cogna registry`
+## `cogna cache`
 
-### `registry serve`
+### `cache list`
 
-启动本地 HTTP registry server：
+列出当前 workspace local cache 中的对象：
 
 ```bash
-cogna registry serve --port 8787
+cogna cache list
 ```
 
-默认端口来自 `cogna.yml -> registry.port`，命令行 `--port` 会覆盖它。
-
-本地存储目录优先级：
-
-1. `COGNA_REGISTRY_STORE_DIR`
-2. `cogna.yml -> registry.storeDir`
-3. `.cogna/cache/registry`
-
-### `registry status`
-
-查看 registry descriptor 和健康状态：
+也可以按前缀过滤：
 
 ```bash
-cogna registry status
+cogna cache list --prefix blob/
+```
+
+
+### `cache add`
+
+把一个本地文件加入当前 workspace 的 local cache：
+
+```bash
+cogna cache add --key blob/sha256/example --file ./dist/bundle.ciq.tgz
+```
+
+### `cache remove`
+
+从当前 workspace 的 local cache 删除对象：
+
+```bash
+cogna cache remove --key blob/sha256/example
 ```
 
 ---
@@ -190,8 +192,8 @@ cogna init
 cogna build
 cogna diff
 cogna check
-cogna publish
-cogna registry serve --port 8787
+cogna serve --port 8787
+cogna cache list
 ```
 
 另一个终端里，如果要给 AI / Agent 使用：

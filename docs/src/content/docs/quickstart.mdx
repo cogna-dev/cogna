@@ -36,8 +36,10 @@ source:
 inputs:
   include:
     - "**/*.go"
-registry:
-  storeDir: .cogna/cache/registry
+cache:
+  type: local
+  local:
+    storeDir: .cogna/cache
 ```
 
 `profile` 决定 Cogna 如何理解你的代码。支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`、`policy-bundle`。
@@ -65,7 +67,7 @@ dist/
 └── bundle.ciq.tgz          ← 完整归档，后续步骤用的就是它
 ```
 
-`bundle.ciq.tgz` 是你所有后续操作的基础——diff、check、query、publish 都会用到它。
+`bundle.ciq.tgz` 是你所有后续操作的基础——diff、check、query，以及后续 cache 复用都会用到它。
 
 ---
 
@@ -125,8 +127,10 @@ source:
 inputs:
   include:
     - "**/*.rego"
-registry:
-  storeDir: .cogna/cache/registry
+cache:
+  type: local
+  local:
+    storeDir: .cogna/cache
 ```
 
 然后构建它：

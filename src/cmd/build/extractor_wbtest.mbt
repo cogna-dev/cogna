@@ -26,26 +26,4 @@ test "inventory validation declarations keep non-Go profiles unchanged" {
   assert_eq(filtered.length(), 2)
 }
 
-///|
-test "native metadata normalization masks mode while preserving backend and server" {
-  let metadata : Json = {
-    "schemaVersion": "ciq-metadata/v1",
-    "profile": "go-module",
-    "inputPatterns": Json::array([Json::string("presign_post.go")]),
-    "build": Json::object({}),
-    "extractor": Json::object({
-      "role": Json::string("canonical"),
-      "mode": Json::string("native-assisted"),
-      "backend": Json::string("native"),
-      "server": Json::string("gopls"),
-      "version": Json::string("available"),
-      "fallback": Json::boolean(false),
-      "timingMs": Json::object({}),
-      "stats": Json::object({}),
-    }),
-  }
-  let normalized = normalize_bench_snapshot_text(metadata.stringify(indent=2))
-  assert_true(normalized.contains("\"backend\": \"native\""))
-  assert_true(normalized.contains("\"server\": \"gopls\""))
-  assert_true(normalized.contains("\"mode\": \"<normalized>\""))
-}
+

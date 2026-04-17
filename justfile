@@ -27,7 +27,7 @@
 #  install   | install-vscode      | Build and install the VSCode extension
 #  run       | run [ARGS...]       | Run cogna via moon run (no install required)
 #  gen       | gen-proto           | Regenerate protobuf bindings
-#  gen       | gen-registry        | Regenerate registry stubs from openapi.json (mapi)
+#  gen       | gen-openapi         | Regenerate API stubs from openapi.json (mapi)
 #  test      | test-sdk            | Run JS SDK tests (vitest)
 #  release   | release-dry         | Dry-run SDK publish to validate package
 #  clean     | clean               | Remove all build artifacts (moon clean)
@@ -173,8 +173,8 @@ gen-proto:
     go build -o proto/protoc-gen-cogna/protoc-gen-cogna ./proto/protoc-gen-cogna
     buf generate --template buf.gen.yaml
 
-# Regenerate registry server stubs from openapi.json into the existing project (mapi ≥ 0.1.1)
-gen-registry:
+# Regenerate API stubs from openapi.json into the existing project (mapi ≥ 0.1.1)
+gen-openapi:
     mapi generate --spec openapi.json --project .
 
 # ------------------------------------------------------------------------------

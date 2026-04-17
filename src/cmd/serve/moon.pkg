@@ -1,0 +1,19 @@
+import {
+  "cogna-dev/cogna/cache" @cache,
+  "cogna-dev/cogna/cache/http" @http_cache,
+  "cogna-dev/cogna/cache/local" @local_cache,
+  "cogna-dev/cogna/cli" @cli,
+  "cogna-dev/cogna/core/config" @config,
+  "cogna-dev/mapi/lib" @mapi,
+  "moonbitlang/async" @mbasync,
+  "moonbitlang/async/http" @http,
+  "moonbitlang/async/socket" @socket,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "shu-kitamura/sha256" @sha256,
+}
+
+import {
+  "moonbitlang/x/fs" @fs,
+} for "wbtest"
+
+supported_targets = "native"

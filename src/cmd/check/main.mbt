@@ -55,18 +55,6 @@ fn read_json_file(path : String, kind : String) -> Result[Json, @cli.CliError] {
 }
 
 ///|
-fn ensure_file_exists(
-  path : String,
-  kind : String,
-) -> Result[Unit, @cli.CliError] {
-  if @fs.path_exists(path) {
-    Ok(())
-  } else {
-    Err(check_error("missing \{kind} file: \{path}"))
-  }
-}
-
-///|
 fn shell_escape(value : String) -> String {
   let escaped = value.replace_all(old="'", new="'\"'\"'")
   "'\{escaped}'"

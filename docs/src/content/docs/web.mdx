@@ -1,6 +1,6 @@
 ---
 title: Web 界面
-description: Cogna 的 Web 界面功能尚未支持。本页说明未来 Web 功能的规划，以及今天如何用 CLI 和本地 registry 达到类似效果。
+description: Cogna 的 Web 界面功能尚未支持。本页说明未来 Web 功能的规划，以及今天如何用 CLI 和本地 cache proxy 达到类似效果。
 order: 18
 ---
 
@@ -42,7 +42,7 @@ Cogna 目前没有独立的 Web UI。在线 bundle 浏览器、diff explorer 和
 
 ```mermaid
 flowchart LR
-    A["CLI: cogna build\ncogna publish"] --> B["Web: Bundle 浏览器\n搜索 PURL"]
+    A["CLI: cogna build\ncogna serve"] --> B["Web: Bundle 浏览器\n搜索 PURL"]
     A --> C["Web: Diff Explorer\n可视化变化"]
     A --> D["Web: Policy Dashboard\n查看检查结果"]
 ```
@@ -53,23 +53,19 @@ flowchart LR
 
 ### 场景一：团队内共享 bundle
 
-运行本地 registry server，暴露最小 HTTP 接口：
+运行本地 cache proxy，暴露最小 HTTP 接口：
 
 ```bash
 cd ./sdk
 cogna build
-cogna publish
-cogna registry serve --port 8787
+cogna serve --port 8787
 ```
 
-其他人可以通过 HTTP 下载 bundle：
+其他人可以通过 HTTP 下载 cache object：
 
 ```bash
-# 按 PURL 解析 bundle
-curl "http://localhost:8787/api/v1/bundles/resolve?purl=pkg:cargo/mylib@1.0.0"
-
 # 下载 bundle
-curl "http://localhost:8787/api/v1/bundles/{bundleId}/download" -o bundle.ciq.tgz
+curl "http://localhost:8787/cache/v1/object?key=blob%2Fsha256%2Fexample" -o bundle.ciq.tgz
 ```
 
 ### 场景二：把检查结果接入已有系统
@@ -90,7 +86,7 @@ cogna check
 ls ./sdk/dist/
 # diff.json          ← 结构化变更列表，可供脚本解析
 # check.sarif.json   ← 标准 SARIF，可上传到任何支持 SARIF 的平台
-# bundle.ciq.tgz     ← bundle 归档，可通过 registry 分发
+# bundle.ciq.tgz     ← bundle 归档，可通过 cache proxy 分发
 ```
 
 ### 场景三：查看 diff 结果
@@ -117,4 +113,4 @@ for c in d.get('changes', []):
 
 - 了解 SARIF 集成：[启用 SARIF 集成](/docs/sarif)
 - 本地共享 bundle：[共享 Bundle](/docs/bundle-sharing)
-- MCP / Registry 参考：[MCP / Registry 参考](/docs/runtime-reference)
+- MCP / Cache 参考：[MCP / Cache 参考](/docs/runtime-reference)

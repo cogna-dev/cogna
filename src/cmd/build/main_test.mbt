@@ -1,4 +1,25 @@
 ///|
+fn ensure_tree_removed(path : String) -> Unit {
+  if !@fs.path_exists(path) {
+    return
+  }
+  let is_dir = try? @fs.is_dir(path)
+  if is_dir is Ok(true) {
+    let entries = @fs.read_dir(path) catch { _ => [] }
+    for i in 0..<entries.length() {
+      ensure_tree_removed("\{path}/\{entries[i]}")
+    }
+    @fs.remove_dir(path) catch {
+      _ => ()
+    }
+  } else {
+    @fs.remove_file(path) catch {
+      _ => ()
+    }
+  }
+}
+
+///|
 fn ensure_file_removed(path : String) -> Unit {
   @fs.remove_file(path) catch {
     _ => ()
@@ -14,7 +35,7 @@ fn ensure_dir_removed(path : String) -> Unit {
 
 ///|
 fn cleanup_tmp_repo(repo : String) -> Unit {
-  @build_shell.run_command_capture("rm -rf '\{repo}'") |> ignore
+  ensure_tree_removed(repo)
   ensure_file_removed("\{repo}/cogna.yml")
   ensure_file_removed("\{repo}/cogna.yaml")
   ensure_file_removed("\{repo}/policy.rego")
@@ -47,6 +68,12 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   ensure_file_removed(
     "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/bundle.ciq.tgz",
   )
+  ensure_file_removed("\{repo}/.cogna/cache/index/keys.jsonl")
+  ensure_dir_removed("\{repo}/.cogna/cache/index")
+  ensure_dir_removed("\{repo}/.cogna/cache/meta")
+  ensure_dir_removed("\{repo}/.cogna/cache/objects")
+  ensure_dir_removed("\{repo}/.cogna/cache")
+  ensure_dir_removed("\{repo}/.cogna")
   ensure_dir_removed("\{repo}/dist/dependencies/pkg_npm_react_18.2.0")
   ensure_dir_removed("\{repo}/dist/dependencies")
   ensure_file_removed("\{repo}/node_modules/react/package.json")
@@ -125,11 +152,13 @@ fn write_valid_v2_config(path : String) -> Unit {
     #|  format: spdx
     #|  dependencyBundles: true
     #|  requireLocalPackages: true
-    #|publish:
-    #|  includeDependencies: true
-    #|registry:
-    #|  port: 8787
-    #|  storeDir: .cogna/cache/registry
+    #|cache:
+    #|  type: local
+    #|  local:
+    #|    storeDir: .cogna/cache
+    #|  http:
+    #|    baseUrl:
+    #|    timeoutMs: 10000
     #|mcp:
     #|  port: 3000
     #|
@@ -350,6 +379,69 @@ test "build writes dependency bundles for resolved local packages" {
     }
   }
   assert_true(dependency_bundle.length() > 0)
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build restores bundle skeleton from local cache on second run" {
+  let repo = tmp_build_repo("local-cache-hit")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_valid_v2_config("\{repo}/cogna.yml")
+  let first_out = run({ repo, })
+  guard first_out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("first build should succeed")
+  }
+  ensure_file_removed("\{repo}/dist/manifest.json")
+  ensure_file_removed("\{repo}/dist/declarations.ndjson")
+  ensure_file_removed("\{repo}/dist/symbols.ndjson")
+  ensure_file_removed("\{repo}/dist/software-components.ndjson")
+  ensure_file_removed("\{repo}/dist/sbom.spdx.json")
+  ensure_file_removed("\{repo}/dist/metadata.json")
+  ensure_file_removed("\{repo}/dist/checksums.txt")
+  ensure_file_removed("\{repo}/dist/bundle.ciq.tgz")
+
+  let second_out = run({ repo, })
+  guard second_out is Ok(result) else {
+    cleanup_tmp_repo(repo)
+    fail("second build should restore from cache")
+  }
+
+  inspect(
+    result.display(),
+    content="Restored CIQ bundle skeleton from local cache at /tmp/cogna-build-local-cache-hit/dist",
+  )
+  let manifest = read_text_main(
+    "\{repo}/dist/manifest.json",
+    "manifest should be restored from local cache",
+  )
+  assert_true(manifest.contains("\"schemaVersion\": \"ciq-bundle/v1\""))
+
+  cleanup_tmp_repo(repo)
+}
+
+///|
+test "build stores bundle in local cache after generation" {
+  let repo = tmp_build_repo("local-cache-store")
+  cleanup_tmp_repo(repo)
+  @fs.create_dir(repo)
+
+  write_valid_v2_config("\{repo}/cogna.yml")
+  let out = run({ repo, })
+  guard out is Ok(_) else {
+    cleanup_tmp_repo(repo)
+    fail("build should succeed")
+  }
+
+  let cache_entries_out = @local_cache.list("\{repo}/.cogna/cache", prefix="build/")
+  guard cache_entries_out is Ok(entries) else {
+    cleanup_tmp_repo(repo)
+    fail("local cache entries should be readable")
+  }
+  assert_true(entries.length() > 0)
 
   cleanup_tmp_repo(repo)
 }
@@ -734,150 +826,6 @@ test "build policy-bundle includes signature value when provided" {
   assert_true(manifest.contains("\"status\": \"verified\""))
   assert_true(manifest.contains("\"keyId\": \"acme-main\""))
   assert_true(manifest.contains("\"value\": \"ZmFrZS1zaWduYXR1cmU=\""))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build fails when lsp server is unavailable for go profile" {
-  let repo = tmp_build_repo("go-lsp-hardfail")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  let config =
-    #|schemaVersion: ciq-config/v1
-    #|profile: go-module
-    #|validation: lsp
-    #|purl: pkg:golang/github.com/acme/demo@0.1.0
-    #|source:
-    #|  repo: https://github.com/acme/demo
-    #|  ref: main
-    #|inputs:
-    #|  include:
-    #|    - "**/*.go"
-    #|checks:
-    #|  format: sarif
-    #|  policy: default-compat
-    #|
-  @fs.write_string_to_file("\{repo}/cogna.yaml", config) catch {
-    _ => abort("failed to write go hardfail config")
-  }
-  @fs.write_string_to_file(
-    "\{repo}/main.go",
-    "package main\n\nfunc Hello() string { return \"hi\" }\n",
-  ) catch {
-    _ => abort("failed to write go fixture")
-  }
-
-  @sys.set_env_var("COGNA_TEST_FORCE_LSP_FALLBACK", "true")
-  let out = run({ repo, })
-  @sys.unset_env_var("COGNA_TEST_FORCE_LSP_FALLBACK")
-  guard out is Err(e) else {
-    cleanup_tmp_repo(repo)
-    fail("build should fail when lsp server is missing for go-module")
-  }
-  assert_true(e.message.contains("gopls"))
-  assert_true(e.message.contains("missing:"))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build fails when lsp server is unavailable for rust profile" {
-  let repo = tmp_build_repo("rust-lsp-hardfail")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  let config =
-    #|schemaVersion: ciq-config/v1
-    #|profile: rust-crate
-    #|validation: lsp
-    #|purl: pkg:cargo/acme-demo@0.1.0
-    #|source:
-    #|  repo: https://github.com/acme/demo
-    #|  ref: main
-    #|inputs:
-    #|  include:
-    #|    - "**/*.rs"
-    #|checks:
-    #|  format: sarif
-    #|  policy: default-compat
-    #|
-  @fs.write_string_to_file("\{repo}/cogna.yaml", config) catch {
-    _ => abort("failed to write rust hardfail config")
-  }
-  @fs.write_string_to_file(
-    "\{repo}/lib.rs",
-    "pub fn hello() -> &'static str { \"hi\" }\n",
-  ) catch {
-    _ => abort("failed to write rust fixture")
-  }
-
-  @sys.set_env_var("COGNA_TEST_FORCE_LSP_FALLBACK", "true")
-  let out = run({ repo, })
-  @sys.unset_env_var("COGNA_TEST_FORCE_LSP_FALLBACK")
-  guard out is Err(e) else {
-    cleanup_tmp_repo(repo)
-    fail("build should fail when lsp server is missing for rust-crate")
-  }
-  assert_true(e.message.contains("rust-analyzer"))
-  assert_true(e.message.contains("missing:"))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build keeps canonical metadata under lsp validation" {
-  let repo = tmp_build_repo("go-validation-metadata")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  let config =
-    #|schemaVersion: ciq-config/v1
-    #|profile: go-module
-    #|validation: lsp
-    #|purl: pkg:golang/github.com/acme/demo@0.1.0
-    #|source:
-    #|  repo: https://github.com/acme/demo
-    #|  ref: main
-    #|inputs:
-    #|  include:
-    #|    - "**/*.go"
-    #|checks:
-    #|  format: sarif
-    #|  policy: default-compat
-    #|
-  @fs.write_string_to_file("\{repo}/cogna.yaml", config) catch {
-    _ => abort("failed to write go validation config")
-  }
-  @fs.write_string_to_file(
-    "\{repo}/main.go",
-    "package main\n\nfunc Hello() string { return \"hi\" }\n",
-  ) catch {
-    _ => abort("failed to write go validation fixture")
-  }
-
-  let out = run({ repo, })
-  guard out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("build should succeed with lsp validation")
-  }
-
-  let metadata = read_text_main(
-    "\{repo}/dist/metadata.json",
-    "metadata should exist under validation",
-  )
-  assert_true(metadata.contains("\"mode\": \"parser-first\""))
-  assert_true(metadata.contains("\"fallback\": false"))
-  assert_true(metadata.contains("\"backend\": \"canonical\""))
-  assert_true(metadata.contains("\"server\": \"canonical\""))
-
-  let declarations = read_text_main(
-    "\{repo}/dist/declarations.ndjson",
-    "declarations should exist under validation",
-  )
-  assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
-  assert_true(declarations.contains("\"server\":\"gopls\""))
 
   cleanup_tmp_repo(repo)
 }

@@ -22,7 +22,7 @@ flowchart LR
     B --> C["diff\n比较版本"]
     C --> D["check\n策略检查"]
     D --> E["query / mcp\n查询接口"]
-    B --> F["publish\n共享 bundle"]
+    B --> F["serve / cache\n共享 bundle"]
 ```
 
 | 步骤 | 你得到什么 |
@@ -32,7 +32,7 @@ flowchart LR
 | `cogna diff` | 两个版本之间的结构化变更报告（`dist/diff.json`） |
 | `cogna check` | 基于 OPA policy 的兼容性检查结果，SARIF 格式（`dist/check.sarif.json`） |
 | `cogna query` / `cogna mcp` | 精确查询某个符号、接口或契约的当前状态 |
-| `cogna publish` | 把 bundle 发布到本地 registry，供其他工具复用 |
+| `cogna serve` / `cogna cache` | 通过 cache proxy 与 local cache 复用 bundle |
 
 ## 跟其他工具有什么区别？
 

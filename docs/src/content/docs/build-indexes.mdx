@@ -132,13 +132,13 @@ cogna mcp serve --port 3000
 
 ### 分享给团队
 
-把 bundle 上传到本地 Registry，团队成员可以按 PURL 下载：
+把 bundle 放进 cache 并通过 proxy 共享给团队：
 
 ```bash
 cd ./sdk
 cogna build
-cogna publish
-# 上传后可用 PURL 检索：pkg:golang/github.com/acme/sdk@v1.2.0
+cogna serve --port 8787
+# 其他机器可通过 HTTP cache object API 读取对象
 ```
 
 ---
