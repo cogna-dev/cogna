@@ -5,7 +5,6 @@ import {
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/sdk/generated" @generated,
   "cogna-dev/cogna/core/config" @config,
-  "cogna-dev/cogna/cmd/build" @build,
 }
 
 options(
