@@ -1,60 +1,99 @@
 ---
-title: "内置策略规则"
-description: "Cogna 内置 compatibility policy 的规则目录与 canonical helpUri 入口。"
+title: 内置策略规则
+description: Cogna 内置 compatibility policy 的规则目录与 canonical helpUri 入口。
 order: 25
 ---
 
-# 内置策略规则
+# Cogna Policy Rules
 
-这组页面由仓库内置 policy catalog 自动生成，是 GitHub Code Scanning、SARIF viewer 与未来 VSCode 插件使用的 canonical `helpUri` 文档源。
+This directory contains the built-in OPA Rego policies for `cogna check`.
 
-- 规则总数：`29`
-- 规则家族：`6`
-- 入口：`data.cogna.compat.deny`
+## Structure
 
-## core
+```text
+policies/
+  compat.rego   # all built-in compatibility rules (package cogna.compat)
+```
 
-- [compat.core.removed-declaration](/docs/policies/generated/core/removed-declaration) — Public declaration was removed and callers will break.
-- [compat.core.new-declaration](/docs/policies/generated/core/new-declaration) — Public declaration was added.
-- [compat.core.deprecated-declaration](/docs/policies/generated/core/deprecated-declaration) — Public declaration became deprecated.
+## OPA Entrypoint
 
-## go
+`data.cogna.compat.deny`
 
-- [compat.go.pointer-receiver-changed](/docs/policies/generated/go/pointer-receiver-changed) — Go pointer receiver compatibility changed.
-- [compat.go.receiver-changed](/docs/policies/generated/go/receiver-changed) — Go receiver type changed.
-- [compat.go.method-set-shrunk](/docs/policies/generated/go/method-set-shrunk) — Go method set shrank.
-- [compat.go.method-set-expanded](/docs/policies/generated/go/method-set-expanded) — Go method set expanded and needs review.
-- [compat.go.signature-changed](/docs/policies/generated/go/signature-changed) — Go public signature changed.
+## Rule metadata contract
 
-## rust
+Every `deny` output object must include:
 
-- [compat.rust.became-unsafe](/docs/policies/generated/rust/became-unsafe) — Rust public item became unsafe.
-- [compat.rust.extern-abi-added](/docs/policies/generated/rust/extern-abi-added) — Rust extern ABI was added.
-- [compat.rust.extern-abi-changed](/docs/policies/generated/rust/extern-abi-changed) — Rust extern ABI changed.
-- [compat.rust.where-clause-changed](/docs/policies/generated/rust/where-clause-changed) — Rust where-clause changed.
-- [compat.rust.signature-changed](/docs/policies/generated/rust/signature-changed) — Rust public signature changed.
+- `rule_id`: canonical rule id (for example `compat.go.signature-changed`)
+- `level`: `error` | `warning` | `note`
+- `message`: human-readable summary
+- `path`: source path in diff payload
+- `docs`: canonical policy documentation URL
 
-## terraform
+Canonical docs URL pattern:
 
-- [compat.terraform.provider-ref-changed](/docs/policies/generated/terraform/provider-ref-changed) — Terraform provider reference changed.
-- [compat.terraform.prevent-destroy-added](/docs/policies/generated/terraform/prevent-destroy-added) — Terraform prevent_destroy was added.
-- [compat.terraform.create-before-destroy-added](/docs/policies/generated/terraform/create-before-destroy-added) — Terraform create_before_destroy was added.
-- [compat.terraform.ignore-changes-expanded](/docs/policies/generated/terraform/ignore-changes-expanded) — Terraform ignore_changes expanded.
-- [compat.terraform.lifecycle-changed](/docs/policies/generated/terraform/lifecycle-changed) — Terraform lifecycle metadata changed.
-- [compat.terraform.input-became-required](/docs/policies/generated/terraform/input-became-required) — Terraform input became required and callers must update configuration.
-- [compat.terraform.output-removed](/docs/policies/generated/terraform/output-removed) — Terraform output was removed and downstream references can break.
+`https://cogna.xaclabs.dev/docs/policies#rule-<rule_id_with_dots_replaced_by_dashes>`
 
-## openapi
+Example for `compat.go.signature-changed`:
 
-- [compat.openapi.http-method-changed](/docs/policies/generated/openapi/http-method-changed) — OpenAPI HTTP method changed.
-- [compat.openapi.became-required](/docs/policies/generated/openapi/became-required) — OpenAPI field or parameter became required.
-- [compat.openapi.status-codes-added](/docs/policies/generated/openapi/status-codes-added) — OpenAPI status codes were added.
-- [compat.openapi.media-types-added](/docs/policies/generated/openapi/media-types-added) — OpenAPI media types were added.
-- [compat.openapi.operation-changed](/docs/policies/generated/openapi/operation-changed) — OpenAPI operation changed.
-- [compat.openapi.response-status-removed](/docs/policies/generated/openapi/response-status-removed) — OpenAPI response status code was removed.
-- [compat.openapi.response-schema-narrowed](/docs/policies/generated/openapi/response-schema-narrowed) — OpenAPI response schema narrowed and clients may fail to parse it.
+`https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed`
 
-## component
+## Built-in rule index
 
-- [compat.component.version-upgrade](/docs/policies/generated/component/version-upgrade) — Software component version changed.
-- [compat.component.metadata-changed](/docs/policies/generated/component/metadata-changed) — Software component metadata changed.
+### core
+
+- <a id="rule-compat-core-removed-declaration"></a>`compat.core.removed-declaration` — Public declaration was removed and callers will break.
+- <a id="rule-compat-core-new-declaration"></a>`compat.core.new-declaration` — Public declaration was added.
+- <a id="rule-compat-core-deprecated-declaration"></a>`compat.core.deprecated-declaration` — Public declaration became deprecated.
+
+### go
+
+- <a id="rule-compat-go-pointer-receiver-changed"></a>`compat.go.pointer-receiver-changed` — Go pointer receiver compatibility changed.
+- <a id="rule-compat-go-receiver-changed"></a>`compat.go.receiver-changed` — Go receiver type changed.
+- <a id="rule-compat-go-method-set-shrunk"></a>`compat.go.method-set-shrunk` — Go method set shrank.
+- <a id="rule-compat-go-method-set-expanded"></a>`compat.go.method-set-expanded` — Go method set expanded and needs review.
+- <a id="rule-compat-go-signature-changed"></a>`compat.go.signature-changed` — Go public signature changed.
+
+### rust
+
+- <a id="rule-compat-rust-became-unsafe"></a>`compat.rust.became-unsafe` — Rust public item became unsafe.
+- <a id="rule-compat-rust-extern-abi-added"></a>`compat.rust.extern-abi-added` — Rust extern ABI was added.
+- <a id="rule-compat-rust-extern-abi-changed"></a>`compat.rust.extern-abi-changed` — Rust extern ABI changed.
+- <a id="rule-compat-rust-where-clause-changed"></a>`compat.rust.where-clause-changed` — Rust where-clause changed.
+- <a id="rule-compat-rust-signature-changed"></a>`compat.rust.signature-changed` — Rust public signature changed.
+
+### terraform
+
+- <a id="rule-compat-terraform-provider-ref-changed"></a>`compat.terraform.provider-ref-changed` — Terraform provider reference changed.
+- <a id="rule-compat-terraform-prevent-destroy-added"></a>`compat.terraform.prevent-destroy-added` — Terraform prevent_destroy was added.
+- <a id="rule-compat-terraform-create-before-destroy-added"></a>`compat.terraform.create-before-destroy-added` — Terraform create_before_destroy was added.
+- <a id="rule-compat-terraform-ignore-changes-expanded"></a>`compat.terraform.ignore-changes-expanded` — Terraform ignore_changes expanded.
+- <a id="rule-compat-terraform-lifecycle-changed"></a>`compat.terraform.lifecycle-changed` — Terraform lifecycle metadata changed.
+- <a id="rule-compat-terraform-input-became-required"></a>`compat.terraform.input-became-required` — Terraform input became required and callers must update configuration.
+- <a id="rule-compat-terraform-output-removed"></a>`compat.terraform.output-removed` — Terraform output was removed and downstream references can break.
+
+### openapi
+
+- <a id="rule-compat-openapi-http-method-changed"></a>`compat.openapi.http-method-changed` — OpenAPI HTTP method changed.
+- <a id="rule-compat-openapi-became-required"></a>`compat.openapi.became-required` — OpenAPI field or parameter became required.
+- <a id="rule-compat-openapi-status-codes-added"></a>`compat.openapi.status-codes-added` — OpenAPI status codes were added.
+- <a id="rule-compat-openapi-media-types-added"></a>`compat.openapi.media-types-added` — OpenAPI media types were added.
+- <a id="rule-compat-openapi-operation-changed"></a>`compat.openapi.operation-changed` — OpenAPI operation changed.
+- <a id="rule-compat-openapi-response-status-removed"></a>`compat.openapi.response-status-removed` — OpenAPI response status code was removed.
+- <a id="rule-compat-openapi-response-schema-narrowed"></a>`compat.openapi.response-schema-narrowed` — OpenAPI response schema narrowed and clients may fail to parse it.
+
+### component
+
+- <a id="rule-compat-component-version-upgrade"></a>`compat.component.version-upgrade` — Software component version changed.
+- <a id="rule-compat-component-metadata-changed"></a>`compat.component.metadata-changed` — Software component metadata changed.
+
+## Adding custom rules
+
+Add new `.rego` files to this directory and keep package `cogna.compat`.
+For custom rules, follow the same metadata contract and set `docs` to a stable URL.
+
+## Helper functions in `compat.rego`
+
+| Function | Description |
+|---|---|
+| `has_finding(change, code)` | Matches a semantic diff finding by code |
+| `component_upgrade(change, kind)` | Matches a component diff by upgrade kind |

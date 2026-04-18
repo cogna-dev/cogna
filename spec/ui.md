@@ -55,33 +55,29 @@ UI 主叙事必须直接映射用户侧 API：
 
 ## 3. SDK 接入结论
 
-### 3.1 本轮 demo 采用 mock-first
+### 3.1 Desktop 已接入真实 SDK
 
-`integrations/sdk/node/` 当前**不适合直接接入** `integrations/desktop/` renderer demo，原因：
+`integrations/desktop/` 当前已通过 Electron `main -> preload -> renderer` 边界接入真实 `@cogna-dev/sdk`：
 
-1. `src/moonbit.ts` 依赖 monorepo 内部路径：
-   - `../../../../_build/js/debug/build/sdk/sdk.js`
-2. 该依赖要求 repo 内特定构建产物存在，不是稳定的 npm/runtime contract
-3. desktop renderer 是 Electron + Vite web 渲染层，当前 SDK 更接近 monorepo Node dev facade
-4. 即使放到 Electron main process，也仍然依赖 `_build` 文件布局，review 时不够稳妥
+1. SDK 只在 `main process` 导入与调用
+2. renderer 只通过 `window.api.sdk.*` 访问
+3. 包树 / outlines / query / build / diff 都来自真实 SDK 返回
 
-### 3.2 结论
+### 3.2 接入边界结论
 
-本轮应：
+当前实现遵循以下边界：
 
-- 在 `spec/ui.md` 中明确记录 SDK blocker
-- 在 `integrations/desktop/` 中使用 mock 数据实现完整 demo
-- mock 数据 shape 必须尽量贴近 `spec/api.md` 与当前 Node DTO
+- renderer 不直接 import `@cogna-dev/sdk`
+- main process 负责 IPC handler 与错误 envelope
+- preload 暴露 typed API，避免 renderer 直接触达 `ipcRenderer`
 
-### 3.3 后续接入策略
+### 3.3 后续优化方向
 
-后续若 SDK 完成以下改造，可把 demo 从 mock 切到真实数据源：
+后续演进重点不再是 mock 替换，而是：
 
-1. 去除对 monorepo `_build` 路径的硬编码依赖
-2. 提供稳定的 runtime bundle
-3. 明确 Electron 中应由 main/preload 还是 renderer 消费 SDK
-
-届时建议只替换数据访问层，不重做界面结构。
+1. 增强 desktop 端 loading/error/empty 状态的交互一致性
+2. 增强 `Build` / `Diff` 的执行反馈与结果可视化
+3. 持续对齐 SDK contract 与桌面端 DTO 映射
 
 ## 4. 信息架构
 
@@ -91,7 +87,7 @@ UI 主叙事必须直接映射用户侧 API：
 
 ```text
 ┌───────────────────────────────────────────────────────────────┐
-│ Header: project status / mock badge / Build & Diff guidance │
+│ Header: project status / SDK status / Build & Diff guidance  │
 ├───────────────┬──────────────────────────────┬────────────────┤
 │ Package Tree  │ Explorer Pane                │ Detail Pane    │
 │ FetchPackages │ QueryOutlines / Query        │ symbol details │
@@ -106,7 +102,7 @@ UI 主叙事必须直接映射用户侧 API：
 负责：
 
 - 当前项目上下文提示
-- mock / sdk 状态标识
+- sdk 状态标识
 - Build 状态摘要
 - Diff 摘要
 - CLI guidance 入口
@@ -246,14 +242,14 @@ pnpm exec cogna diff --base v1.1.0 --target working-tree --include-test-changes
 2. **查询态**：切换模式后返回不同结果
 3. **空结果态**：查询无结果时给出说明
 4. **CLI guidance 态**：Build / Diff 展示清晰命令
-5. **SDK blocker 态**：明确显示当前为 mock data
+5. **SDK error 态**：SDK 请求失败时明确显示错误并可恢复
 
 ## 9. 交付要求
 
 `integrations/desktop/` demo 本轮交付应满足：
 
 1. 能直接打开并 review
-2. 不依赖真实 SDK runtime
+2. 使用真实 SDK runtime（通过 main/preload IPC）
 3. 视觉风格接近 Shadcn 数据工作台
 4. 数据 shape 对齐 `spec/api.md`
 5. 后续可低成本替换为真实 SDK / IPC data source

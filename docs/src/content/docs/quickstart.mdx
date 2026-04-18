@@ -1,6 +1,6 @@
 ---
 title: 快速开始
-description: 跟着这份教程，用 15 分钟跑完 init → build → diff → check → query 完整流程。
+description: 跟着这份教程，用 15 分钟跑完 init → build → diff → check 完整流程。
 order: 2
 ---
 
@@ -59,15 +59,12 @@ cogna build
 dist/
 ├── manifest.json           ← bundle 的元数据描述
 ├── declarations.ndjson     ← 公开声明（函数、类型、接口等）
-├── symbols.ndjson          ← 符号索引
-├── software-components.ndjson
-├── sbom.spdx.json          ← SPDX SBOM
 ├── metadata.json
 ├── checksums.txt
 └── bundle.ciq.tgz          ← 完整归档，后续步骤用的就是它
 ```
 
-`bundle.ciq.tgz` 是你所有后续操作的基础——diff、check、query，以及后续 cache 复用都会用到它。
+`bundle.ciq.tgz` 是你所有后续操作的基础——diff、check，以及后续 cache 复用都会用到它。
 
 ---
 
@@ -179,32 +176,6 @@ cogna check
 
 ---
 
-## 第 6 步：查询具体接口
-
-如果你想精确查看某个函数现在的签名：
-
-```bash
-# 准备查询文件
-cat > query.json << 'EOF'
-{
-  "schemaVersion": "ciq-query/v1",
-  "purl": "pkg:golang/github.com/your-org/your-lib@1.0.0",
-  "selector": {
-    "path": "github.com/your-org/your-lib.Client.Do",
-    "kind": "function"
-  },
-  "intent": "upgrade"
-}
-EOF
-
-cd ./your-lib
-cogna query ../query.json
-```
-
-结果会写到 `./query.result.json`。
-
----
-
 ## 你现在有了什么？
 
 ```text
@@ -212,9 +183,6 @@ your-lib/dist/
 ├── bundle.ciq.tgz      ← 当前版本的公开接口快照
 ├── diff.json           ← 与上个版本的结构化变更
 └── check.sarif.json    ← policy 检查结果（SARIF）
-
-your-lib/
-└── query.result.json   ← 单次查询结果
 ```
 
 ## 接下来

@@ -89,65 +89,23 @@ fn recursive_pattern(pattern : String) -> (String, String)? {
   }
 }
 
-///|
-fn collect_recursive(
-  repo : String,
-  relative_dir : String,
-  suffix : String,
-  out : Array[String],
-) -> Result[Unit, @cli.CliError] {
-  let dir_path = if relative_dir == "" {
-    repo
-  } else {
-    "\{repo}/\{relative_dir}"
-  }
-  let entries = @fs.read_dir(dir_path) catch {
-    err =>
-      return Err(
-        extractor_error("cannot read directory \{dir_path}: \{err.to_string()}"),
-      )
-  }
-  entries.sort()
-
-  for i in 0..<entries.length() {
-    let entry = entries[i]
-    let relative_path = if relative_dir == "" {
-      entry
-    } else {
-      "\{relative_dir}/\{entry}"
-    }
-    if relative_path == "dist" ||
-      relative_path.has_prefix("dist/") ||
-      relative_path == ".git" ||
-      relative_path.has_prefix(".git/") ||
-      relative_path.contains("/.git/") {
-      continue
-    }
-
-    let absolute_path = "\{repo}/\{relative_path}"
-    let dir_out = try? @fs.is_dir(absolute_path)
-    if dir_out is Ok(true) {
-      let nested = collect_recursive(repo, relative_path, suffix, out)
-      guard nested is Ok(_) else { return Err(nested.unwrap_err()) }
-      continue
-    }
-
-    let file_out = try? @fs.is_file(absolute_path)
-    if file_out is Ok(true) {
-      if suffix == "" || relative_path.has_suffix(suffix) {
-        out.push(relative_path)
-      }
-    }
-  }
-
-  Ok(())
-}
-
-///|
 fn resolve_input_files(
   config : @config.Config,
   repo : String,
 ) -> Result[Array[String], @cli.CliError] {
+  let package_view_out = local_package_view(repo)
+  guard package_view_out is Ok(package_view) else {
+    return Err(package_view_out.unwrap_err())
+  }
+  resolve_input_files_from_view(config, package_view)
+}
+
+///|
+fn resolve_input_files_from_view(
+  config : @config.Config,
+  package_view : @vp.ReadonlyPackageView,
+) -> Result[Array[String], @cli.CliError] {
+  let available_paths = package_view.list_paths()
   let files : Array[String] = []
 
   for i in 0..<config.inputs.include_paths.length() {
@@ -158,29 +116,35 @@ fn resolve_input_files(
 
     match recursive_pattern(pattern) {
       Some((prefix, suffix)) => {
-        let base = if prefix == "" { repo } else { "\{repo}/\{prefix}" }
-        if @fs.path_exists(base) {
-          let out = collect_recursive(repo, prefix, suffix, files)
-          guard out is Ok(_) else { return Err(out.unwrap_err()) }
+        let normalized_prefix = if prefix == "" {
+          ""
+        } else {
+          let prefix_out = @vp.normalize_path(prefix)
+          guard prefix_out is Ok(value) else { continue }
+          value
+        }
+        for j in 0..<available_paths.length() {
+          let path = available_paths[j]
+          if !@vp.path_has_prefix(path, normalized_prefix) {
+            continue
+          }
+          if suffix == "" || path.has_suffix(suffix) {
+            files.push(path)
+          }
         }
       }
       None => {
-        let normalized = if pattern.has_prefix("./") {
-          pattern[2:].to_string()
-        } else {
-          pattern
-        }
-        let absolute = "\{repo}/\{normalized}"
-        if !@fs.path_exists(absolute) {
+        let normalized_out = @vp.normalize_path(pattern)
+        guard normalized_out is Ok(normalized) else { continue }
+        if package_view.exists(normalized) {
+          files.push(normalized)
           continue
         }
-
-        let dir_out = try? @fs.is_dir(absolute)
-        if dir_out is Ok(true) {
-          let out = collect_recursive(repo, normalized, "", files)
-          guard out is Ok(_) else { return Err(out.unwrap_err()) }
-        } else {
-          files.push(normalized)
+        for j in 0..<available_paths.length() {
+          let path = available_paths[j]
+          if @vp.path_has_prefix(path, normalized) {
+            files.push(path)
+          }
         }
       }
     }
@@ -421,19 +385,32 @@ fn collect_records(
   files : Array[String],
   server : String,
 ) -> Result[(Array[Json], Array[Json]), @cli.CliError] {
+  let package_view_out = local_package_view(repo)
+  guard package_view_out is Ok(package_view) else {
+    return Err(package_view_out.unwrap_err())
+  }
+  collect_records_from_view(config, package_view, files, server)
+}
+
+///|
+fn collect_records_from_view(
+  config : @config.Config,
+  package_view : @vp.ReadonlyPackageView,
+  files : Array[String],
+  server : String,
+) -> Result[(Array[Json], Array[Json]), @cli.CliError] {
   let declarations : Array[Json] = []
   let symbols : Array[Json] = []
 
   for i in 0..<files.length() {
     let relative_path = files[i]
-    let absolute_path = "\{repo}/\{relative_path}"
-    let content = @fs.read_file_to_string(absolute_path) catch {
-      err =>
-        return Err(
-          extractor_error(
-            "cannot read source file \{absolute_path}: \{err.to_string()}",
-          ),
-        )
+    let content_out = package_view.read_text(relative_path)
+    guard content_out is Ok(content) else {
+      return Err(
+        extractor_error(
+          "cannot read source file \{relative_path}: \{content_out.unwrap_err()}",
+        ),
+      )
     }
     let lines = content.split("\n").to_array().map(line => line.to_string())
     match config.profile {
@@ -498,6 +475,17 @@ fn collect_records(
       @extract.sort_and_dedup(symbols, "id"),
     ),
   )
+}
+
+///|
+fn local_package_view(repo : String) -> Result[@vp.ReadonlyPackageView, @cli.CliError] {
+  let package_out = @source.resolve_source(
+    @vp.SourceSpec::LocalWorkspace({ root_dir: repo }),
+  )
+  guard package_out is Ok(pkg) else {
+    return Err(extractor_error(package_out.unwrap_err()))
+  }
+  Ok(@vp.view_of(pkg))
 }
 
 ///|
@@ -612,4 +600,19 @@ fn extract_build(
   }
   guard extract_out is Ok(extract) else { return Err(extract_out.unwrap_err()) }
   Ok(extract)
+}
+
+///|
+fn inventory_validation_declarations(
+  profile : String,
+  declarations : Array[Json]
+) -> Array[Json] {
+  if profile == "go-module" {
+    declarations.filter(fn(decl) {
+      let path = @extract.field_string(decl, "path")
+      !path.has_suffix("_test.go")
+    })
+  } else {
+    declarations
+  }
 }

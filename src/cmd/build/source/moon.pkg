@@ -1,0 +1,14 @@
+import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/sys" @sys,
+  "moonbitlang/x/fs" @fs,
+  "cogna-dev/cogna/process" @process,
+  "cogna-dev/cogna/core/virtual_package" @vp,
+}
+
+supported_targets = "native"
+
+import {
+  "moonbitlang/x/sys" @sys,
+  "moonbitlang/x/fs" @fs,
+} for "test"

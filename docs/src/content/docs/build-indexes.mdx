@@ -56,11 +56,14 @@ cogna build
 ./sdk/dist/
 ├── bundle.ciq.tgz          ← 主 bundle，后续所有命令的入口
 ├── declarations.ndjson      ← 所有公开 API 声明（函数、类型、接口等）
-├── symbols.ndjson           ← 符号索引，供 query / mcp 使用
-├── software-components.ndjson  ← 依赖项列表
-├── sbom.spdx.json           ← SPDX 格式的软件物料清单
 ├── manifest.json            ← bundle 元信息（版本、profile、文件哈希等）
 └── checksums.txt            ← 所有文件的 SHA-256 校验和
+```
+
+SPDX 文件写入项目根目录：
+
+```text
+./sdk/.cogna/sbom.spdx.json
 ```
 
 你最常用到的是 **`bundle.ciq.tgz`**，它是其他所有命令的统一入口。

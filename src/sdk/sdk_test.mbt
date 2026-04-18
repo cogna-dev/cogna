@@ -1,90 +1,153 @@
-// SDK fixture tests: validate all 5 user-facing APIs against e2e/sdk-fixtures/*.json.
-// Fixtures contain the canonical input/output shapes defined in spec/api.md.
-// These tests verify:
-//   (a) fixture input JSON parses into the correct request struct
-//   (b) fixture output JSON round-trips through the response struct
-//   (c) SDK api.mbt dispatches correctly and returns structurally valid responses
-// NOTE: @core.* functions are currently TODO stubs, so response *values* are not
-//       yet verified against fixture outputs — only structure and mode routing.
+// SDK fixture tests validate API DTO parsing and runtime behavior.
 
 ///|
-/// --- Build ---
-test "build: fixture input parses into BuildRequest" {
-  let input : Json = {}
-  let req = @generated.BuildRequest::from_json(input)
-  assert_true(req is Some(_))
-}
-
-///|
-test "build: fixture output parses into BuildResponse" {
-  let output : Json = { "success": true }
-  let resp = @generated.BuildResponse::from_json(output)
-  guard resp is Some(r) else { fail("BuildResponse should parse") }
-  assert_true(r.success)
-}
-
-///|
-test "build: api returns success response" {
-  let req = @generated.BuildRequest::{  }
-  let resp = build(req)
-  assert_true(resp.success)
-}
-
-///|
-/// --- Diff ---
-test "diff: fixture input parses into DiffRequest" {
-  let input : Json = {
-    "base": "v0.0.1",
-    "target": "working-tree",
-    "include_test_changes": false,
+fn write_test_file(path : String, content : String) -> Unit {
+  @fs.write_string_to_file(path, content) catch {
+    _ => abort("failed to write test file")
   }
-  let req = @generated.DiffRequest::from_json(input)
-  guard req is Some(r) else { fail("DiffRequest should parse") }
-  inspect(r.base, content="Some(\"v0.0.1\")")
-  inspect(r.target, content="Some(\"working-tree\")")
-  inspect(r.include_test_changes, content="Some(false)")
 }
 
 ///|
-test "diff: fixture output parses into DiffResponse" {
-  let output : Json = {
-    "summary": { "added": 4, "removed": 0, "changed": 0, "deprecated": 0 },
-    "changes": [
+fn ensure_test_dir(path : String) -> Unit {
+  if @fs.path_exists(path) {
+    return
+  }
+  @fs.create_dir(path) catch {
+    _ => abort("failed to create test directory")
+  }
+}
+
+///|
+fn setup_sdk_runtime_context() -> Unit {
+  let config_text =
+    #|schemaVersion: ciq-config/v1
+    #|profile: go-module
+    #|purl: pkg:golang/example/sdkacceptance@0.1.0
+    #|source:
+    #|  repo: https://github.com/example/cogna-sdkacceptance
+    #|  ref: main
+    #|inputs:
+    #|  include:
+    #|    - "**/*.go"
+    #|checks:
+    #|  format: sarif
+    #|  policy: default-compat
+    #|
+  write_test_file("./cogna.yaml", config_text)
+  ensure_test_dir("./dist")
+  ensure_test_dir("./.cogna")
+  ensure_test_dir("./.cogna/cache")
+
+  let declarations : Array[Json] = [
+    {
+      "id": "decl:go:example/sdkacceptance.Greeter",
+      "kind": "type",
+      "name": "Greeter",
+      "canonical_name": "Greeter",
+      "path": "main.go",
+      "signature": "type Greeter struct { Prefix string `json:\"prefix\"` }",
+      "visibility": "public",
+      "docs": "Greeter holds a prefix string used when greeting",
+      "language": "go",
+      "location": { "uri": "main.go", "startLine": 12, "endLine": 14 },
+    },
+    {
+      "id": "decl:go:example/sdkacceptance.Greeter.Greet",
+      "kind": "method",
+      "name": "Greet",
+      "canonical_name": "Greeter.Greet",
+      "path": "main.go",
+      "signature": "func (g Greeter) Greet(name string) string",
+      "visibility": "public",
+      "docs": "Greet returns a formatted greeting string for the given name",
+      "language": "go",
+      "location": { "uri": "main.go", "startLine": 27, "endLine": 35 },
+    },
+    {
+      "id": "decl:go:example/sdkacceptance.NewRequestID",
+      "kind": "function",
+      "name": "NewRequestID",
+      "canonical_name": "NewRequestID",
+      "path": "main.go",
+      "signature": "func NewRequestID(prefix string) string",
+      "visibility": "public",
+      "docs": "NewRequestID generates a new UUID-based request ID with the given prefix",
+      "language": "go",
+      "location": { "uri": "main.go", "startLine": 16, "endLine": 18 },
+    },
+    {
+      "id": "decl:go:example/sdkacceptance.BuildLabels",
+      "kind": "function",
+      "name": "BuildLabels",
+      "canonical_name": "BuildLabels",
+      "path": "main.go",
+      "signature": "func BuildLabels(items []string) []string",
+      "visibility": "public",
+      "docs": "BuildLabels filters empty items and formats each as name:index",
+      "language": "go",
+      "location": { "uri": "main.go", "startLine": 20, "endLine": 25 },
+    },
+  ]
+  let declaration_lines : Array[String] = []
+  for i in 0..<declarations.length() {
+    declaration_lines.push(declarations[i].stringify())
+  }
+  write_test_file("./dist/declarations.ndjson", declaration_lines.join("\n") + "\n")
+
+  let spdx_doc : Json = {
+    "spdxVersion": "SPDX-2.3",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "sdkacceptance",
+    "packages": [
       {
-        "kind": "added",
-        "id": "decl:go:example/sdkacceptance.Greeter",
-        "symbol": "Greeter",
-        "level": "non-breaking",
-        "message": "new exported type added",
+        "SPDXID": "SPDXRef-Root",
+        "name": "sdkacceptance",
+        "versionInfo": "0.1.0",
+      },
+      {
+        "SPDXID": "SPDXRef-Package-UUID",
+        "name": "github.com/google/uuid",
+        "versionInfo": "1.6.0",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceType": "purl",
+            "referenceLocator": "pkg:golang/github.com/google/uuid@1.6.0",
+          },
+        ],
+      },
+      {
+        "SPDXID": "SPDXRef-Package-LO",
+        "name": "github.com/samber/lo",
+        "versionInfo": "1.49.1",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceType": "purl",
+            "referenceLocator": "pkg:golang/github.com/samber/lo@1.49.1",
+          },
+        ],
       },
     ],
-    "test_changes": [],
+    "relationships": [
+      {
+        "spdxElementId": "SPDXRef-Root",
+        "relationshipType": "DEPENDS_ON",
+        "relatedSpdxElement": "SPDXRef-Package-UUID",
+      },
+      {
+        "spdxElementId": "SPDXRef-Root",
+        "relationshipType": "DEPENDS_ON",
+        "relatedSpdxElement": "SPDXRef-Package-LO",
+      },
+    ],
   }
-  let resp = @generated.DiffResponse::from_json(output)
-  guard resp is Some(r) else { fail("DiffResponse should parse") }
-  guard r.summary is Some(s) else { fail("summary should be present") }
-  inspect(s.added, content="4")
-  inspect(r.changes.length(), content="1")
-  inspect(r.changes[0].kind, content="added")
-}
+  write_test_file("./.cogna/sbom.spdx.json", spdx_doc.stringify(indent=2))
 
-///|
-test "diff: api returns structurally valid DiffResponse" {
-  let req : @generated.DiffRequest = {
-    base: Some("v0.0.1"),
-    target: Some("working-tree"),
-    include_test_changes: Some(false),
-  }
-  let resp = diff(req)
-  guard resp is Some(r) else { fail("diff should return Some") }
-  // @core.diff is a TODO stub; verify structure only
-  guard r.summary is Some(s) else {
-    fail("summary should be present in stub response")
-  }
-  assert_true(s.added >= 0)
-  assert_true(s.removed >= 0)
-  assert_true(s.changed >= 0)
-  assert_true(s.deprecated >= 0)
+  let manifest_records : Array[String] = [
+    ({ "purl": "pkg:golang/example/sdkacceptance@0.1.0" } : Json).stringify(),
+  ]
+  write_test_file("./dist/manifest.ndjson", manifest_records.join("\n") + "\n")
 }
 
 ///|
@@ -142,15 +205,16 @@ test "fetch_packages: fixture output parses into FetchPackagesResponse" {
 
 ///|
 test "fetch_packages: api returns structurally valid FetchPackagesResponse" {
+  setup_sdk_runtime_context()
   let req = @generated.FetchPackagesRequest::{  }
   let resp = fetch_packages(req)
-  // @core.fetch_packages is a TODO stub; verify structure only
   guard resp is Some(r) else { fail("fetch_packages should return Some") }
   guard r.root is Some(root) else {
-    fail("root should be present in stub response")
+    fail("root should be present")
   }
-  assert_true(root.name != "")
-  assert_true(root.relation != "")
+  inspect(root.name, content="sdkacceptance")
+  inspect(root.relation, content="root")
+  inspect(root.children.length(), content="2")
 }
 
 ///|
@@ -216,6 +280,7 @@ test "query_outlines: fixture output parses into QueryOutlinesResponse" {
 
 ///|
 test "query_outlines: api returns real outlines from ndjson" {
+  setup_sdk_runtime_context()
   let req : @generated.QueryOutlinesRequest = { package: "example/sdkacceptance" }
   let resp = query_outlines(req)
   guard resp is Some(r) else { fail("query_outlines should return Some") }
@@ -277,6 +342,7 @@ test "query exact-id: fixture output parses into QueryResponse" {
 
 ///|
 test "query exact-id: api routes to exact-id mode and returns Greeter match" {
+  setup_sdk_runtime_context()
   let req : @generated.QueryRequest = {
     package: "example/sdkacceptance",
     exact_id: Some("decl:go:example/sdkacceptance.Greeter"),
@@ -336,6 +402,7 @@ test "query exact-symbol: fixture output parses into QueryResponse" {
 
 ///|
 test "query exact-symbol: api routes to exact-symbol mode and returns Greeter.Greet" {
+  setup_sdk_runtime_context()
   let req : @generated.QueryRequest = {
     package: "example/sdkacceptance",
     exact_id: None,
@@ -408,6 +475,7 @@ test "query fuzzy-text: fixture output parses into QueryResponse" {
 
 ///|
 test "query fuzzy-text: api routes to fuzzy-text mode and matches BuildLabels" {
+  setup_sdk_runtime_context()
   let req : @generated.QueryRequest = {
     package: "example/sdkacceptance",
     exact_id: None,

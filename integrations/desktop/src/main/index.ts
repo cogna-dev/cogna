@@ -3,6 +3,7 @@ import { existsSync, statSync } from 'fs'
 import { basename, join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { sdkBuild, sdkDiff, sdkFetchPackages, sdkQuery, sdkQueryOutlines } from './sdk'
 
 const APP_ID = 'dev.xaclabs.cogna'
 const PROTOCOL_NAME = 'cogna'
@@ -201,6 +202,24 @@ if (!gotTheLock) {
     updateWorkspaceFolder(folderPath, 'renderer')
   })
   ipcMain.handle('workspace:get-state', () => workspaceState)
+  ipcMain.handle('sdk:build', () => sdkBuild(workspaceState.folderPath))
+  ipcMain.handle('sdk:diff', (_event, params: { base: string; target: string; includeTestChanges: boolean }) =>
+    sdkDiff({ ...params, workspacePath: workspaceState.folderPath })
+  )
+  ipcMain.handle('sdk:fetch-packages', () => sdkFetchPackages())
+  ipcMain.handle('sdk:query-outlines', (_event, pkg: string) => sdkQueryOutlines(pkg))
+  ipcMain.handle(
+    'sdk:query',
+    (
+      _event,
+      params: {
+        package: string
+        mode: 'exact-id' | 'exact-symbol' | 'fuzzy-text'
+        input: string
+        limit?: number
+      },
+    ) => sdkQuery(params),
+  )
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId(APP_ID)

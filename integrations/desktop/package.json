@@ -26,6 +26,7 @@
     "dist:linux:x64": "pnpm run build && electron-builder --linux AppImage deb --x64 --publish never"
   },
   "dependencies": {
+    "@cogna-dev/sdk": "workspace:*",
     "@cogna/ui": "workspace:*",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",

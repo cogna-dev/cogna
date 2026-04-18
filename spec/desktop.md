@@ -62,7 +62,6 @@ CLI 仍是 **写操作与自动化入口**。
 - `cogna build`
 - `cogna diff`
 - `cogna check`
-- `cogna query`
 - `cogna serve`
 - `cogna cache list|add|remove`
 - `cogna mcp serve|status`
@@ -275,13 +274,11 @@ CLI 的 `open` 子命令必须：
 
 ## 9. 后续演进
 
-当前桌面端仍是 mock-first demo，但其结构应为真实数据源留接口。
+当前桌面端已接入真实 SDK（main/preload IPC），后续演进方向聚焦在体验与可观测性增强：
 
-后续演进方向：
-
-1. 用真实 `FetchPackages` / `QueryOutlines` / `Query` 替换 mock data
-2. 将 Build / Diff 从 CLI guidance 提升为真实可执行动作
-3. 引入最近项目列表与最近打开历史
-4. 在 docs 站提供“桌面端 + CLI 联动” how-to 文档
+1. 持续增强 Build / Diff 的执行反馈与错误恢复
+2. 引入最近项目列表与最近打开历史
+3. 在 docs 站提供“桌面端 + CLI 联动” how-to 文档
+4. 增补 desktop main/preload contract 的自动化 smoke coverage
 
 长期来看，桌面端不是新的产品分叉，而是 Cogna 用户侧 API 的一个图形化宿主。

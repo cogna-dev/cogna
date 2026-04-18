@@ -8,7 +8,7 @@ order: 2
 
 ## 当前 active boundary
 
-Cogna 当前的 active boundary 是：#strong[单机 CLI + Local Registry + local query runtime]。
+Cogna 当前的 active boundary 是：#strong[单机 CLI + local cache + HTTP cache proxy + local query runtime]。
 
 这意味着当前主线围绕以下能力收口：
 
@@ -22,7 +22,7 @@ Cogna 当前的 active boundary 是：#strong[单机 CLI + Local Registry + loca
 
 - hosted registry / distributed replication / multi-node HA
 - trust verifier / trust root / KMS
-- 把 build / diff / check / publish 迁移成查询运行时职责
+- 把 build / diff / check / cache lifecycle 迁移成查询运行时职责
 
 ## 文档分工
 
@@ -52,7 +52,7 @@ Cogna 当前的 active boundary 是：#strong[单机 CLI + Local Registry + loca
 - Cogna 的目标与适用场景
 - 支持的仓库类型
 - CLI 工作流与核心命令
-- Bundle / Diff / Check / Query / SARIF / Registry / MCP 的使用视角说明
+- Bundle / Diff / Check / Query / SARIF / Cache / MCP 的使用视角说明
 
 更偏内部的内容应保留在贡献者文档：
 

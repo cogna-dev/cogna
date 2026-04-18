@@ -10,22 +10,7 @@
   "artifacts": [
     {
       "path": "declarations.ndjson",
-      "sha256": "31ed95bde1b1cc13bbd2295e7af69816d6b9cd98f7b9f30da05e2e1f259194db",
-      "compression": "none"
-    },
-    {
-      "path": "symbols.ndjson",
-      "sha256": "e177f6cda698fe47d5d0714809c286a630b924db680dd2579894f344f673ba0d",
-      "compression": "none"
-    },
-    {
-      "path": "software-components.ndjson",
-      "sha256": "b6d10daef2370251997116f9bf7b1cb5a4fa0114c58b2d16f3b170dfd9647d16",
-      "compression": "none"
-    },
-    {
-      "path": "sbom.spdx.json",
-      "sha256": "d22cffe2a9582e1e3af5460d713a4aaac3561a763b17c551e04cbcf69d98dec6",
+      "sha256": "78fd6d7c7168fbd5e90bd460cefa37aad420e1267d9ed1cc723e236d70f2172e",
       "compression": "none"
     }
   ]

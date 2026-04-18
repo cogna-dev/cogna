@@ -13,6 +13,7 @@ import {
   "cogna-dev/cogna/extractors/terraform" @extract_terraform,
   "cogna-dev/cogna/core/bundle" @bundle,
   "cogna-dev/cogna/core/snapshot" @sbom_snapshot,
+  "cogna-dev/cogna/core/virtual_package" @vp,
   "cogna-dev/cogna/core/policy" @policy_rules,
   "cogna-dev/cogna/cache/local" @local_cache,
   "cogna-dev/cogna/cache/http" @http_cache,
@@ -20,6 +21,7 @@ import {
   "cogna-dev/sbom/src/types" @sbom_types,
   "cogna-dev/cogna/cli" @cli,
   "cogna-dev/cogna/core/config" @config,
+  "cogna-dev/cogna/cmd/build/source" @source,
 }
 
 import {

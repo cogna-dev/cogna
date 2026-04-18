@@ -17,7 +17,7 @@ flowchart LR
     subgraph BUILD["1. 构建"]
         A["代码仓库或 API 规格"] -->|"cogna init"| B["cogna.yml 配置文件"]
         B -->|"cogna build"| C["dist/bundle.ciq.tgz"]
-        B -->|"cogna build"| C2["dist/sbom.spdx.json"]
+        B -->|"cogna build"| C2[".cogna/sbom.spdx.json"]
         B -->|"cogna build"| C3["dist/dependencies/*"]
     end
 
@@ -33,8 +33,7 @@ flowchart LR
 
     subgraph QUERY["4. 查询"]
         F -->|"cogna serve"| G["HTTP Cache Proxy"]
-        C -->|"cogna query"| H["CLI 单次查询"]
-        F -->|"cogna mcp serve"| I["AI / Agent MCP 接口"]
+        F -->|"cogna mcp serve"| H["AI / Agent MCP 查询"]
     end
 ```
 
@@ -50,8 +49,7 @@ flowchart LR
 
 构建后会产出：
 
-- `software-components.ndjson`
-- `sbom.spdx.json`
+- `.cogna/sbom.spdx.json`
 
 不再生成 CycloneDX 文件。
 

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import type { DiffResult, DiffChange, DiffChangeKind } from '../mock-data'
-import { runMockDiff } from '../mock-data'
+import type { DiffResult, DiffChange } from '../types'
 import { cn } from '../lib/utils'
 import { GitBranch, GitCompare, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react'
+
+type DiffChangeKind = DiffChange['kind']
 
 const KIND_COLORS: Record<DiffChangeKind, string> = {
   added:      'text-green-500',
@@ -25,13 +26,27 @@ const LEVEL_COLORS = {
 function ChangeRow({ change }: { change: DiffChange }) {
   const [expanded, setExpanded] = useState(false)
   const hasSig = !!(change.beforeSignature || change.afterSignature)
+  const rowKey = `${change.id}-${change.kind}-${change.level}`
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'border-b border-border/20 hover:bg-muted/30 transition-colors',
-        hasSig && 'cursor-pointer'
+        'w-full text-left border-b border-border/20 hover:bg-muted/30 transition-colors',
+        hasSig ? 'cursor-pointer' : 'cursor-default'
       )}
       onClick={() => hasSig && setExpanded((v: boolean) => !v)}
+      onKeyDown={(event) => {
+        if (!hasSig) {
+          return
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          setExpanded((v: boolean) => !v)
+        }
+      }}
+      disabled={!hasSig}
+      aria-expanded={expanded}
+      data-row-key={rowKey}
     >
       {/* Compact row */}
       <div className="flex items-center gap-2 px-3 py-1.5">
@@ -77,32 +92,51 @@ function ChangeRow({ change }: { change: DiffChange }) {
           <p className="text-xs text-muted-foreground sm:hidden">{change.message}</p>
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
 interface DiffViewProps {
   /** If true, the Run Diff and base/target inputs are disabled with a placeholder message */
   readonly?: boolean
+  initialResult?: DiffResult | null
+  onRunDiff?: (params: {
+    base: string
+    target: string
+    includeTestChanges: boolean
+  }) => Promise<DiffResult | null>
 }
 
-export function DiffView({ readonly = false }: DiffViewProps): React.JSX.Element {
+export function DiffView({
+  readonly = false,
+  initialResult = null,
+  onRunDiff,
+}: DiffViewProps): React.JSX.Element {
   const [base, setBase] = useState('v1.1.0')
   const [target, setTarget] = useState('working-tree')
   const [includeTestChanges, setIncludeTestChanges] = useState(true)
-  const [result, setResult] = useState<DiffResult | null>(null)
+  const [result, setResult] = useState<DiffResult | null>(initialResult)
   const [filterKind, setFilterKind] = useState<DiffChangeKind | 'all'>('all')
   const [showTestChanges, setShowTestChanges] = useState(true)
+  const [isRunning, setIsRunning] = useState(false)
 
   useEffect(() => {
-    // In readonly mode, show mock data immediately; in interactive mode, wait for user to click Run Diff
-    if (readonly) {
-      setResult(runMockDiff(base, target, includeTestChanges))
-    }
-  }, [])
+    setResult(initialResult)
+  }, [initialResult])
 
-  const handleRunDiff = () => {
-    setResult(runMockDiff(base, target, includeTestChanges))
+  const handleRunDiff = async () => {
+    if (!onRunDiff || isRunning || readonly) {
+      return
+    }
+    setIsRunning(true)
+    try {
+      const next = await onRunDiff({ base, target, includeTestChanges })
+      if (next) {
+        setResult(next)
+      }
+    } finally {
+      setIsRunning(false)
+    }
   }
 
   const allChanges = result ? [...result.changes, ...(showTestChanges ? result.testChanges : [])] : []
@@ -142,25 +176,14 @@ export function DiffView({ readonly = false }: DiffViewProps): React.JSX.Element
           />
           Include test changes
         </label>
-        {readonly ? (
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              disabled
-              className="h-7 px-3 text-xs rounded bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-60"
-              title="Diff requires local CLI environment. Use: pnpm exec cogna diff"
-            >
-              Run Diff
-            </button>
-            <span className="text-[10px] text-muted-foreground hidden md:block">
-              Requires local CLI — run <code className="font-mono bg-muted px-1 rounded">cogna diff</code>
-            </span>
-          </div>
-        ) : (
+        {!readonly && (
           <button
+            type="button"
             onClick={handleRunDiff}
-            className="ml-auto h-7 px-3 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            disabled={isRunning}
+            className="ml-auto h-7 px-3 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Run Diff
+            {isRunning ? 'Running…' : 'Run Diff'}
           </button>
         )}
       </div>
@@ -189,6 +212,7 @@ export function DiffView({ readonly = false }: DiffViewProps): React.JSX.Element
             <div className="flex gap-1.5">
               {(['all', 'added', 'removed', 'changed', 'deprecated'] as const).map((kind) => (
                 <button
+                  type="button"
                   key={kind}
                   onClick={() => setFilterKind(kind as DiffChangeKind | 'all')}
                   className={cn(
@@ -219,8 +243,8 @@ export function DiffView({ readonly = false }: DiffViewProps): React.JSX.Element
                 No changes match the current filters.
               </div>
             ) : (
-              filteredChanges.map((change, i) => (
-                <ChangeRow key={change.id + i} change={change} />
+              filteredChanges.map((change) => (
+                <ChangeRow key={`${change.id}-${change.kind}-${change.level}`} change={change} />
               ))
             )}
           </div>

@@ -26,12 +26,12 @@ Current scope is local-first: CLI, local cache, cache proxy, and MCP share one w
 - Build a reusable bundle for a repo or spec
 - Compare versions before release
 - Run policy checks and export SARIF
-- Query APIs and dependencies from CLI or MCP
+- Query APIs and dependencies from SDK / Desktop / MCP
 
 ## Typical flow
 
 ```text
-init -> build -> diff -> check -> query
+init -> build -> diff -> check
 ```
 
 ## Links

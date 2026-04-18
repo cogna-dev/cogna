@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/x/fs" @fs,
+  "shu-kitamura/sha256" @sha256,
+  "cogna-dev/cogna/core/extract" @extract,
+  "cogna-dev/cogna/core/virtual_package" @vp,
+  "cogna-dev/cogna/extractors/rust" @extract_rust,
+  "cogna-dev/cogna/cmd/build/source" @source,
+}
+
+supported_targets = "native"

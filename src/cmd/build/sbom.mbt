@@ -1,9 +1,6 @@
 ///|
 priv struct BuildSoftwareComponent {
   id : String
-  name : String
-  version : String?
-  purl : String?
   scope : String
   evidence_path : String
   pkg : @sbom_types.Package?
@@ -11,7 +8,6 @@ priv struct BuildSoftwareComponent {
 
 ///|
 priv struct BuildSbomArtifacts {
-  components_ndjson : String
   spdx_json : String
 }
 
@@ -22,65 +18,8 @@ priv struct BuildSbomScanResult {
 }
 
 ///|
-fn build_sbom_string_json(value : String?) -> Json {
-  match value {
-    Some(text) => Json::string(text)
-    None => Json::null()
-  }
-}
-
-///|
-fn ecosystem_from_purl(purl : String?) -> String {
-  match purl {
-    Some(p) => {
-      let trimmed = if p.has_prefix("pkg:") { p[4:].to_string() } else { p }
-      match trimmed.find("/") {
-        Some(idx) => trimmed[0:idx].to_string()
-        None =>
-          match trimmed.find("@") {
-            Some(idx) => trimmed[0:idx].to_string()
-            None => trimmed
-          }
-      }
-    }
-    None => ""
-  }
-}
-
-///|
-fn build_component_record_json(component : BuildSoftwareComponent) -> Json {
-  let eco = ecosystem_from_purl(component.purl)
-  let record : Map[String, Json] = {
-    "name": component.name,
-    "scope": component.scope,
-    "version": build_sbom_string_json(component.version),
-    "purl": build_sbom_string_json(component.purl),
-  }
-  if eco != "" {
-    record["ecosystem"] = Json::string(eco)
-  }
-  Json::object(record)
-}
-
-///|
-fn build_components_ndjson(
-  components : Array[BuildSoftwareComponent],
-) -> String {
-  let lines : Array[String] = []
-  for i in 0..<components.length() {
-    lines.push(build_component_record_json(components[i]).stringify())
-  }
-  if lines.is_empty() {
-    ""
-  } else {
-    lines.join("\n") + "\n"
-  }
-}
-
-///|
 fn build_sbom_artifacts(scan : BuildSbomScanResult) -> BuildSbomArtifacts {
   {
-    components_ndjson: build_components_ndjson(scan.components),
     spdx_json: @ext_sbom.export_spdx(scan.sbom),
   }
 }
@@ -135,9 +74,6 @@ fn sbom_purl_version(purl : String) -> String? {
 fn build_root_component(config : @config.Config) -> BuildSoftwareComponent {
   {
     id: config.purl,
-    name: sbom_purl_name(config.purl),
-    version: sbom_purl_version(config.purl),
-    purl: Some(config.purl),
     scope: "local",
     evidence_path: "cogna.yml",
     pkg: None,
@@ -253,9 +189,6 @@ fn build_file_component(
 ) -> Result[BuildSoftwareComponent, String] {
   Ok({
     id: "component:file:\{relative_path}",
-    name: relative_path,
-    version: None,
-    purl: None,
     scope: "source-file",
     evidence_path: relative_path,
     pkg: None,
@@ -269,9 +202,6 @@ fn build_dependency_component(
 ) -> BuildSoftwareComponent {
   {
     id: pkg.id(),
-    name: pkg.name,
-    version: Some(pkg.version()),
-    purl: Some(pkg.to_purl()),
     scope: pkg.group.to_string(),
     evidence_path,
     pkg: Some(pkg),
@@ -527,7 +457,7 @@ fn build_append_package_json_deps(
               build_append_unique_component(
                 components,
                 seen,
-                build_dependency_component(pkg, "package.json", []),
+                build_dependency_component(pkg, "package.json"),
               )
             }
           }
@@ -765,7 +695,7 @@ fn build_resolve_package_component(
             @sbom_snapshot.resolve_path(repo, path),
           )
         @sbom_types.DependencySource::Workspace =>
-          Ok(build_dependency_component(pkg, ".", []))
+          Ok(build_dependency_component(pkg, "."))
         _ =>
           match build_cargo_vendor_dir(repo, pkg.name, pkg.version()) {
             Some(path) => build_component_from_root(repo, pkg, path)
@@ -788,7 +718,7 @@ fn build_resolve_package_component(
             @sbom_snapshot.resolve_path(repo, path),
           )
         @sbom_types.DependencySource::Workspace =>
-          Ok(build_dependency_component(pkg, ".", []))
+          Ok(build_dependency_component(pkg, "."))
         _ =>
           match build_go_module_cache_dir(pkg) {
             Some(path) => build_component_from_root(repo, pkg, path)
@@ -803,7 +733,6 @@ fn build_resolve_package_component(
         build_dependency_component(
           pkg,
           build_fallback_evidence_path(pkg.pkg_type),
-          [],
         ),
       )
     _ =>
@@ -811,7 +740,6 @@ fn build_resolve_package_component(
         build_dependency_component(
           pkg,
           build_fallback_evidence_path(pkg.pkg_type),
-          [],
         ),
       )
   }
@@ -824,7 +752,6 @@ fn build_resolve_package_component(
       build_dependency_component(
         pkg,
         build_fallback_evidence_path(pkg.pkg_type),
-        [],
       ),
     )
   }

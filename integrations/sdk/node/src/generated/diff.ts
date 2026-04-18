@@ -21,11 +21,11 @@ export type DiffChange = {
 export function parseDiffChange(raw: unknown): DiffChange | undefined {
   if (!isRecord(raw)) return undefined
   return {
-    kind: typeof raw['kind'] === 'string' ? raw['kind'] : '',
-    id: typeof raw['id'] === 'string' ? raw['id'] : '',
-    symbol: typeof raw['symbol'] === 'string' ? raw['symbol'] : '',
-    level: typeof raw['level'] === 'string' ? raw['level'] : '',
-    message: typeof raw['message'] === 'string' ? raw['message'] : '',
+    kind: typeof raw.kind === 'string' ? raw.kind : '',
+    id: typeof raw.id === 'string' ? raw.id : '',
+    symbol: typeof raw.symbol === 'string' ? raw.symbol : '',
+    level: typeof raw.level === 'string' ? raw.level : '',
+    message: typeof raw.message === 'string' ? raw.message : '',
   }
 }
 
@@ -37,43 +37,64 @@ export type DiffRequest = {
 
 export function parseDiffRequest(raw: unknown): DiffRequest {
   if (!isRecord(raw)) return {}
-  const itc = raw['include_test_changes'] ?? raw['includeTestChanges']
+  const itc = raw.include_test_changes ?? raw.includeTestChanges
   return {
-    base: typeof raw['base'] === 'string' ? raw['base'] : undefined,
-    target: typeof raw['target'] === 'string' ? raw['target'] : undefined,
+    base: typeof raw.base === 'string' ? raw.base : undefined,
+    target: typeof raw.target === 'string' ? raw.target : undefined,
     includeTestChanges: typeof itc === 'boolean' ? itc : undefined,
   }
 }
 
 export function serializeDiffRequest(val: DiffRequest): JsonObject {
   const obj: JsonObject = {}
-  if (val.base !== undefined) obj['base'] = val.base
-  if (val.target !== undefined) obj['target'] = val.target
-  if (val.includeTestChanges !== undefined) obj['include_test_changes'] = val.includeTestChanges
+  if (val.base !== undefined) obj.base = val.base
+  if (val.target !== undefined) obj.target = val.target
+  if (val.includeTestChanges !== undefined) obj.include_test_changes = val.includeTestChanges
   return obj
 }
 
 export type DiffResponse = {
+  summary?: DiffChangeSummary
   changes: DiffChange[]
   testChanges: DiffChange[]
 }
 
+export function parseDiffChangeSummary(raw: unknown): DiffChangeSummary | undefined {
+  if (!isRecord(raw)) return undefined
+  return {
+    added: typeof raw.added === 'number' ? raw.added : 0,
+    removed: typeof raw.removed === 'number' ? raw.removed : 0,
+    changed: typeof raw.changed === 'number' ? raw.changed : 0,
+    deprecated: typeof raw.deprecated === 'number' ? raw.deprecated : 0,
+  }
+}
+
 export function parseDiffResponse(raw: unknown): DiffResponse | undefined {
   if (!isRecord(raw)) return undefined
-  const changes = Array.isArray(raw['changes'])
-    ? (raw['changes'] as unknown[]).flatMap(c => { const p = parseDiffChange(c); return p ? [p] : [] })
+  const summary = parseDiffChangeSummary(raw.summary)
+  const changes = Array.isArray(raw.changes)
+    ? (raw.changes as unknown[]).flatMap(c => { const p = parseDiffChange(c); return p ? [p] : [] })
     : []
-  const testChanges = Array.isArray(raw['test_changes'] ?? raw['testChanges'])
-    ? ((raw['test_changes'] ?? raw['testChanges']) as unknown[]).flatMap(c => { const p = parseDiffChange(c); return p ? [p] : [] })
+  const testChanges = Array.isArray(raw.test_changes ?? raw.testChanges)
+    ? ((raw.test_changes ?? raw.testChanges) as unknown[]).flatMap(c => { const p = parseDiffChange(c); return p ? [p] : [] })
     : []
-  return { changes, testChanges }
+  return { summary, changes, testChanges }
 }
 
 export function serializeDiffResponse(val: DiffResponse): JsonObject {
-  return {
+  const obj: JsonObject = {
     changes: val.changes.map(c => serializeDiffChange(c)),
     test_changes: val.testChanges.map(c => serializeDiffChange(c)),
   }
+  if (val.summary) {
+    obj.summary = {
+      added: val.summary.added,
+      removed: val.summary.removed,
+      changed: val.summary.changed,
+      deprecated: val.summary.deprecated,
+    }
+  }
+  return obj
 }
 
 function serializeDiffChange(val: DiffChange): JsonObject {

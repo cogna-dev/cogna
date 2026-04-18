@@ -16,12 +16,10 @@ fn remove_dir_if_exists(path : String) -> Unit {
 fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/base/manifest.json")
   remove_file_if_exists("\{repo}/dist/base/declarations.ndjson")
-  remove_file_if_exists("\{repo}/dist/base/symbols.ndjson")
-  remove_file_if_exists("\{repo}/dist/base/software-components.ndjson")
+  remove_file_if_exists("\{repo}/dist/base/sbom.spdx.json")
   remove_file_if_exists("\{repo}/dist/target/manifest.json")
   remove_file_if_exists("\{repo}/dist/target/declarations.ndjson")
-  remove_file_if_exists("\{repo}/dist/target/symbols.ndjson")
-  remove_file_if_exists("\{repo}/dist/target/software-components.ndjson")
+  remove_file_if_exists("\{repo}/dist/target/sbom.spdx.json")
   remove_file_if_exists("\{repo}/dist/diff.json")
   remove_dir_if_exists("\{repo}/dist/base")
   remove_dir_if_exists("\{repo}/dist/target")
@@ -63,6 +61,38 @@ fn write_records(path : String, lines : String) -> Unit {
 }
 
 ///|
+fn write_spdx(path : String, packages : Array[Json]) -> Unit {
+  let relationships : Array[Json] = []
+  let doc_packages : Array[Json] = [
+    {
+      "SPDXID": "SPDXRef-Root",
+      "name": "test-bundle",
+      "versionInfo": "0.0.0",
+    },
+  ]
+  for i in 0..<packages.length() {
+    guard packages[i] is Object(pkg) else { continue }
+    guard pkg.get("SPDXID") is Some(String(spdx_id)) else { continue }
+    doc_packages.push(packages[i])
+    relationships.push({
+      "spdxElementId": "SPDXRef-Root",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": spdx_id,
+    })
+  }
+  let doc : Json = {
+    "spdxVersion": "SPDX-2.3",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "test-bundle",
+    "packages": Json::array(doc_packages),
+    "relationships": Json::array(relationships),
+  }
+  @fs.write_string_to_file(path, doc.stringify(indent=2)) catch {
+    _ => abort("failed to write spdx fixture")
+  }
+}
+
+///|
 test "diff generates skeleton diff output" {
   let repo = tmp_diff_repo("repo")
   cleanup_tmp_repo(repo)
@@ -86,21 +116,13 @@ test "diff generates skeleton diff output" {
     #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|{"id":"decl:payment:remove","kind":"operation","path":"openapi/payment.yaml","signature":"operation removePayment","location":{"uri":"openapi/payment.yaml","startLine":30,"endLine":40}}
     #|
-  let base_symbols =
-    #|{"id":"sym:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
-    #|
   let target_declarations =
     #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPaymentV2","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|{"id":"decl:payment:add","kind":"operation","path":"openapi/payment.yaml","signature":"operation addPayment","location":{"uri":"openapi/payment.yaml","startLine":50,"endLine":60}}
     #|
-  let target_symbols =
-    #|{"id":"sym:payment:create","kind":"symbol","path":"openapi/payment.yaml","signature":"symbol createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":10}}
-    #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", base_symbols)
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", target_symbols)
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(result) else {
@@ -197,9 +219,7 @@ test "diff includes since and test changes fields when requested" {
     #|{"id":"decl:payment:create","kind":"operation","path":"openapi/payment.yaml","signature":"operation createPayment","location":{"uri":"openapi/payment.yaml","startLine":10,"endLine":20}}
     #|
   write_records("\{repo}/dist/base/declarations.ndjson", records)
-  write_records("\{repo}/dist/base/symbols.ndjson", records)
   write_records("\{repo}/dist/target/declarations.ndjson", records)
-  write_records("\{repo}/dist/target/symbols.ndjson", records)
 
   let out = run({
     repo,
@@ -257,9 +277,7 @@ test "diff computes go test changes when requested" {
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({
     repo,
@@ -319,19 +337,40 @@ test "diff includes software component changes" {
     "openapi-spec",
   )
   write_records("\{repo}/dist/base/declarations.ndjson", "")
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", "")
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
-  let base_component =
-    #|{"id":"pkg:npm/react@18.2.0","kind":"component","path":"package.json","signature":"library react@18.2.0","name":"react","componentType":"library","scope":"dependency","version":"18.2.0","purl":"pkg:npm/react@18.2.0","location":{"uri":"package.json","startLine":1,"endLine":1}}
-    #|
-  let target_component =
-    #|{"id":"pkg:npm/react@19.0.0","kind":"component","path":"package.json","signature":"library react@19.0.0","name":"react","componentType":"library","scope":"dependency","version":"19.0.0","purl":"pkg:npm/react@19.0.0","location":{"uri":"package.json","startLine":1,"endLine":1}}
-    #|
-  write_records("\{repo}/dist/base/software-components.ndjson", base_component)
-  write_records(
-    "\{repo}/dist/target/software-components.ndjson",
-    target_component,
+  write_spdx(
+    "\{repo}/dist/base/sbom.spdx.json",
+    [
+      {
+        "SPDXID": "SPDXRef-Package-React",
+        "name": "react",
+        "versionInfo": "18.2.0",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceType": "purl",
+            "referenceLocator": "pkg:npm/react@18.2.0",
+          },
+        ],
+      },
+    ],
+  )
+  write_spdx(
+    "\{repo}/dist/target/sbom.spdx.json",
+    [
+      {
+        "SPDXID": "SPDXRef-Package-React",
+        "name": "react",
+        "versionInfo": "19.0.0",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceType": "purl",
+            "referenceLocator": "pkg:npm/react@19.0.0",
+          },
+        ],
+      },
+    ],
   )
 
   let out = run({ repo, since: None, include_test_changes: false })
@@ -390,9 +429,7 @@ test "diff marks declarations changed when richer shape metadata changes" {
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -451,9 +488,7 @@ test "diff marks rust declarations changed when richer language metadata changes
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -522,9 +557,7 @@ test "diff marks terraform declarations changed when richer language metadata ch
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -600,9 +633,7 @@ test "diff marks terraform variables becoming required and outputs being removed
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -661,9 +692,7 @@ test "diff marks openapi declarations changed when richer language metadata chan
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -738,9 +767,7 @@ test "diff marks openapi deeper status and schema narrowing findings" {
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -796,9 +823,7 @@ test "diff includes semanticDiff in changed entries" {
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {
@@ -855,21 +880,42 @@ test "diff includes componentDiff in changed component entries" {
     "openapi-spec",
   )
   write_records("\{repo}/dist/base/declarations.ndjson", "")
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", "")
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
-  // Same purl id (purl-keyed), but version field and signature differ
-  let base_component =
-    #|{"id":"pkg:npm/react","kind":"component","path":"package.json","signature":"library react@18.2.0","version":"18.2.0","purl":"pkg:npm/react@18.2.0","componentType":"library","scope":"required","location":{"uri":"package.json","startLine":1,"endLine":1}}
-    #|
-  let target_component =
-    #|{"id":"pkg:npm/react","kind":"component","path":"package.json","signature":"library react@19.0.0","version":"19.0.0","purl":"pkg:npm/react@19.0.0","componentType":"library","scope":"required","location":{"uri":"package.json","startLine":1,"endLine":1}}
-    #|
-  write_records("\{repo}/dist/base/software-components.ndjson", base_component)
-  write_records(
-    "\{repo}/dist/target/software-components.ndjson",
-    target_component,
+  // Same package name, version changes via SPDX-derived component records
+  write_spdx(
+    "\{repo}/dist/base/sbom.spdx.json",
+    [
+      {
+        "SPDXID": "SPDXRef-Package-React",
+        "name": "react",
+        "versionInfo": "18.2.0",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceType": "purl",
+            "referenceLocator": "pkg:npm/react@18.2.0",
+          },
+        ],
+      },
+    ],
+  )
+  write_spdx(
+    "\{repo}/dist/target/sbom.spdx.json",
+    [
+      {
+        "SPDXID": "SPDXRef-Package-React",
+        "name": "react",
+        "versionInfo": "19.0.0",
+        "externalRefs": [
+          {
+            "referenceCategory": "PACKAGE-MANAGER",
+            "referenceType": "purl",
+            "referenceLocator": "pkg:npm/react@19.0.0",
+          },
+        ],
+      },
+    ],
   )
 
   let out = run({ repo, since: None, include_test_changes: false })
@@ -937,9 +983,7 @@ test "diff includes richer records for added removed and deprecated declarations
     #|
 
   write_records("\{repo}/dist/base/declarations.ndjson", base_declarations)
-  write_records("\{repo}/dist/base/symbols.ndjson", "")
   write_records("\{repo}/dist/target/declarations.ndjson", target_declarations)
-  write_records("\{repo}/dist/target/symbols.ndjson", "")
 
   let out = run({ repo, since: None, include_test_changes: false })
   guard out is Ok(_) else {

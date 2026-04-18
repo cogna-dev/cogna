@@ -1,0 +1,12 @@
+schemaVersion: ciq-config/v1
+profile: go-module
+purl: pkg:golang/example/sdkacceptance@0.1.0
+source:
+  repo: https://github.com/example/cogna-sdkacceptance
+  ref: main
+inputs:
+  include:
+    - "**/*.go"
+checks:
+  format: sarif
+  policy: default-compat

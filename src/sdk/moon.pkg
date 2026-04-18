@@ -5,15 +5,12 @@ import {
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/sdk/generated" @generated,
   "cogna-dev/cogna/core/config" @config,
-  "cogna-dev/cogna/cmd/build" @build,
 }
 
 options(
   link: {
     "js": {
       "exports": [
-        "build_js:build",
-        "diff_js:diff",
         "fetch_packages_js:fetch_packages",
         "query_outlines_js:query_outlines",
         "query_js:query",
@@ -21,5 +18,7 @@ options(
       "format": "esm",
     },
   },
-  targets: { "js.mbt": ["js"], "build.mbt": ["native"] },
+  targets: {
+    "js.mbt": ["js"],
+  },
 )

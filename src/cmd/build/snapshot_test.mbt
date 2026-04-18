@@ -17,11 +17,11 @@ fn reset_repo(path : String) -> Unit {
   remove_if_exists("\{path}/cogna.yaml")
   remove_if_exists("\{path}/dist/manifest.json")
   remove_if_exists("\{path}/dist/declarations.ndjson")
-  remove_if_exists("\{path}/dist/symbols.ndjson")
   remove_if_exists("\{path}/dist/metadata.json")
   remove_if_exists("\{path}/dist/checksums.txt")
   remove_if_exists("\{path}/dist/bundle.ciq.tgz")
   remove_dir_if_exists("\{path}/dist")
+  remove_dir_if_exists("\{path}/.cogna")
 }
 
 ///|
@@ -101,7 +101,7 @@ fn write_config_for(
     _ => "pkg:openapi/example/demo@0.1.0"
   }
   let content = (
-      #|schemaVersion: ciq-config/v1
+      #|schemaVersion: ciq-config/v2
       #|profile: 
       #|purl: 
       #|source:
@@ -254,18 +254,12 @@ fn run_snapshot_case(
     "\{repo}/dist/declarations.ndjson",
     "declarations output should exist",
   )
-  let symbols = read_text_snapshot(
-    "\{repo}/dist/symbols.ndjson",
-    "symbols output should exist",
-  )
 
   let dec_snapshot_path = "\{snapshot_root}/declarations.ndjson"
-  let sym_snapshot_path = "\{snapshot_root}/symbols.ndjson"
   let manifest_snapshot_path = "\{snapshot_root}/manifest.json"
   let metadata_snapshot_path = "\{snapshot_root}/metadata.json"
   let checksums_snapshot_path = "\{snapshot_root}/checksums.txt"
   let expected_dec = read_snapshot(dec_snapshot_path, declarations)
-  let expected_sym = read_snapshot(sym_snapshot_path, symbols)
   let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
     _ => abort("manifest output should exist")
   }
@@ -288,7 +282,6 @@ fn run_snapshot_case(
     read_snapshot(checksums_snapshot_path, normalized_checksums),
   )
   let missing_snapshots = !@fs.path_exists(dec_snapshot_path) ||
-    !@fs.path_exists(sym_snapshot_path) ||
     !@fs.path_exists(manifest_snapshot_path) ||
     !@fs.path_exists(metadata_snapshot_path) ||
     !@fs.path_exists(checksums_snapshot_path)
@@ -307,7 +300,6 @@ fn run_snapshot_case(
   if missing_snapshots {
     if update {
       persist_snapshot(dec_snapshot_path, declarations)
-      persist_snapshot(sym_snapshot_path, symbols)
       persist_snapshot(manifest_snapshot_path, normalized_manifest)
       persist_snapshot(metadata_snapshot_path, normalized_metadata)
       persist_snapshot(checksums_snapshot_path, normalized_checksums)
@@ -318,14 +310,12 @@ fn run_snapshot_case(
       )
     }
   } else if expected_dec == declarations &&
-    expected_sym == symbols &&
     expected_manifest == normalized_manifest &&
     expected_metadata == normalized_metadata &&
     expected_checksums == normalized_checksums {
     ()
   } else if update {
     persist_snapshot(dec_snapshot_path, declarations)
-    persist_snapshot(sym_snapshot_path, symbols)
     persist_snapshot(manifest_snapshot_path, normalized_manifest)
     persist_snapshot(metadata_snapshot_path, normalized_metadata)
     persist_snapshot(checksums_snapshot_path, normalized_checksums)

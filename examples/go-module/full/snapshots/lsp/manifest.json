@@ -12,21 +12,6 @@
       "path": "declarations.ndjson",
       "sha256": "37e9cfc60ae0313a929e5599dfeaeb5fe7efafe12a5cf5b33444c2d22ecbd663",
       "compression": "none"
-    },
-    {
-      "path": "symbols.ndjson",
-      "sha256": "517a3f6758390fe181e8cbfa5eb65a7d92fad58c43c483fa5727494ec8df132b",
-      "compression": "none"
-    },
-    {
-      "path": "software-components.ndjson",
-      "sha256": "938be6f105bb16c28103f5e075c3347554fcc92c7576463fc5ecf992b44ea55b",
-      "compression": "none"
-    },
-    {
-      "path": "sbom.spdx.json",
-      "sha256": "76e5ef757ebf8b67d43756739194ce802ea3ed599d2156894123f3b1d4c72312",
-      "compression": "none"
     }
   ]
 }

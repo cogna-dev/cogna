@@ -133,7 +133,6 @@ cogna --help
 - `build`
 - `diff`
 - `check`
-- `query <query-file>`
 - `serve`
 - `cache list`
 - `mcp serve`
@@ -163,12 +162,11 @@ ls dist
 
 - `bundle.ciq.tgz`
 - `declarations.ndjson`
-- `software-components.ndjson`
 - `manifest.json`
 - `metadata.json`
 - `checksums.txt`
 
-如果当前实现仍会写出 `symbols.ndjson` 或 `sbom.spdx.json`，可记录为当前 reality，但不能把它们当作本轮人工验收的唯一成功条件。
+如果当前实现还保留额外产物（例如历史分支中的 `symbols.ndjson`），可记录为当前 reality，但不能把它们当作本轮人工验收的唯一成功条件；当前 SPDX 以 `.cogna/sbom.spdx.json` 为准。
 
 ## 4.3 验收 3：产物内容与 repo 事实一致
 
@@ -190,61 +188,23 @@ grep -n "Greeter\|NewRequestID\|BuildLabels\|Greet" dist/declarations.ndjson
 - 若这些符号完全缺失，判定失败
 - 若符号存在但明显归属错误（例如不属于当前 repo），判定失败
 
-同时抽查依赖信息：
+同时抽查依赖信息（当前 truth source）：
 
 ```bash
-grep -n "github.com/google/uuid\|github.com/samber/lo" dist/software-components.ndjson
+grep -n "github.com/google/uuid\|github.com/samber/lo" .cogna/sbom.spdx.json
 ```
 
 人工判定标准：
 
-- 这两个依赖至少应能在依赖产物中被识别出来
+- 这两个依赖至少应能在 SPDX dependency truth 中被识别出来
 
-## 4.4 验收 4：`cogna query` 的人工冒烟
-
-在 `e2e/repo/` 下创建一个最小查询文件：
-
-```bash
-cat > query.json <<'EOF'
-{
-  "schemaVersion": "ciq-query/v1",
-  "purl": "pkg:golang/example/sdkacceptance@0.1.0",
-  "selector": {
-    "path": "sdkacceptance::main.go::BuildLabels"
-  },
-  "intent": "review"
-}
-EOF
-```
-
-然后执行：
-
-```bash
-cogna query ./query.json
-```
-
-人工检查：
-
-```bash
-cat query.result.json
-```
-
-预期：
-
-- 命令成功返回
-- `query.result.json` 被写出
-- 结果中应能看到与 `BuildLabels` 对应的命中项，或至少能看出当前查询行为稳定地围绕本 repo 运行
-
-如果当前 query shape 与文档仍有过渡差异，人工应记录“结果结构是否稳定、是否显然来自当前 repo”，而不是纠结字段名的临时波动。
-
-## 4.5 验收 5：必要时的人工失败判定
+## 4.4 验收 4：必要时的人工失败判定
 
 以下情况即使自动化通过，也应人工判定 CLI 验收失败：
 
 1. `cogna build` 产物与 `e2e/repo` 的源码事实明显不一致
-2. `cogna query` 输出不是围绕当前 repo 的结果
-3. 用户看不懂命令面，帮助文本仍暴露旧叙事
-4. `open <folder>` 帮助、解析或行为与桌面联动目标脱节
+2. 用户看不懂命令面，帮助文本仍暴露旧叙事
+3. `open <folder>` 帮助、解析或行为与桌面联动目标脱节
 
 ---
 
@@ -252,15 +212,15 @@ cat query.result.json
 
 ## 5.1 验收前提
 
-Desktop 当前是 **mock-first demo**。
+Desktop 当前已通过 `main/preload` 接入真实 `@cogna-dev/sdk`。
 
-这意味着本轮人工验收关注的是：
+这意味着本轮人工验收既要关注：
 
 - workspace 上下文是否正确显示
 - CLI 到 desktop 的唤醒链路是否成立
 - UI 信息架构是否与 `spec/ui.md` / `spec/desktop.md` 一致
 
-而不是验证真实 SDK 数据是否已经打通。
+也要验证真实 SDK 数据链路是否成立。
 
 ## 5.2 验收 1：桌面端能启动
 
@@ -361,9 +321,9 @@ cogna open ./e2e/repo
 6. 在 desktop 中人工浏览 package tree / outlines / detail pane
 7. 人工确认桌面端呈现出的工作台叙事，与 CLI 刚刚处理的 repo 是一致的
 
-联合验收的关键不是“数据是否已经完全真实”，而是：
+联合验收的关键是：
 
-> **CLI 与 Desktop 是否围绕同一个项目上下文工作。**
+> **CLI 与 Desktop 是否围绕同一个项目上下文工作，且 desktop 数据来自真实 SDK。**
 
 ---
 
@@ -376,7 +336,7 @@ cogna open ./e2e/repo
 3. 修改 `integrations/desktop/src/main/index.ts`
 4. 修改 `integrations/desktop/src/preload/*`
 5. 修改 `integrations/desktop/src/renderer/src/App.tsx`
-6. 修改 `integrations/ui/src/mock-data.ts`
+6. 修改 `integrations/desktop/src/main/sdk.ts`
 7. 修改 `spec/ui.md`、`spec/desktop.md`、`spec/api.md` 后，需要确认用户可见行为仍成立
 
 ---

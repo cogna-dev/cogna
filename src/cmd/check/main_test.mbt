@@ -19,9 +19,6 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/cogna.yaml")
   remove_file_if_exists("\{repo}/dist/manifest.json")
   remove_file_if_exists("\{repo}/dist/declarations.ndjson")
-  remove_file_if_exists("\{repo}/dist/symbols.ndjson")
-  remove_file_if_exists("\{repo}/dist/software-components.ndjson")
-  remove_file_if_exists("\{repo}/dist/sbom.spdx.json")
   remove_file_if_exists("\{repo}/dist/metadata.json")
   remove_file_if_exists("\{repo}/dist/checksums.txt")
   @sys.unset_env_var("COGNA_OPA_EVAL_JSON")
@@ -444,7 +441,7 @@ test "check routes componentDiff changes to componentChanges with richer evidenc
       #|              "level": "warning",
       #|              "message": "Software component version changed.",
       #|              "path": "package.json",
-      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/component/version-upgrade"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-component-version-upgrade"
       #|            }
       #|          ]
       #|        }
@@ -540,14 +537,14 @@ test "check emits two sarif results when one change has two finding codes" {
       #|              "level": "error",
       #|              "message": "Rust public item became unsafe.",
       #|              "path": "src/lib.rs",
-      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-became-unsafe"
       #|            },
       #|            {
       #|              "rule_id": "compat.rust.signature-changed",
       #|              "level": "warning",
       #|              "message": "Rust public signature changed.",
       #|              "path": "src/lib.rs",
-      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-signature-changed"
       #|            }
       #|          ]
       #|        }
@@ -709,14 +706,14 @@ test "check merges policy catalog rules into sarif driver metadata" {
       #|              "level": "error",
       #|              "message": "Rust public item became unsafe.",
       #|              "path": "src/lib.rs",
-      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-became-unsafe"
       #|            },
       #|            {
       #|              "rule_id": "compat.rust.signature-changed",
       #|              "level": "warning",
       #|              "message": "Rust public signature changed.",
       #|              "path": "src/lib.rs",
-      #|              "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed"
+      #|              "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-signature-changed"
       #|            }
       #|          ]
       #|        }
@@ -762,7 +759,7 @@ test "check merges policy catalog rules into sarif driver metadata" {
   )
   assert_true(
     sarif.contains(
-      "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed",
+      "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-signature-changed",
     ),
   )
 

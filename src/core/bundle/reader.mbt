@@ -190,8 +190,102 @@ pub fn read_bundle_declarations(repo : String) -> Result[Array[Json], String] {
 ///|
 pub fn read_bundle_components(repo : String) -> Result[Array[Json], String] {
   let path_out = bundle_ndjson_path(repo, "software-components")
-  guard path_out is Ok(path) else { return Err(path_out.unwrap_err()) }
-  read_ndjson(path)
+  match path_out {
+    Ok(path) => read_ndjson(path)
+    Err(_) => {
+      let spdx_path = "\{repo}/dist/sbom.spdx.json"
+      if !@fs.path_exists(spdx_path) {
+        return Err(path_out.unwrap_err())
+      }
+      read_spdx_component_records(spdx_path)
+    }
+  }
+}
+
+///|
+fn read_spdx_component_records(path : String) -> Result[Array[Json], String] {
+  let text = @fs.read_file_to_string(path) catch {
+    _ => return Err("cannot read json \{path}")
+  }
+  let parsed = try? @json.parse(text)
+  guard parsed is Ok(Object(root)) else {
+    return Err("invalid json in \{path}")
+  }
+  guard root.get("packages") is Some(Array(packages)) else { return Ok([]) }
+  let records : Array[Json] = []
+  for i in 0..<packages.length() {
+    guard packages[i] is Object(pkg) else { continue }
+    let spdx_id = match pkg.get("SPDXID") {
+      Some(String(value)) => value
+      _ => ""
+    }
+    if spdx_id == "" || !spdx_id.contains("-Package-") {
+      continue
+    }
+    let name = match pkg.get("name") {
+      Some(String(value)) if value != "" => value
+      _ => continue
+    }
+    let version = match pkg.get("versionInfo") {
+      Some(String(value)) if value != "" => Some(value)
+      _ => None
+    }
+    let mut purl : String? = None
+    match pkg.get("externalRefs") {
+      Some(Array(refs)) => {
+        for j in 0..<refs.length() {
+          guard refs[j] is Object(ref_obj) else { continue }
+          let ref_type = match ref_obj.get("referenceType") {
+            Some(String(value)) => value
+            _ => ""
+          }
+          if ref_type != "purl" {
+            continue
+          }
+          match ref_obj.get("referenceLocator") {
+            Some(String(value)) if value != "" => {
+              purl = Some(value)
+              break
+            }
+            _ => ()
+          }
+        }
+      }
+      _ => ()
+    }
+    let id = match purl {
+      Some(value) => value
+      None => "pkg:unknown/\{name}"
+    }
+    let signature = match version {
+      Some(value) => "library \{name}@\{value}"
+      None => "library \{name}"
+    }
+    let record : Map[String, Json] = {
+      "id": Json::string(id),
+      "kind": Json::string("component"),
+      "path": Json::string("sbom.spdx.json"),
+      "signature": Json::string(signature),
+      "name": Json::string(name),
+      "componentType": Json::string("library"),
+      "scope": Json::string("dependency"),
+      "location": {
+        "uri": "sbom.spdx.json",
+        "startLine": 1,
+        "endLine": 1,
+      },
+    }
+    match version {
+      Some(value) => record["version"] = Json::string(value)
+      None => ()
+    }
+    match purl {
+      Some(value) => record["purl"] = Json::string(value)
+      None => ()
+    }
+    records.push(Json::object(record))
+  }
+  Ok(records)
 }
 
 ///|

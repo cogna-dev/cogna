@@ -19,7 +19,7 @@ deny contains out if {
     "level": "error",
     "message": "Public declaration was removed and callers will break.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration"
   }
 }
 
@@ -31,7 +31,7 @@ deny contains out if {
     "level": "note",
     "message": "Public declaration was added.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/core/new-declaration"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-new-declaration"
   }
 }
 
@@ -43,7 +43,7 @@ deny contains out if {
     "level": "note",
     "message": "Public declaration became deprecated.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/core/deprecated-declaration"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-deprecated-declaration"
   }
 }
 
@@ -55,7 +55,7 @@ deny contains out if {
     "level": "error",
     "message": "Go pointer receiver compatibility changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/go/pointer-receiver-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-pointer-receiver-changed"
   }
 }
 
@@ -67,7 +67,7 @@ deny contains out if {
     "level": "error",
     "message": "Go receiver type changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/go/receiver-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-receiver-changed"
   }
 }
 
@@ -79,7 +79,7 @@ deny contains out if {
     "level": "error",
     "message": "Go method set shrank.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/go/method-set-shrunk"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-method-set-shrunk"
   }
 }
 
@@ -91,7 +91,7 @@ deny contains out if {
     "level": "warning",
     "message": "Go method set expanded and needs review.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/go/method-set-expanded"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-method-set-expanded"
   }
 }
 
@@ -103,7 +103,7 @@ deny contains out if {
     "level": "warning",
     "message": "Go public signature changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed"
   }
 }
 
@@ -115,7 +115,7 @@ deny contains out if {
     "level": "error",
     "message": "Rust public item became unsafe.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/became-unsafe"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-became-unsafe"
   }
 }
 
@@ -127,7 +127,7 @@ deny contains out if {
     "level": "error",
     "message": "Rust extern ABI was added.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/extern-abi-added"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-extern-abi-added"
   }
 }
 
@@ -139,7 +139,7 @@ deny contains out if {
     "level": "error",
     "message": "Rust extern ABI changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/extern-abi-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-extern-abi-changed"
   }
 }
 
@@ -151,7 +151,7 @@ deny contains out if {
     "level": "warning",
     "message": "Rust where-clause changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/where-clause-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-where-clause-changed"
   }
 }
 
@@ -163,7 +163,7 @@ deny contains out if {
     "level": "warning",
     "message": "Rust public signature changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/rust/signature-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-signature-changed"
   }
 }
 
@@ -175,7 +175,7 @@ deny contains out if {
     "level": "error",
     "message": "Terraform provider reference changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/provider-ref-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-provider-ref-changed"
   }
 }
 
@@ -187,7 +187,7 @@ deny contains out if {
     "level": "warning",
     "message": "Terraform prevent_destroy was added.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/prevent-destroy-added"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-prevent-destroy-added"
   }
 }
 
@@ -199,7 +199,7 @@ deny contains out if {
     "level": "warning",
     "message": "Terraform create_before_destroy was added.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/create-before-destroy-added"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-create-before-destroy-added"
   }
 }
 
@@ -211,7 +211,7 @@ deny contains out if {
     "level": "note",
     "message": "Terraform ignore_changes expanded.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/ignore-changes-expanded"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-ignore-changes-expanded"
   }
 }
 
@@ -223,7 +223,7 @@ deny contains out if {
     "level": "warning",
     "message": "Terraform lifecycle metadata changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/lifecycle-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-lifecycle-changed"
   }
 }
 
@@ -235,7 +235,7 @@ deny contains out if {
     "level": "error",
     "message": "Terraform input became required and callers must update configuration.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/input-became-required"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-input-became-required"
   }
 }
 
@@ -247,7 +247,7 @@ deny contains out if {
     "level": "error",
     "message": "Terraform output was removed and downstream references can break.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/terraform/output-removed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-output-removed"
   }
 }
 
@@ -259,7 +259,7 @@ deny contains out if {
     "level": "error",
     "message": "OpenAPI HTTP method changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/http-method-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-http-method-changed"
   }
 }
 
@@ -271,7 +271,7 @@ deny contains out if {
     "level": "error",
     "message": "OpenAPI field or parameter became required.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/became-required"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-became-required"
   }
 }
 
@@ -283,7 +283,7 @@ deny contains out if {
     "level": "warning",
     "message": "OpenAPI status codes were added.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/status-codes-added"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-status-codes-added"
   }
 }
 
@@ -295,7 +295,7 @@ deny contains out if {
     "level": "note",
     "message": "OpenAPI media types were added.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/media-types-added"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-media-types-added"
   }
 }
 
@@ -307,7 +307,7 @@ deny contains out if {
     "level": "warning",
     "message": "OpenAPI operation changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/operation-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-operation-changed"
   }
 }
 
@@ -319,7 +319,7 @@ deny contains out if {
     "level": "error",
     "message": "OpenAPI response status code was removed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/response-status-removed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-response-status-removed"
   }
 }
 
@@ -331,7 +331,7 @@ deny contains out if {
     "level": "error",
     "message": "OpenAPI response schema narrowed and clients may fail to parse it.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/openapi/response-schema-narrowed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-response-schema-narrowed"
   }
 }
 
@@ -343,7 +343,7 @@ deny contains out if {
     "level": "warning",
     "message": "Software component version changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/component/version-upgrade"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-component-version-upgrade"
   }
 }
 
@@ -355,6 +355,6 @@ deny contains out if {
     "level": "warning",
     "message": "Software component metadata changed.",
     "path": change.path,
-    "docs": "https://cogna.xaclabs.dev/docs/policies/generated/component/metadata-changed"
+    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-component-metadata-changed"
   }
 }

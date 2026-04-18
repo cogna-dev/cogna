@@ -21,9 +21,34 @@ for arg in "$@"; do
   fi
 done
 
+has_target=0
+if [[ ${#moon_args[@]} -gt 0 ]]; then
+  for arg in "${moon_args[@]}"; do
+    if [[ "$arg" == "--target" || "$arg" == --target=* ]]; then
+      has_target=1
+      break
+    fi
+  done
+fi
+if [[ $has_target -eq 0 ]]; then
+  if [[ ${#moon_args[@]} -gt 0 ]]; then
+    moon_args=(--target native "${moon_args[@]}")
+  else
+    moon_args=(--target native)
+  fi
+fi
+
 cd "$source_root"
-if [[ ${#cli_args[@]} -eq 0 ]]; then
-  moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main
+if [[ ${#moon_args[@]} -eq 0 ]]; then
+  if [[ ${#cli_args[@]} -eq 0 ]]; then
+    moon run --manifest-path "$manifest_path" src/cmd/main
+  else
+    moon run --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
+  fi
 else
-  moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
+  if [[ ${#cli_args[@]} -eq 0 ]]; then
+    moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main
+  else
+    moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
+  fi
 fi

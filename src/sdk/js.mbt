@@ -1,15 +1,4 @@
 ///|
-pub fn build_js(req : @generated.BuildRequest) -> @generated.BuildResponse {
-  ignore(req)
-  { success: false }
-}
-
-///|
-pub fn diff_js(req : @generated.DiffRequest) -> @generated.DiffResponse? {
-  diff(req)
-}
-
-///|
 pub fn fetch_packages_js(
   req : @generated.FetchPackagesRequest,
 ) -> @generated.FetchPackagesResponse? {

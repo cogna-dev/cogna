@@ -53,7 +53,7 @@ cogna check
             {
               "id": "compat.go.signature-changed",
               "name": "SignatureChanged",
-              "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed",
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed",
               "defaultConfiguration": {
                 "level": "warning"
               }
@@ -96,7 +96,7 @@ cogna check
 | `message.text` | 对这条结果的人类可读说明 |
 | `artifactLocation.uri` | 变化发生在哪个文件 |
 | `region.startLine` | 变化的起始行号 |
-| `tool.driver.rules[].helpUri` | 规则文档链接；built-in rules 会稳定指向 `/docs/policies/generated/<family>/<rule>` |
+| `tool.driver.rules[].helpUri` | 规则文档链接；built-in rules 会稳定指向 `/docs/policies#rule-<rule-id-with-dashes>` |
 
 ---
 

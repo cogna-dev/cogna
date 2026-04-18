@@ -17,6 +17,15 @@ fn resolved_root_dir() -> String {
 }
 
 ///|
+fn repo_for_package(pkg : String) -> String {
+  if pkg != "" && @fs.path_exists(pkg) {
+    pkg
+  } else {
+    resolved_root_dir()
+  }
+}
+
+///|
 fn spdx_cache_path() -> String {
   "\{resolved_root_dir()}/.cogna/sbom.spdx.json"
 }
@@ -332,9 +341,25 @@ fn record_string(record : Json, field : String) -> String? {
 }
 
 ///|
+fn record_symbol(record : Json) -> String {
+  match record_string(record, "symbol") {
+    Some(value) => value
+    None =>
+      match record_string(record, "canonical_name") {
+        Some(value) => value
+        None =>
+          match record_string(record, "name") {
+            Some(value) => value
+            None => record_string(record, "id").unwrap_or("")
+          }
+      }
+  }
+}
+
+///|
 fn selector_match_rank(record : Json, selector_path : String) -> Int? {
   let path = record_string(record, "location").unwrap_or("")
-  let symbol = record_string(record, "symbol").unwrap_or("")
+  let symbol = record_symbol(record)
   let id = record_string(record, "id").unwrap_or("")
   let signature = record_string(record, "signature").unwrap_or("")
   if path == selector_path {
@@ -452,10 +477,107 @@ pub fn read_repo_records(
 }
 
 ///|
+fn spdx_component_records(repo : String) -> Result[Array[Json], String] {
+  let path = "\{repo}/.cogna/sbom.spdx.json"
+  if !@fs.path_exists(path) {
+    return Err("cannot read json \{path}")
+  }
+  let text = @fs.read_file_to_string(path) catch {
+    _ => return Err("cannot read json \{path}")
+  }
+  let parsed = try? @json.parse(text)
+  guard parsed is Ok(Object(root)) else {
+    return Err("invalid json in \{path}")
+  }
+  guard root.get("packages") is Some(Array(packages)) else { return Ok([]) }
+  let records : Array[Json] = []
+  for i in 0..<packages.length() {
+    guard packages[i] is Object(pkg) else { continue }
+    let spdx_id = obj_str(pkg, "SPDXID")
+    if spdx_id == "" || !spdx_id.contains("-Package-") {
+      continue
+    }
+    let name = obj_str(pkg, "name")
+    if name == "" {
+      continue
+    }
+    let version = {
+      let value = obj_str(pkg, "versionInfo")
+      if value == "" { None } else { Some(value) }
+    }
+    let purl = match pkg.get("externalRefs") {
+      Some(Array(refs)) => {
+        let mut found : String? = None
+        for j in 0..<refs.length() {
+          guard refs[j] is Object(ref_obj) else { continue }
+          if obj_str(ref_obj, "referenceType") != "purl" {
+            continue
+          }
+          let locator = obj_str(ref_obj, "referenceLocator")
+          if locator != "" {
+            found = Some(locator)
+            break
+          }
+        }
+        found
+      }
+      _ => None
+    }
+    let id = match purl {
+      Some(value) => value
+      None => "pkg:unknown/\{name}"
+    }
+    let signature = match version {
+      Some(value) => "library \{name}@\{value}"
+      None => "library \{name}"
+    }
+    let record : Map[String, Json] = {
+      "id": Json::string(id),
+      "kind": Json::string("component"),
+      "path": Json::string("sbom.spdx.json"),
+      "signature": Json::string(signature),
+      "name": Json::string(name),
+      "componentType": Json::string("library"),
+      "scope": Json::string("dependency"),
+      "location": {
+        "uri": "sbom.spdx.json",
+        "startLine": 1,
+        "endLine": 1,
+      },
+    }
+    match version {
+      Some(value) => record["version"] = Json::string(value)
+      None => ()
+    }
+    match purl {
+      Some(value) => record["purl"] = Json::string(value)
+      None => ()
+    }
+    records.push(Json::object(record))
+  }
+  Ok(records)
+}
+
+///|
+fn read_component_records(repo : String) -> Array[Json] {
+  match read_repo_records(repo, "software-components") {
+    Ok(records) => records
+    Err(_) =>
+      match spdx_component_records(repo) {
+        Ok(records) => records
+        Err(_) => []
+      }
+  }
+}
+
+///|
 pub fn all_bundle_records(repo : String) -> Array[Json] {
   let records : Array[Json] = []
   append_records(records, read_repo_records(repo, "declarations"))
-  append_records(records, read_repo_records(repo, "software-components"))
+  let components = read_component_records(repo)
+  for i in 0..<components.length() {
+    records.push(components[i])
+  }
   records
 }
 
@@ -474,10 +596,7 @@ pub fn all_bundle_records_with_cancel(
   if query_deadline_exceeded(cancelled) {
     return Err("request cancelled")
   }
-  let components = match read_repo_records(repo, "software-components") {
-    Ok(values) => values
-    Err(_) => []
-  }
+  let components = read_component_records(repo)
   if query_deadline_exceeded(cancelled) {
     return Err("request cancelled")
   }
@@ -517,6 +636,13 @@ fn record_matches_selector(
   if id == "" || kind == "" || signature == "" {
     return None
   }
+  if kind == "component" {
+    return None
+  }
+  let symbol = record_symbol(record)
+  if symbol == "" {
+    return None
+  }
   match selector_kind {
     Some(kind_hint) if kind != kind_hint => return None
     _ => ()
@@ -531,6 +657,7 @@ fn record_matches_selector(
   let match_record : Map[String, Json] = {
     "id": id,
     "kind": kind,
+    "symbol": symbol,
     "signature": signature,
     "location": record_location(record, location_path),
   }
@@ -667,6 +794,9 @@ pub fn query_outlines_paginated(
       Some(value) => value
       None => continue
     }
+    if kind == "component" {
+      continue
+    }
     let key = "\{path}::\{kind}::\{signature}"
     if seen.contains(key) {
       continue
@@ -724,6 +854,9 @@ pub fn query_outlines_with_cancel(
     let signature = match record_string(records[i], "signature") {
       Some(value) => value
       None => continue
+    }
+    if kind == "component" {
+      continue
     }
     let key = "\{path}::\{kind}::\{signature}"
     if seen.contains(key) {
@@ -816,31 +949,31 @@ pub fn fetch_packages_json() -> Json {
     _ => "."
   }
   let children : Array[Json] = []
-  match read_repo_records(root, "software-components") {
-    Ok(records) =>
-      for i in 0..<records.length() {
-        guard records[i] is Object(obj) else { continue }
-        let name = obj_str(obj, "name")
-        let relation = obj_str(obj, "scope")
-        if name == "" || relation == "" {
-          continue
-        }
-        let version = match obj.get("version") {
-          Some(String(v)) if v != "" => v
-          _ => ""
-        }
-        children.push(
-          package_node_json(
-            name,
-            if version != "" { Some(version) } else { None },
-            None,
-            relation,
-            None,
-            [],
-          ),
-        )
-      }
-    Err(_) => ()
+  let records = read_component_records(root)
+  for i in 0..<records.length() {
+    guard records[i] is Object(obj) else { continue }
+    let name = obj_str(obj, "name")
+    let relation = {
+      let scope = obj_str(obj, "scope")
+      if scope == "" { "dependency" } else { scope }
+    }
+    if name == "" {
+      continue
+    }
+    let version = match obj.get("version") {
+      Some(String(v)) if v != "" => v
+      _ => ""
+    }
+    children.push(
+      package_node_json(
+        name,
+        if version != "" { Some(version) } else { None },
+        None,
+        relation,
+        None,
+        [],
+      ),
+    )
   }
   {
     "root": package_node_json(
@@ -857,7 +990,7 @@ pub fn fetch_packages_json() -> Json {
 ///|
 /// Return public API outlines for the given package.
 pub fn query_outlines_for_package(pkg : String) -> Json {
-  let records = all_bundle_records(pkg)
+  let records = all_bundle_records(repo_for_package(pkg))
   let outlines : Array[Json] = []
   let seen : Map[String, Bool] = {}
   for i in 0..<records.length() {
@@ -867,13 +1000,26 @@ pub fn query_outlines_for_package(pkg : String) -> Json {
     if id == "" || kind == "" {
       continue
     }
+    if kind == "component" {
+      continue
+    }
     if seen.contains(id) {
       continue
     }
     seen[id] = true
     let symbol = {
       let s = obj_str(obj, "symbol")
-      if s != "" { s } else { obj_str(obj, "id") }
+      if s != "" {
+        s
+      } else {
+        let canonical = obj_str(obj, "canonical_name")
+        if canonical != "" {
+          canonical
+        } else {
+          let name = obj_str(obj, "name")
+          if name != "" { name } else { obj_str(obj, "id") }
+        }
+      }
     }
     let summary_str = {
       let d = obj_str(obj, "docs")
@@ -923,7 +1069,7 @@ pub fn query_package(
     Some(n) if n > 0 => n
     _ => 20
   }
-  let raw_matches = query_matches(pkg, selector, None)
+  let raw_matches = query_matches(repo_for_package(pkg), selector, None)
   let enriched : Array[Json] = []
   for i in 0..<raw_matches.length() {
     guard raw_matches[i] is Object(obj) else {

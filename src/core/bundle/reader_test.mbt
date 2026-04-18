@@ -228,9 +228,9 @@ test "bundle reader accepts richer declaration ndjson" {
 }
 
 ///|
-test "bundle reader parses software component ndjson" {
+test "bundle reader parses component records from spdx" {
   let repo = "/tmp/cogna-bundle-reader-components"
-  @fs.remove_file("\{repo}/dist/software-components.ndjson") catch {
+  @fs.remove_file("\{repo}/dist/sbom.spdx.json") catch {
     _ => ()
   }
   @fs.remove_dir("\{repo}/dist") catch {
@@ -247,21 +247,59 @@ test "bundle reader parses software component ndjson" {
   }
 
   let components =
-    #|{"id":"pkg:openapi/acme/payment-api@2026.03.01","kind":"component","path":"cogna.yaml","signature":"application payment-api@2026.03.01","location":{"uri":"cogna.yaml","startLine":1,"endLine":1}}
-    #|{"id":"component:file:openapi/payment.yaml","kind":"component","path":"openapi/payment.yaml","signature":"file openapi/payment.yaml","location":{"uri":"openapi/payment.yaml","startLine":1,"endLine":1}}
-    #|
+    #|{
+    #|  "spdxVersion": "SPDX-2.3",
+    #|  "SPDXID": "SPDXRef-DOCUMENT",
+    #|  "name": "bundle-reader",
+    #|  "packages": [
+    #|    {
+    #|      "SPDXID": "SPDXRef-Root",
+    #|      "name": "bundle-reader",
+    #|      "versionInfo": "0.1.0"
+    #|    },
+    #|    {
+    #|      "SPDXID": "SPDXRef-Package-UUID",
+    #|      "name": "github.com/google/uuid",
+    #|      "versionInfo": "1.6.0",
+    #|      "externalRefs": [
+    #|        {
+    #|          "referenceCategory": "PACKAGE-MANAGER",
+    #|          "referenceType": "purl",
+    #|          "referenceLocator": "pkg:golang/github.com/google/uuid@1.6.0"
+    #|        }
+    #|      ]
+    #|    },
+    #|    {
+    #|      "SPDXID": "SPDXRef-Package-LO",
+    #|      "name": "github.com/samber/lo",
+    #|      "versionInfo": "1.49.1",
+    #|      "externalRefs": [
+    #|        {
+    #|          "referenceCategory": "PACKAGE-MANAGER",
+    #|          "referenceType": "purl",
+    #|          "referenceLocator": "pkg:golang/github.com/samber/lo@1.49.1"
+    #|        }
+    #|      ]
+    #|    }
+    #|  ]
+    #|}
   @fs.write_string_to_file(
-    "\{repo}/dist/software-components.ndjson",
+    "\{repo}/dist/sbom.spdx.json",
     components,
   ) catch {
-    _ => fail("failed to write components")
+    _ => fail("failed to write spdx")
   }
 
   let out = read_bundle_components(repo)
   guard out is Ok(records) else { fail("expected component records") }
   inspect(records.length(), content="2")
+  guard records[0] is Object(first) else { fail("expected first record object") }
+  guard first.get("kind") is Some(String(kind)) else {
+    fail("expected kind on first record")
+  }
+  assert_eq(kind, "component")
 
-  @fs.remove_file("\{repo}/dist/software-components.ndjson") catch {
+  @fs.remove_file("\{repo}/dist/sbom.spdx.json") catch {
     _ => ()
   }
   @fs.remove_dir("\{repo}/dist") catch {
@@ -424,7 +462,7 @@ test "bundle reader materializes bundle tar.gz into dist" {
   @fs.remove_file("\{repo}/out/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{repo}/out/symbols.ndjson") catch {
+  @fs.remove_file("\{repo}/out/sbom.spdx.json") catch {
     _ => ()
   }
   @fs.remove_file("\{repo}/out/metadata.json") catch {
@@ -454,19 +492,19 @@ test "bundle reader materializes bundle tar.gz into dist" {
     },
     "artifacts": [
       { "path": "declarations.ndjson", "sha256": "x", "compression": "none" },
-      { "path": "symbols.ndjson", "sha256": "y", "compression": "none" },
+      { "path": "sbom.spdx.json", "sha256": "y", "compression": "none" },
     ],
   }
   let declarations_text =
     #|{"id":"decl:a","kind":"function","path":"a.go","signature":"fn a","location":{"uri":"a.go","startLine":1,"endLine":1}}
     #|
-  let symbols_text =
-    #|{"id":"decl:a","selector":"pkg:generic/acme/demo@0.5.0#a.go#fn:a","name":"a","kind":"function"}
+  let spdx_text =
+    #|{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"demo","packages":[{"SPDXID":"SPDXRef-Root","name":"demo"},{"SPDXID":"SPDXRef-Package-Demo","name":"demo-lib","versionInfo":"0.5.0","externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl","referenceLocator":"pkg:generic/acme/demo-lib@0.5.0"}]}]}
     #|
   let tar_payload = tar_archive([
     ("manifest.json", @utf8.encode(manifest.stringify(indent=2))),
     ("declarations.ndjson", @utf8.encode(declarations_text)),
-    ("symbols.ndjson", @utf8.encode(symbols_text)),
+    ("sbom.spdx.json", @utf8.encode(spdx_text)),
     ("metadata.json", @utf8.encode("{}\n")),
     ("checksums.txt", @utf8.encode("manifest.json  x\n")),
   ])
@@ -480,7 +518,7 @@ test "bundle reader materializes bundle tar.gz into dist" {
   guard materialize_out is Ok(_) else { fail("materialize should succeed") }
   assert_true(@fs.path_exists("\{repo}/out/manifest.json"))
   assert_true(@fs.path_exists("\{repo}/out/declarations.ndjson"))
-  assert_true(@fs.path_exists("\{repo}/out/symbols.ndjson"))
+  assert_true(@fs.path_exists("\{repo}/out/sbom.spdx.json"))
   assert_true(@fs.path_exists("\{repo}/out/metadata.json"))
   assert_true(@fs.path_exists("\{repo}/out/checksums.txt"))
 
@@ -493,7 +531,7 @@ test "bundle reader materializes bundle tar.gz into dist" {
   @fs.remove_file("\{repo}/out/declarations.ndjson") catch {
     _ => ()
   }
-  @fs.remove_file("\{repo}/out/symbols.ndjson") catch {
+  @fs.remove_file("\{repo}/out/sbom.spdx.json") catch {
     _ => ()
   }
   @fs.remove_file("\{repo}/out/metadata.json") catch {

@@ -43,5 +43,4 @@
 - Use minimal naming: avoid repeating directory/context words in file and symbol names (e.g. `src/e2e/init_test.mbt`, not `init_e2e_test.mbt`).
 - Never modify system-level configuration; changes must stay within the current project directory or `/tmp`.
 - Never commit temporary files or auto-generated files; only commit intentional source/docs/test artifacts.
-- After every development cycle, update the progress dashboard at `docs/src/content/docs/progress.mdx` before reporting completion.
-- In `docs/src/content/docs/progress.mdx`, detailed execution checklist sections must keep only the current active stage; completed or future stages should be summary-only.
+- Don't update `docs/src/content/docs/progress.mdx`, it removed!

@@ -16,12 +16,10 @@ order: 24
 cogna build
 ```
 
-构建完成后，`dist/` 中会包含：
+构建完成后，会包含：
 
 ```text
-dist/
-├── software-components.ndjson   ← Cogna 内部组件列表
-└── sbom.spdx.json               ← SPDX JSON SBOM
+.cogna/sbom.spdx.json            ← SPDX JSON SBOM
 ```
 
 如果配置里启用了本地依赖 bundle（默认开启），并且项目中存在可解析的本地依赖，还会额外看到：
@@ -46,7 +44,7 @@ dist/dependencies/<safe-purl>/
 - 本地依赖的 evidence path
 - 基于本地内容快照生成的校验信息（`verifiedUsing`）
 
-这使得 Cogna 后续的 `diff`、`publish` 和 dependency bundle 编排都能使用同一套组件事实来源。
+这使得 Cogna 后续的 `diff` 和 dependency bundle 编排都能使用同一套组件事实来源。
 
 ---
 
@@ -80,13 +78,13 @@ dist/dependencies/<safe-purl>/
   uses: actions/upload-artifact@v4
   with:
     name: sbom
-    path: ./sdk/dist/sbom.spdx.json
+    path: ./sdk/.cogna/sbom.spdx.json
 ```
 
 ### 作为 release 附件
 
 ```bash
-cp ./sdk/dist/sbom.spdx.json ./release-assets/
+cp ./sdk/.cogna/sbom.spdx.json ./release-assets/
 ```
 
 如果你的 SCA 平台只接受 CycloneDX，那么当前需要在 Cogna 之外做一次 SPDX → CycloneDX 转换；Cogna 自身不再直接生成 `sbom.cdx.json`。

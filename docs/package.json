@@ -3,12 +3,12 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
-    "generate:policy-docs": "moon -C .. run src/scripts/gendoc/main",
+    "sync:policy-docs": "node ./scripts/sync-policy-readme.mjs",
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "predev": "pnpm run generate:policy-docs",
-    "prebuild": "pnpm run generate:policy-docs",
+    "predev": "pnpm run sync:policy-docs",
+    "prebuild": "pnpm run sync:policy-docs",
     "lint": "biome check src/components/primitive src/lib --linter-enabled=true --formatter-enabled=false --assist-enabled=false",
     "lint:fix": "biome check src/components/primitive src/lib --linter-enabled=true --formatter-enabled=false --assist-enabled=false --write",
     "format": "biome format --write ."

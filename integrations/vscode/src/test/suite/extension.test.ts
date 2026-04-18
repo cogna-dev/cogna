@@ -59,7 +59,7 @@ suite("Cogna extension", () => {
     const opened = await vscode.commands.executeCommand<string>(OPEN_RULE_DOCUMENTATION_COMMAND)
     assert.equal(
       opened,
-      "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+      "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration",
     )
   })
 

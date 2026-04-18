@@ -11,17 +11,6 @@ test "parse invocation uses config-driven check defaults" {
 }
 
 ///|
-test "parse invocation supports query positional file" {
-  let argv = ["cogna", "query", "./query.json"]
-  let out = parse_cli_args(argv)
-  guard out is Ok(Query(params)) else {
-    fail("expected query invocation to parse")
-  }
-
-  inspect(params.query_file, content="./query.json")
-}
-
-///|
 test "parse invocation supports open positional folder" {
   let argv = ["cogna", "open", "./workspace"]
   let out = parse_cli_args(argv)

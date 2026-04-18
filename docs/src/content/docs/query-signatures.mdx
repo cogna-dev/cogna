@@ -1,6 +1,6 @@
 ---
 title: 检索函数签名
-description: 如何用 cogna query 或 MCP 精确查询函数、方法、接口、变量或 API operation 的当前签名和文档。
+description: 如何通过 MCP 精确查询函数、方法、接口、变量或 API operation 的当前签名和文档。
 order: 14
 ---
 
@@ -14,49 +14,12 @@ order: 14
 
 | 场景 | 方式 |
 |------|------|
-| 查一个具体的符号 | `cogna query <query-file>` |
+| 查一个具体的符号 | `cogna mcp serve --port 3000` + tool 调用 |
 | 让 AI 自主探索和回答 | `cogna mcp serve --port 3000` |
 
 ---
 
-## 方式一：CLI 一次性查询
-
-### 步骤 1：构建 bundle
-
-```bash
-cd ./sdk
-cogna build
-```
-
-### 步骤 2：准备查询文件
-
-```json
-{
-  "schemaVersion": "ciq-query/v1",
-  "purl": "pkg:cargo/tokio@1.43.0",
-  "selector": {
-    "path": "tokio::sync::Mutex::lock",
-    "kind": "function"
-  },
-  "intent": "upgrade"
-}
-```
-
-`intent` 字段说明你查询的目的（`upgrade` / `review` / `understand`），帮助 Cogna 优化返回内容。
-
-### 步骤 3：执行查询
-
-```bash
-cd ./sdk
-cogna query ../query.json
-
-# 结果保存在
-cat ./query.result.json
-```
-
----
-
-## 方式二：MCP 让 AI 探索
+## 方式：MCP 让 AI 探索
 
 当你需要让 AI 助手回答"这个 SDK 里有没有线程安全的 Mutex？" 这类问题时，MCP 更适合。
 
@@ -174,8 +137,8 @@ cogna build
 # 准备 dist/base 与 dist/target 两套产物后，用 diff 找出有哪些签名变了
 cogna diff
 
-# 再用 query 精确查询某个函数的当前签名
-cogna query ../query.json
+# 再通过 MCP tool 精确查询某个函数的当前签名
+cogna mcp serve --port 3000
 ```
 
 当前 CLI 不支持 `diff --since ...` 这种覆盖式参数；版本基线由你准备好的 `dist/base` / `dist/target` 决定。

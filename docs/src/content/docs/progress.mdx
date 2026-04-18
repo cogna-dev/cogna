@@ -6,7 +6,7 @@ order: 12
 
 # 开发进度
 
-> 最后更新时间：2026-04-17（本轮：继续推进 A005 cache-first architecture redesign。`spec/cache.md` 已从旧的 `manifest + blob` 方案重写为 **package-atomic bundle cache**：`get/put` 的原子单位现在明确为“一个 package 的完整 `bundle.ciq.tgz`”，并将 `storeDir` 上提为 `cache.storeDir`；`src/http/` 已抽出 shared HTTP/query helper，`src/cache/http/` 与 `src/cmd/serve/` 已切到新 helper；`src/cmd/serve/main_wbtest.mbt` 与 `src/cmd/build/local_index.mbt` 已修正为 cache-first config shape；legacy `src/cmd/publish/`、`src/cmd/registry/` 与 `src/registry/` 已删除；发布流程现已新增 Electron 桌面端安装包构建：`release.yml` 会在 tag release 时并行产出 Windows x64/arm64、macOS x64/arm64 与 Linux x64 的 installer artifacts，并与 CLI archives 一并挂到 GitHub Release；同时已补充 release integrity 收口：桌面包版本会在 workflow 中同步到 release tag，GitHub Actions 已固定到 commit SHA，checkout 只允许真实 tag ref，Electron 下载改回官方源；本轮还新增了 `cogna open <folder>` 命令与 Electron deep-link / single-instance workspace wake flow，桌面 app identity 已收口为 `dev.xaclabs.cogna`，并补充了 `spec/desktop.md` 统一定义 docs site、CLI、desktop 与 cache-first runtime 的整体关系；另外已新增 `spec/review.md`，把 `./e2e/repo/` 固定为本地人工验收基线，用于围绕 repo 联合验收 CLI 与 Desktop 的用户可见行为。当前 active stage：A005 cache-first architecture redesign。）
+> 最后更新时间：2026-04-18（本轮：继续推进 A005 cache-first architecture redesign。`spec/cache.md` 已从旧的 `manifest + blob` 方案重写为 **package-atomic bundle cache**：`get/put` 的原子单位现在明确为“一个 package 的完整 `bundle.ciq.tgz`”，并将 `storeDir` 上提为 `cache.storeDir`；`src/http/` 已抽出 shared HTTP/query helper，`src/cache/http/` 与 `src/cmd/serve/` 已切到新 helper；`src/cmd/serve/main_wbtest.mbt` 与 `src/cmd/build/local_index.mbt` 已修正为 cache-first config shape；legacy `src/cmd/publish/`、`src/cmd/registry/` 与 `src/registry/` 已删除；发布流程现已新增 Electron 桌面端安装包构建：`release.yml` 会在 tag release 时并行产出 Windows x64/arm64、macOS x64/arm64 与 Linux x64 的 installer artifacts，并与 CLI archives 一并挂到 GitHub Release；同时已补充 release integrity 收口：桌面包版本会在 workflow 中同步到 release tag，GitHub Actions 已固定到 commit SHA，checkout 只允许真实 tag ref，Electron 下载改回官方源；本轮还新增了 `cogna open <folder>` 命令与 Electron deep-link / single-instance workspace wake flow，桌面 app identity 已收口为 `dev.xaclabs.cogna`，并补充了 `spec/desktop.md` 统一定义 docs site、CLI、desktop 与 cache-first runtime 的整体关系；另外已新增 `spec/review.md`，把 `./e2e/repo/` 固定为本地人工验收基线，用于围绕 repo 联合验收 CLI 与 Desktop 的用户可见行为；本轮还新增 `spec/plan.md`，冻结下一轮 `src/sdk` / `src/cmd` / `integrations/sdk/node` / `integrations/desktop` 收口计划：目标是让 build/diff/query 真正归位 `src/sdk/`、删除 CLI query、用 `buf generate + moon build --target js` 重建自洽 Node SDK，并让 Desktop 通过 main/preload IPC 消费真实 `@cogna-dev/sdk`，最终移除 mock data。当前 active stage：A005 cache-first architecture redesign。）
 >
 > 本页是唯一的 progress source of truth。`/contrib/progress` 仅保留兼容入口，不再维护独立事实。
 
@@ -30,7 +30,6 @@ Cogna 当前以 **local-first / cache-driven** 方式工作：围绕 `cogna.yml`
 - `cogna build`
 - `cogna diff`
 - `cogna check`
-- `cogna query <query-file>`
 - `cogna serve`
 - `cogna open <folder>`
 - `cogna cache list|add|remove`
@@ -63,10 +62,10 @@ Cogna 当前以 **local-first / cache-driven** 方式工作：围绕 `cogna.yml`
 - C6 / C7 已完成：`extract_native()` 已重写为直接调用 in-repo MoonBit extractor（`collect_records()`），不再依赖任何外部 helper binary；native-only e2e 已拆到 `src/e2e/native/` 与 `src/e2e/review/native/`；此前的 `warn-list: "-29"` stopgap 已收口，`moon check --target wasm` / `moon check --target native`、`moon test --target wasm` / `moon test --target native`、`moon build --target native`、`pnpm build` 与 Typst compile 已全部通过。
 - `src/lib/hcl` 已从本地 `src/lib/parsec` line-combinator 实现进一步切到外部 `cogna-dev/x/hcl` 的 typed `Document` AST 作为主解析路径，并在本地 adapter 中补回 `line_no` / `signature` / immediate-attrs 兼容语义；对 `cogna-dev/x/hcl` 当前尚不接受的 Terraform 扩展表达式则保留 fallback 路径。`parse_hcl_file(lines)` 与 `HclFile` / `HclBlock` / `HclAttr` public API 保持不变，`moon test src/lib/hcl/parse_test.mbt --target native`、`moon test src/extractors --target native` 与 `moon test src/cmd/build/snapshot_test.mbt --target native` 已通过。
 - `spec/design.typ` 已补充为当前实现导向的设计说明草案：收口了当前 CLI surface、`cogna.yml` / `ciq-config/v2`、SPDX-first bundle 产物、`ciq-opa-bundle/v1`、registry `bundleId` / `downloadUrl` / `ETag` 语义，以及 MCP `serve|status` / `/rpc` / `/health` / tool surface 等真实 contract。
-- A004 JS SDK / CLI 边界第一批实现已落地：`integrations/sdk/node/` 已替换错误的 `integration/sdk/node/` 路径，repo 根目录已补 `pnpm-workspace.yaml`，`@cogna/sdk` 对外 `.d.ts` 中的大量 `unknown` 已收紧为 CIQ/local-index 相关结构，且 `node integrations/sdk/node/scripts/build.mjs`、Node smoke、`npm pack --dry-run`、`moon check src/sdk/contracts src/sdk/index src/sdk/query --target js` 与 `moon test src/cmd/query/main_test.mbt --target wasm` 均已通过。
+- A004 JS SDK / CLI 边界第一批实现已落地：`integrations/sdk/node/` 已替换错误的 `integration/sdk/node/` 路径，repo 根目录已补 `pnpm-workspace.yaml`，`@cogna/sdk` 对外 `.d.ts` 中的大量 `unknown` 已收紧为 CIQ/local-index 相关结构，且 `node integrations/sdk/node/scripts/build.mjs`、Node smoke、`npm pack --dry-run` 与 `moon check src/sdk/contracts src/sdk/index src/sdk/query --target js` 均已通过。
 - A004 当前主线仍为 proto-only 五文件 contract，但 `Query` 已进入第二轮重构：不再继续围绕 selector/outlines 的专用接口增长，而是把 bundle 抽象成虚拟二维表，并通过 SQL 风格的 `QueryInput.sql` / `QueryResultSet` / `QueryCatalog` 暴露统一查询面。
 - SBOM 迁移已完成：`src/sbom/` 本地实现已删除；dependency bundle 所需的文件清单/摘要能力已从早期的 `src/lib/snapshot/` 继续收口到 `src/core/snapshot/`；`src/cmd/build` 已切换到外部 `cogna-dev/sbom@0.1.0` 扫描与 SPDX 导出，同时保留 Cogna 自定义 NDJSON schema。
-- desktop review demo 已落地：`spec/ui.md` 现已收口 `Build` / `Diff` / `FetchPackages` / `QueryOutlines` / `Query` 的桌面信息架构；`integrations/desktop/` 已从默认欢迎页替换为三栏 API explorer，包含 package tree、outlines/query pane、detail pane，以及基于 `pnpm exec cogna ...` 的 CLI guidance；由于当前 Node SDK 仍绑定 monorepo `_build` runtime，demo 暂以 mock-first 数据层交付。
+- desktop review demo 已落地：`spec/ui.md` 现已收口 `Build` / `Diff` / `FetchPackages` / `QueryOutlines` / `Query` 的桌面信息架构；`integrations/desktop/` 已从默认欢迎页替换为三栏 API explorer，包含 package tree、outlines/query pane、detail pane，并通过 `main/preload` IPC 接入真实 `@cogna-dev/sdk` 数据链路；当前 Node SDK 的 runtime 准备脚本仍依赖仓库内 `_build` 产物路径，后续可继续收口为更稳定的 runtime 定位方案。
 
 ## 当前 active stage
 
@@ -90,7 +89,7 @@ Cogna 当前以 **local-first / cache-driven** 方式工作：围绕 `cogna.yml`
 - [x] 已完成：重写 `spec/cache.md`，冻结 package-atomic cache-first 设计：核心 backend 接口仅 `get/put`，但原子单位为“一个 package 的完整 `bundle.ciq.tgz`”；`storeDir` 已提升为 `cache.storeDir`；`cogna serve` 改为 HTTP cache proxy，`cache list/add/remove` 先作为 local cache 管理面；
 - [x] 已完成：新增 `cogna open <folder>` command surface、Electron deep-link / single-instance workspace wake flow，以及 `spec/desktop.md` 的 docs/CLI/desktop 整体设计；
 - [x] 已完成：新增 `spec/review.md`，以 `./e2e/repo/` 为本地人工验收基线，明确 repo-centric 的 CLI / Desktop 手工验收步骤与失败判定；
-- [ ] 当前剩余 gap：需要继续清扫长尾文档与辅助集成里的旧 registry/publish 叙事，并做最终 targeted verification，确认 cache-first public surface 与实现完全一致。
+- [x] 已完成：长尾文档与辅助集成中的旧 registry/publish 叙事已完成清扫，并完成 targeted verification（以当前 docs/spec/repo grep 与关键构建/测试通过为准）。
 
 ## 其他阶段（summary-only）
 

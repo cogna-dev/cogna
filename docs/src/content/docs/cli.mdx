@@ -36,13 +36,16 @@ cogna build
 dist/
 ├── manifest.json
 ├── declarations.ndjson
-├── symbols.ndjson
-├── software-components.ndjson
-├── sbom.spdx.json
 ├── metadata.json
 ├── checksums.txt
 ├── bundle.ciq.tgz
 └── dependencies/              ← 仅在可解析本地依赖时出现
+```
+
+另外会写入：
+
+```text
+.cogna/sbom.spdx.json
 ```
 
 如果 `profile: policy-bundle`，还会额外生成：
@@ -86,31 +89,6 @@ dist/check.sarif.json
 ```
 
 > `check` 依赖本机可用的 `opa eval`。
-
----
-
-## `cogna query`
-
-一次性查询某个 bundle 中的符号或 operation：
-
-```bash
-cogna query <query-file>
-```
-
-示例查询文件：
-
-```json
-{
-  "schemaVersion": "ciq-query/v1",
-  "purl": "pkg:cargo/tokio@1.43.0",
-  "selector": {
-    "path": "tokio::sync::Mutex::lock"
-  },
-  "intent": "upgrade"
-}
-```
-
-`selector.kind` 当前是可选的；如果省略，Cogna 会在服务端做 ranked matching。
 
 ---
 

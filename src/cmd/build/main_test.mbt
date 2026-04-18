@@ -45,9 +45,6 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   ensure_file_removed("\{repo}/lib.rs")
   ensure_file_removed("\{repo}/dist/manifest.json")
   ensure_file_removed("\{repo}/dist/declarations.ndjson")
-  ensure_file_removed("\{repo}/dist/symbols.ndjson")
-  ensure_file_removed("\{repo}/dist/software-components.ndjson")
-  ensure_file_removed("\{repo}/dist/sbom.spdx.json")
   ensure_file_removed("\{repo}/dist/metadata.json")
   ensure_file_removed("\{repo}/dist/checksums.txt")
   ensure_file_removed("\{repo}/dist/opa-bundle.tar.gz")
@@ -264,32 +261,21 @@ test "build creates bundle skeleton files" {
   }
   assert_true(has_64_hex(checksum_for(checksums, "manifest.json")))
   assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson")))
-  assert_true(has_64_hex(checksum_for(checksums, "symbols.ndjson")))
-  assert_true(has_64_hex(checksum_for(checksums, "software-components.ndjson")))
-  assert_true(has_64_hex(checksum_for(checksums, "sbom.spdx.json")))
   assert_true(has_64_hex(checksum_for(checksums, "metadata.json")))
 
   let declarations = read_text_main(
     "\{repo}/dist/declarations.ndjson",
     "declarations should exist",
   )
-  assert_true(declarations.contains("\"baselineRole\":\"baseline\""))
+  assert_true(declarations.contains("\"kind\":\"bundle\""))
+  assert_true(declarations.contains("\"signature\":\"bundle_root\""))
 
-  let symbols = read_text_main(
-    "\{repo}/dist/symbols.ndjson",
-    "symbols should exist",
-  )
-  assert_true(symbols.contains("\"id\":\"sym:openapi-spec:"))
-  let components = read_text_main(
-    "\{repo}/dist/software-components.ndjson",
-    "software components should exist",
-  )
-  assert_true(components.contains("\"kind\":\"component\""))
   let spdx = read_text_main(
-    "\{repo}/dist/sbom.spdx.json",
+    "\{repo}/.cogna/sbom.spdx.json",
     "spdx sbom should exist",
   )
   assert_true(spdx.contains("\"spdxVersion\": \"SPDX-2.3\""))
+  assert_true(spdx.contains("\"packages\""))
 
   let bundle = @fs.read_file_to_bytes("\{repo}/dist/bundle.ciq.tgz") catch {
     _ => {
@@ -397,9 +383,6 @@ test "build restores bundle skeleton from local cache on second run" {
   }
   ensure_file_removed("\{repo}/dist/manifest.json")
   ensure_file_removed("\{repo}/dist/declarations.ndjson")
-  ensure_file_removed("\{repo}/dist/symbols.ndjson")
-  ensure_file_removed("\{repo}/dist/software-components.ndjson")
-  ensure_file_removed("\{repo}/dist/sbom.spdx.json")
   ensure_file_removed("\{repo}/dist/metadata.json")
   ensure_file_removed("\{repo}/dist/checksums.txt")
   ensure_file_removed("\{repo}/dist/bundle.ciq.tgz")
@@ -507,8 +490,8 @@ test "build creates policy-bundle artifacts and opa manifest" {
   assert_true(manifest.contains("\"status\": \"unsigned\""))
   assert_true(manifest.contains("\"path\": \"opa-bundle.tar.gz\""))
   assert_true(manifest.contains("\"path\": \"policy.rules.json\""))
-  assert_true(manifest.contains("\"path\": \"software-components.ndjson\""))
-  assert_true(manifest.contains("\"path\": \"sbom.spdx.json\""))
+  assert_true(!manifest.contains("\"path\": \"software-components.ndjson\""))
+  assert_true(!manifest.contains("\"path\": \"sbom.spdx.json\""))
   assert_true(!manifest.contains("\"path\": \"sbom.cdx.json\""))
   assert_true(!manifest.contains("\"declarationSchema\""))
 
@@ -547,8 +530,7 @@ test "build creates policy-bundle artifacts and opa manifest" {
   }
   assert_true(has_64_hex(checksum_for(checksums, "opa-bundle.tar.gz")))
   assert_true(has_64_hex(checksum_for(checksums, "policy.rules.json")))
-  assert_true(has_64_hex(checksum_for(checksums, "software-components.ndjson")))
-  assert_true(has_64_hex(checksum_for(checksums, "sbom.spdx.json")))
+  assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson")))
 
   cleanup_tmp_repo(repo)
 }

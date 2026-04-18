@@ -177,6 +177,10 @@ gen-proto:
 gen-openapi:
     mapi generate --spec openapi.json --project .
 
+# Export MoonBit SDK JS runtime to dist/runtime for consumers
+export-sdk-runtime:
+    node ./scripts/export-sdk-runtime.mjs
+
 # ------------------------------------------------------------------------------
 # release — Release preparation
 # ------------------------------------------------------------------------------

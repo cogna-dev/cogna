@@ -14,7 +14,7 @@ const report = parseSarif(
             rules: [
               {
                 id: "compat.go.signature-changed",
-                helpUri: "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed",
+                helpUri: "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed",
               },
             ],
           },
@@ -51,5 +51,5 @@ test("collectDiagnosticItems maps sarif results to workspace files", () => {
   assert.equal(items[0]?.filePath, "/workspace/demo/client/client.go")
   assert.equal(items[0]?.startLine, 12)
   assert.equal(items[0]?.endLine, 13)
-  assert.equal(items[0]?.helpUri, "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed")
+  assert.equal(items[0]?.helpUri, "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed")
 })

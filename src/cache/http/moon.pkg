@@ -7,5 +7,3 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "shu-kitamura/sha256" @sha256,
 }
-
-supported_targets = "native"

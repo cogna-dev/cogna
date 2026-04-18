@@ -129,9 +129,9 @@ jobs:
           mkdir -p "$sdk/dist/base" "$sdk/dist/target"
           cp "$sdk/dist/manifest.json" "$sdk/dist/base/manifest.json"
           cp "$sdk/dist/declarations.ndjson" "$sdk/dist/base/declarations.ndjson"
-          cp "$sdk/dist/symbols.ndjson" "$sdk/dist/base/symbols.ndjson"
           cp "$sdk/dist/declarations.ndjson" "$sdk/dist/target/declarations.ndjson"
-          cp "$sdk/dist/symbols.ndjson" "$sdk/dist/target/symbols.ndjson"
+          cp "$sdk/dist/software-components.ndjson" "$sdk/dist/base/software-components.ndjson"
+          cp "$sdk/dist/software-components.ndjson" "$sdk/dist/target/software-components.ndjson"
           python3 - <<'PY'
           import json
           import os
@@ -153,7 +153,7 @@ jobs:
       - name: Run check with SARIF upload branch
         id: check
         env:
-          COGNA_OPA_EVAL_JSON: '{"result":[{"expressions":[{"value":[{"rule_id":"compat.core.removed-declaration","level":"error","message":"Public API removal blocked by policy","path":"openapi/payment.yaml","docs":"https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration"}]}]}]}'
+          COGNA_OPA_EVAL_JSON: '{"result":[{"expressions":[{"value":[{"rule_id":"compat.core.removed-declaration","level":"error","message":"Public API removal blocked by policy","path":"openapi/payment.yaml","docs":"https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration"}]}]}]}'
           COGNA_SARIF_UPLOAD_CAPTURE: ${{ runner.temp }}/cogna-actions-e2e/sdk/dist/check.upload.json
         uses: ./integrations/actions/run-cogna
         with:
@@ -169,6 +169,6 @@ jobs:
           test -f "$sarif_file"
           test -f "$RUNNER_TEMP/cogna-actions-e2e/sdk/dist/check.upload.json"
           grep -q 'compat.core.removed-declaration' "$sarif_file"
-          grep -q 'https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration' "$sarif_file"
+          grep -q 'https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration' "$sarif_file"
           grep -q 'refs/' "$RUNNER_TEMP/cogna-actions-e2e/sdk/dist/check.upload.json"
           grep -q '"commit_sha"' "$RUNNER_TEMP/cogna-actions-e2e/sdk/dist/check.upload.json"

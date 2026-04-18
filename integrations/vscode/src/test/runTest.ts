@@ -79,7 +79,7 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
                 rules: [
                   {
                     id: "compat.core.removed-declaration",
-                    helpUri: "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+                    helpUri: "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration",
                   },
                 ],
               },
@@ -129,9 +129,9 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
   await fs.mkdir(targetDir, { recursive: true })
   await fs.copyFile(path.join(distDir, "manifest.json"), path.join(baseDir, "manifest.json"))
   await fs.copyFile(path.join(distDir, "declarations.ndjson"), path.join(baseDir, "declarations.ndjson"))
-  await fs.copyFile(path.join(distDir, "symbols.ndjson"), path.join(baseDir, "symbols.ndjson"))
   await fs.copyFile(path.join(distDir, "declarations.ndjson"), path.join(targetDir, "declarations.ndjson"))
-  await fs.copyFile(path.join(distDir, "symbols.ndjson"), path.join(targetDir, "symbols.ndjson"))
+  await fs.copyFile(path.join(workspaceDir, ".cogna", "sbom.spdx.json"), path.join(baseDir, "sbom.spdx.json"))
+  await fs.copyFile(path.join(workspaceDir, ".cogna", "sbom.spdx.json"), path.join(targetDir, "sbom.spdx.json"))
 
   const manifestText = await fs.readFile(path.join(distDir, "manifest.json"), "utf8")
   const manifest = JSON.parse(manifestText) as { purl: string }
@@ -161,7 +161,7 @@ async function main() {
                 level: "error",
                 message: "Public API removal blocked by policy",
                 path: "openapi/payment.yaml",
-                docs: "https://cogna.xaclabs.dev/docs/policies/generated/core/removed-declaration",
+                docs: "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration",
               },
             ],
           },

@@ -16,6 +16,17 @@
   date: "March 19, 2026",
 )
 
+= 归档声明（必读）
+
+本文档为 2026-03 的历史申报材料归档，保留当时的术语与规划表述（包含 `publish` / `registry` / `cogna query` 等旧叙事），#strong[不再作为当前实现与对外文档的事实来源]。
+
+当前事实来源请以以下文档为准：
+
+- `docs/src/content/docs/*`（用户文档）
+- `docs/src/content/contrib/*`（贡献者文档）
+- `docs/src/content/docs/progress.mdx`（唯一进度真相源）
+- `spec/cache.md`、`spec/plan.md`、`spec/review.md`（当前迁移与验收基线）
+
 = 项目目标与应用场景
 
 Cogna 的目标不是做一个新的 linter，也不是替代 LSP/IDE 导航，而是构建一个#strong[面向库公开接口（声明）]的事实提取与变更治理系统。它解决的是这样一类问题：当开发者或 AI 代理面对第三方库升级、SDK 发版、Terraform Module 变更、OpenAPI 规格更新时，现有工具往往只能提供文本检索、通用静态分析或实现级告警，却无法稳定回答“这个产物对外承诺了什么”“两个版本之间哪些公开声明发生了变化”“这些变化是否违反组织的兼容性策略”“结果能否接入现有审查与报告工具链”。
@@ -129,10 +140,6 @@ checks:
 pkg:cargo/tokio@1.43.0.ciq.tgz
 ├── manifest.json
 ├── declarations.ndjson
-├── symbols.ndjson
-├── software-components.ndjson
-├── sbom.cdx.json
-├── sbom.spdx.json
 ├── metadata.json
 └── checksums.txt
 ```
@@ -144,10 +151,6 @@ pkg:cargo/tokio@1.43.0.ciq.tgz
   [*文件*], [*格式*], [*用途*],
   [`manifest.json`], [JSON], [描述 bundle 元数据、PURL、profile、输入文件摘要与产物列表],
   [`declarations.ndjson`], [NDJSON], [逐行记录结构化声明信息：原始签名 + 待演进的抽象 shape + 语言特化 tagged union],
-  [`symbols.ndjson`], [NDJSON], [索引声明到逻辑名、路径、父级作用域、唯一 ID],
-  [`software-components.ndjson`], [NDJSON], [逐行记录源码文件与包管理器解析出的标准化 software component facts],
-  [`sbom.cdx.json`], [JSON], [由 component facts 导出的 CycloneDX SBOM],
-  [`sbom.spdx.json`], [JSON-LD], [由 component facts 导出的 SPDX SBOM],
   [`metadata.json`], [JSON], [构建时间、工具版本、语言统计、输入文件列表与摘要],
   [`checksums.txt`], [文本], [bundle 内每个文件的 SHA-256 摘要],
 )
@@ -166,10 +169,8 @@ pkg:cargo/tokio@1.43.0.ciq.tgz
   },
   "artifacts": [
     {"path": "declarations.ndjson", "sha256": "<digest>", "compression": "none"},
-    {"path": "symbols.ndjson", "sha256": "<digest>", "compression": "none"},
-    {"path": "software-components.ndjson", "sha256": "<digest>", "compression": "none"},
-    {"path": "sbom.cdx.json", "sha256": "<digest>", "compression": "none"},
-    {"path": "sbom.spdx.json", "sha256": "<digest>", "compression": "none"}
+    {"path": "metadata.json", "sha256": "<digest>", "compression": "none"},
+    {"path": "checksums.txt", "sha256": "<digest>", "compression": "none"}
   ]
 }
 ```

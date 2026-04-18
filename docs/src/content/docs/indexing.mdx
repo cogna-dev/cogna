@@ -18,12 +18,15 @@ order: 8
 dist/
 ├── manifest.json           ← bundle 元数据：purl、profile、生成时间
 ├── declarations.ndjson     ← 公开声明列表（函数、类型、接口等）
-├── symbols.ndjson          ← 符号信息（路径、签名、位置、文档）
-├── software-components.ndjson  ← 软件组件依赖列表
-├── sbom.spdx.json          ← SPDX 格式的 SBOM
 ├── metadata.json           ← 补充元数据
 ├── checksums.txt           ← 文件校验和
 └── bundle.ciq.tgz          ← 完整归档（cache / 分发用）
+```
+
+另外，SPDX SBOM 会写入项目根目录的：
+
+```text
+.cogna/sbom.spdx.json
 ```
 
 其中 `bundle.ciq.tgz` 是 cache 复用与分发的主要文件；如果这是 policy 仓库，它也会作为 `checks.policy` 指向的 policy bundle。
@@ -108,7 +111,7 @@ dist/
         "rules": [
           {
             "id": "compat.go.signature-changed",
-            "helpUri": "https://cogna.xaclabs.dev/docs/policies/generated/go/signature-changed"
+            "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed"
           }
         ]
       }
@@ -148,7 +151,7 @@ dist/
 }
 ```
 
-执行 `cogna query ./query.json` 后，结果保存在 `./query.result.json`。
+可通过 `cogna mcp serve --port 3000` 暴露查询能力给 AI / Agent；查询请求和结果 shape 仍遵循 `ciq-query/v1` 与 `ciq-result/v1`。
 
 ---
 

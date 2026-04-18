@@ -37,10 +37,10 @@ pub fn build_local_index_native(
 
 ///|
 /// Load NDJSON records from a local index dist/ directory.
-/// Returns all declarations, symbols, and software-components records.
+/// Returns declaration records.
 pub fn load_local_index(repo : String) -> Array[Json] {
   let records : Array[Json] = []
-  let names = ["declarations", "software-components"]
+  let names = ["declarations"]
   for name in names {
     let path = "\{repo}/dist/\{name}.ndjson"
     if !@fs.path_exists(path) {

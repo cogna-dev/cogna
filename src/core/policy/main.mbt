@@ -61,7 +61,9 @@ pub fn rule_slug(rule_id : String) -> String {
 
 ///|
 fn rule_path_from_parts(family : String, rule_id : String) -> String {
-  "/docs/policies/generated/\{family}/\{rule_slug(rule_id)}"
+  ignore(family)
+  let anchor = rule_id.replace_all(old=".", new="-")
+  "/docs/policies#rule-\{anchor}"
 }
 
 ///|

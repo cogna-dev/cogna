@@ -5,7 +5,6 @@ pub(all) enum CliInvocation {
   Build(@build_cmd.BuildParams)
   Diff(@diff_cmd.DiffParams)
   Check(@check_cmd.CheckParams)
-  Query(@query_cmd.QueryParams)
   Serve(@serve_cmd.ServeParams)
   CacheList(@cache_cmd.CacheListParams)
   CacheAdd(@cache_cmd.CacheAddParams)
@@ -39,11 +38,6 @@ pub impl Show for CliInvocation with output(self, logger) {
     }
     Check(params) => {
       logger.write_string("Check(")
-      logger.write_object(params)
-      logger.write_char(')')
-    }
-    Query(params) => {
-      logger.write_string("Query(")
       logger.write_object(params)
       logger.write_char(')')
     }
@@ -84,7 +78,6 @@ fn is_known_subcommand(name : String) -> Bool {
     | "build"
     | "diff"
     | "check"
-    | "query"
     | "serve"
     | "cache"
     | "mcp"
@@ -113,10 +106,9 @@ fn grouped_help() -> String {
     #|Core
     #|  init                Initialize cogna.yml
     #|  open <folder>       Open workspace in desktop app
-    #|  build               Build CIQ bundle
-    #|  diff                Compute CIQ diff
+    #|  build               Build CIQ bundle (native-only)
+    #|  diff                Compute CIQ diff (native-only)
     #|  check               Run policy checks
-    #|  query <query-file>  Query CIQ bundle
     #|
     #|Cache
     #|  serve               Run cache proxy command
@@ -136,6 +128,15 @@ fn usage_error(message? : String = "") -> @cli.CliError {
     @cli.usage_error(grouped_help())
   } else {
     @cli.usage_error("\{message}\n\n\{grouped_help()}")
+  }
+}
+
+///|
+fn parse_bool_flag(value : String, flag : String) -> @cli.CliResult[Bool, @cli.CliError] {
+  match value {
+    "true" => Ok(true)
+    "false" => Ok(false)
+    _ => Err(usage_error(message="\{flag} must be true or false"))
   }
 }
 
@@ -161,15 +162,35 @@ fn parse_invocation(
           num_args=@argparse.ValueRange::single(),
         ),
       ]),
-      @argparse.Command::new("build", about="Build CIQ bundle"),
-      @argparse.Command::new("diff", about="Compute CIQ diff"),
-      @argparse.Command::new("check", about="Run policy checks"),
-      @argparse.Command::new("query", about="Query CIQ bundle", positionals=[
-        @argparse.PositionArg::new(
-          "query_file",
-          num_args=@argparse.ValueRange::single(),
+      @argparse.Command::new("build", about="Build CIQ bundle (native-only)", options=[
+        @argparse.OptionArg::new(
+          "repo",
+          long="repo",
+          action=@argparse.OptionAction::Set,
+          default_values=[""],
         ),
       ]),
+      @argparse.Command::new("diff", about="Compute CIQ diff (native-only)", options=[
+        @argparse.OptionArg::new(
+          "repo",
+          long="repo",
+          action=@argparse.OptionAction::Set,
+          default_values=[""],
+        ),
+        @argparse.OptionArg::new(
+          "since",
+          long="since",
+          action=@argparse.OptionAction::Set,
+          default_values=[""],
+        ),
+        @argparse.OptionArg::new(
+          "include-test-changes",
+          long="include-test-changes",
+          action=@argparse.OptionAction::Set,
+          default_values=["false"],
+        ),
+      ]),
+      @argparse.Command::new("check", about="Run policy checks"),
       @argparse.Command::new(
         "serve",
         about="Run cache proxy command",
@@ -267,27 +288,31 @@ fn parse_invocation(
       Ok(Open(@open_cmd.OpenParams::{ folder: folder_values[0], }))
     }
     Some(("build", build_matches)) => {
-      ignore(build_matches)
-      Ok(Build(@build_cmd.BuildParams::{ repo: "" }))
+      let repo_values = build_matches.values["repo"]
+      Ok(Build(@build_cmd.BuildParams::{ repo: repo_values[0], }))
     }
     Some(("diff", diff_matches)) => {
-      ignore(diff_matches)
+      let repo_values = diff_matches.values["repo"]
+      let since_values = diff_matches.values["since"]
+      let include_test_changes_values = diff_matches.values["include-test-changes"]
+      let include_test_changes_out = parse_bool_flag(
+        include_test_changes_values[0],
+        "--include-test-changes",
+      )
+      guard include_test_changes_out is Ok(include_test_changes) else {
+        return Err(include_test_changes_out.unwrap_err())
+      }
       Ok(
         Diff(@diff_cmd.DiffParams::{
-          repo: "",
-          since: None,
-          include_test_changes: false,
+          repo: repo_values[0],
+          since: if since_values[0] == "" { None } else { Some(since_values[0]) },
+          include_test_changes,
         }),
       )
     }
     Some(("check", check_matches)) => {
       ignore(check_matches)
       Ok(Check(@check_cmd.CheckParams::{ diff_file: "", policies_dir: "" }))
-    }
-    Some(("query", query_matches)) => {
-      let query_values = query_matches.values["query_file"]
-      let query_file = query_values[0]
-      Ok(Query(@query_cmd.QueryParams::{ query_file, }))
     }
     Some(("serve", serve_matches)) => {
       let port_values = serve_matches.values["port"]
@@ -377,11 +402,6 @@ pub fn run(command : CliInvocation) -> @cli.CliResult[String, @cli.CliError] {
       }
     Check(params) =>
       match @check_cmd.run(params) {
-        Ok(result) => Ok(@cli.display(result))
-        Err(error) => Err(error)
-      }
-    Query(params) =>
-      match @query_cmd.run(params) {
         Ok(result) => Ok(@cli.display(result))
         Err(error) => Err(error)
       }

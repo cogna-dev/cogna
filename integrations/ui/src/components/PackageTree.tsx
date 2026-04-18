@@ -1,4 +1,4 @@
-import type { PackageNode } from '../mock-data'
+import type { PackageNode } from '../types'
 import { cn } from '../lib/utils'
 import { FolderTree, Folder } from 'lucide-react'
 

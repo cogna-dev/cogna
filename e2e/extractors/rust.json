@@ -1,0 +1,18 @@
+{
+    "cases": [
+        {
+            "extractor": "rust",
+            "package": "aws-sdk-dynamodb",
+            "version": "1.110.0"
+        },
+        {
+            "extractor": "rust",
+            "package": "aws-config",
+            "version": "1.8.15"
+        },
+        {
+            "extractor": "rust",
+            "repo": "https://github.com/awslabs/aws-sdk-rust"
+        }
+    ]
+}
