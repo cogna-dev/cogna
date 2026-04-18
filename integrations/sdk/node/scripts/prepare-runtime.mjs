@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execSync } from 'node:child_process'
+import { execSync, spawnSync } from 'node:child_process'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(__dirname, '..')
@@ -13,6 +13,15 @@ function run(command, cwd) {
     stdio: 'inherit',
     env: process.env,
   })
+}
+
+function commandExists(command) {
+  const probe = process.platform === 'win32' ? 'where' : 'which'
+  const result = spawnSync(probe, [command], {
+    stdio: 'ignore',
+    env: process.env,
+  })
+  return result.status === 0
 }
 
 function shouldSkipBufGenerate(errorMessage) {
@@ -43,8 +52,27 @@ function tryBufGenerate() {
   }
 }
 
-tryBufGenerate()
-run('node ./scripts/export-sdk-runtime.mjs', repoRoot)
+const generatedMarker = resolve(packageRoot, 'src', 'generated', 'index.ts')
+if (commandExists('buf')) {
+  tryBufGenerate()
+} else if (!existsSync(generatedMarker)) {
+  throw new Error(
+    'buf is required to generate SDK bindings because src/generated artifacts are missing.',
+  )
+} else {
+  console.warn('buf is not installed; using checked-in SDK generated bindings.')
+}
+
+const runtimeTarget = resolve(packageRoot, 'src/runtime/sdk.runtime.js')
+if (commandExists('moon')) {
+  run('node ./scripts/export-sdk-runtime.mjs', repoRoot)
+} else if (!existsSync(runtimeTarget)) {
+  throw new Error(
+    'moon is required to generate SDK runtime because src/runtime/sdk.runtime.js is missing.',
+  )
+} else {
+  console.warn('moon is not installed; using checked-in SDK runtime artifact.')
+}
 
 const runtimeSource = resolve(
   repoRoot,
@@ -52,17 +80,18 @@ const runtimeSource = resolve(
   'runtime',
   'sdk.runtime.js',
 )
-if (!existsSync(runtimeSource)) {
+if (commandExists('moon') && !existsSync(runtimeSource)) {
   throw new Error(`MoonBit JS runtime not found at ${runtimeSource}`)
 }
 
-const runtimeTarget = resolve(packageRoot, 'src/runtime/sdk.runtime.js')
-mkdirSync(dirname(runtimeTarget), { recursive: true })
-copyFileSync(runtimeSource, runtimeTarget)
-const runtimeText = readFileSync(runtimeTarget, 'utf-8')
-const strippedRuntimeText = runtimeText.replace(/\/\/# sourceMappingURL=.*$/m, '')
-if (runtimeText !== strippedRuntimeText) {
-  writeFileSync(runtimeTarget, strippedRuntimeText)
+if (existsSync(runtimeSource)) {
+  mkdirSync(dirname(runtimeTarget), { recursive: true })
+  copyFileSync(runtimeSource, runtimeTarget)
+  const runtimeText = readFileSync(runtimeTarget, 'utf-8')
+  const strippedRuntimeText = runtimeText.replace(/\/\/# sourceMappingURL=.*$/m, '')
+  if (runtimeText !== strippedRuntimeText) {
+    writeFileSync(runtimeTarget, strippedRuntimeText)
+  }
 }
 
 const runtimeMapSource = resolve(
