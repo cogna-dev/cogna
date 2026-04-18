@@ -16,8 +16,8 @@ function run(command, cwd) {
 }
 
 function commandExists(command) {
-  const probe = process.platform === 'win32' ? 'where' : 'which'
-  const result = spawnSync(probe, [command], {
+  const lookupCommand = process.platform === 'win32' ? 'where' : 'which'
+  const result = spawnSync(lookupCommand, [command], {
     stdio: 'ignore',
     env: process.env,
   })
