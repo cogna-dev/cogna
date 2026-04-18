@@ -53,7 +53,8 @@ function tryBufGenerate() {
 }
 
 const generatedMarker = resolve(packageRoot, 'src', 'generated', 'index.ts')
-if (commandExists('buf')) {
+const bufAvailable = commandExists('buf')
+if (bufAvailable) {
   tryBufGenerate()
 } else if (!existsSync(generatedMarker)) {
   throw new Error(
@@ -64,7 +65,8 @@ if (commandExists('buf')) {
 }
 
 const runtimeTarget = resolve(packageRoot, 'src/runtime/sdk.runtime.js')
-if (commandExists('moon')) {
+const moonAvailable = commandExists('moon')
+if (moonAvailable) {
   run('node ./scripts/export-sdk-runtime.mjs', repoRoot)
 } else if (!existsSync(runtimeTarget)) {
   throw new Error(
@@ -80,7 +82,7 @@ const runtimeSource = resolve(
   'runtime',
   'sdk.runtime.js',
 )
-if (commandExists('moon') && !existsSync(runtimeSource)) {
+if (moonAvailable && !existsSync(runtimeSource)) {
   throw new Error(`MoonBit JS runtime not found at ${runtimeSource}`)
 }
 
