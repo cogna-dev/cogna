@@ -288,16 +288,12 @@ fn run_snapshot_case(
   let update = match @sys.get_env_var("COGNA_UPDATE_SNAPSHOTS") {
     Some("true") => true
     _ =>
-      match @sys.get_env_var("ACT") {
-        Some("true") => true
-        _ =>
-          match @env.args().search("--update-snapshots") {
+      match @env.args().search("--update-snapshots") {
+        Some(_) => true
+        None =>
+          match @env.args().search("--update") {
             Some(_) => true
-            None =>
-              match @env.args().search("--update") {
-                Some(_) => true
-                None => false
-              }
+            None => false
           }
       }
   }

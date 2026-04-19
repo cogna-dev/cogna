@@ -37,7 +37,7 @@ inputs:
 
 | 字段 | 作用 | 常见值 |
 |------|------|--------|
-| `profile` | 告诉 Cogna 这是哪种类型的仓库 | `go-module` / `rust-crate` / `terraform-module` / `openapi-spec` |
+| `profile` | 告诉 Cogna 这是哪种类型的仓库 | `go-module` / `rust-crate` / `terraform-module` / `openapi-spec` / `policy-bundle` |
 | `purl` | 这个仓库的唯一标识符（Package URL） | `pkg:golang/github.com/acme/sdk@v1.2.0` |
 | `inputs` | 要扫描的路径 | 默认为当前目录 `.` |
 
@@ -70,15 +70,33 @@ SPDX 文件写入项目根目录：
 
 ---
 
-## 第三步：准备 policy 目录
+## 第三步：构建 policy 仓库
 
-policy 不走 `cogna build` 主流程。默认情况下，`cogna init` 会把内置规则复制到当前项目的：
+如果你在维护一套规则（Rego policy），把 `profile` 设成 `policy-bundle` 后执行同样的命令：
 
-```text
-./.cogna/policies/
+```bash
+cd ./policy
+cogna build
 ```
 
-`cogna check` 会直接把这个目录传给 OPA。若要扩展规则，直接在该目录下添加或修改 `.rego` 文件即可。
+此时 `dist/` 目录会有所不同：
+
+```text
+./policy/dist/
+├── bundle.ciq.tgz       ← 给 `checks.policy` 引用的 policy bundle
+├── opa-bundle.tar.gz    ← OPA 原生 bundle，可直接用于 opa eval
+├── policy.rules.json    ← 规则目录（名称、描述、帮助链接），供人工查阅
+├── manifest.json
+└── checksums.txt
+```
+
+使用 policy bundle：
+
+```bash
+# 在 SDK 仓库目录里执行检查
+cd ./sdk
+cogna check
+```
 
 ---
 

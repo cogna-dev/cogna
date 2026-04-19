@@ -22,7 +22,7 @@ inputs:
     - openapi/**/*.yaml
 checks:
   format: sarif
-  policy: ./.cogna/policies
+  policy: ./dist/policy.ciq.tgz
 diff:
   includeTestChanges: false
 sbom:
@@ -45,13 +45,13 @@ mcp:
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | `schemaVersion` | 是 | 当前写 `ciq-config/v2` |
-| `profile` | 是 | 仓库类型：Go / Rust / Terraform / OpenAPI |
+| `profile` | 是 | 仓库类型：Go / Rust / Terraform / OpenAPI / policy |
 | `purl` | 是 | 当前仓库或规格的唯一标识 |
 | `source.repo` | 是 | 源仓库地址 |
 | `source.ref` | 是 | 默认分支或基线引用 |
 | `inputs.include` | 是 | 要扫描的文件 glob |
 | `checks.format` | 否 | 目前固定为 `sarif` |
-| `checks.policy` | 否 | `cogna check` 默认读取的 policy 目录路径 |
+| `checks.policy` | 否 | `cogna check` 默认读取的 policy bundle 路径 |
 | `diff.includeTestChanges` | 否 | `diff` 是否包含测试变化 |
 | `sbom.format` | 否 | 当前仅支持 `spdx` |
 | `sbom.dependencyBundles` | 否 | 是否为可解析的本地依赖额外产出 dependency bundle |
@@ -87,6 +87,7 @@ cogna serve --port 8787
 | `rust-crate` | Rust crate |
 | `terraform-module` | Terraform module |
 | `openapi-spec` | OpenAPI 规格仓库 |
+| `policy-bundle` | OPA policy bundle |
 
 ## 什么是 PURL？
 

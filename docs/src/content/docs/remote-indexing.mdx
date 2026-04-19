@@ -69,7 +69,7 @@ cogna mcp serve --port 3000
 curl -o policy.bundle.ciq.tgz \
   "http://localhost:8787/cache/v1/object?key=blob%2Fsha256%2Fpolicy"
 
-# 把下载得到的 policy 目录路径写入 cogna.yml -> checks.policy，然后执行检查
+# 把下载得到的 policy bundle 路径写入 cogna.yml -> checks.policy，然后执行检查
 cd ./sdk
 cogna check
 ```
@@ -80,4 +80,4 @@ cogna check
 
 - 了解本地构建与 bundle 产物：[构建索引](/docs/build-indexes)
 - 查看 MCP 接口能力：[AI 查询（MCP）](/docs/mcp)
-- 了解当前完整支持范围：[支持范围](/docs/providers)
+- 了解当前完整支持范围：[开发进度](/docs/progress)

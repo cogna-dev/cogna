@@ -134,22 +134,22 @@ jobs:
 - 当 `command: check` 且 `upload-sarif: true` 时，workflow 必须具备 `security-events: write` 权限；
 - `run-cogna` 默认读取 `working-directory/dist/check.sarif.json`，也可以通过 `sarif-file` 覆盖。
 
-## 用 act 做本地 remote extractor e2e 验证
+## 用 act 做本地端到端验证
 
-仓库内已经提供了 `.github/workflows/remote-e2e.yml` 与 `just act-e2e`：
+仓库内已经提供了 `.github/workflows/actions-e2e.yml` 与 `just action-e2e`：
 
 ```bash
-just act-e2e
+just action-e2e
 ```
 
-这会以 `linux/amd64` 容器运行 `act`，执行 remote extractor e2e 的 prepare / run 两阶段：
+这会以 `linux/amd64` 容器运行 `act`，完整覆盖：
 
-- setup MoonBit / Cogna / Go / Rust / Terraform
-- restore cache（act 本地可复用缓存）
-- `scripts/ci/prepare-remote-e2e.sh` 预热依赖
-- `scripts/ci/run-remote-e2e.sh` 执行 remote case
-
-注意：`act` 主要用于复现 workflow 编排；它不应被视为 GitHub hosted cache backend 的等价环境。
+- `setup-moonbit`
+- `setup-cogna`
+- `run-cogna build`
+- `run-cogna diff`
+- `run-cogna check`
+- `ACT=true` 分支下的 SARIF payload capture 与断言
 
 ---
 
@@ -162,7 +162,7 @@ just act-e2e
 | `./sdk/dist/diff.json` | 结构化变更列表，可供脚本解析或人工阅读 |
 | `./sdk/dist/check.sarif.json` | 标准 SARIF，可上传到 GitHub Code Scanning 等平台 |
 | `./sdk/dist/bundle.ciq.tgz` | bundle 归档，可通过本地 cache / HTTP cache proxy 复用或分发 |
-| `./sdk/.cogna/policies/` | policy 目录；`check` 会直接把它传给 OPA |
+| `./policy/dist/bundle.ciq.tgz` | policy bundle，版本化管理策略规则 |
 
 ---
 

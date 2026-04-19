@@ -1,0 +1,136 @@
+---
+import Layout from "@/layouts/home.astro"
+import { DownloadTabs } from "@/components/download/download-tabs"
+
+const downloadData = {
+  desktop: {
+    title: "Desktop 应用",
+    description: "原生桌面应用，提供完整的图形界面体验",
+    platforms: [
+      {
+        name: "macOS",
+        icon: "apple",
+        variants: [
+          { label: "Apple Silicon (M1/M2/M3)", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-darwin-arm64.dmg" },
+          { label: "Intel", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-darwin-x64.dmg" },
+        ],
+      },
+      {
+        name: "Linux",
+        icon: "linux",
+        variants: [
+          { label: "AppImage (x64)", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-linux-x86_64.AppImage" },
+          { label: "deb (x64)", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-linux-amd64.deb" },
+          { label: "rpm (x64)", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-linux-x86_64.rpm" },
+        ],
+      },
+      {
+        name: "Windows",
+        icon: "windows",
+        variants: [
+          { label: "Installer (x64)", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-win32-x64.exe" },
+          { label: "Portable (x64)", url: "https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-win32-x64-portable.zip" },
+        ],
+      },
+    ],
+  },
+  cli: {
+    title: "CLI 工具",
+    description: "命令行工具，适合 CI/CD 和脚本集成",
+    installMethods: [
+      {
+        name: "cURL (macOS/Linux)",
+        icon: "terminal",
+        code: `curl -fsSL https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.sh | sh`,
+      },
+      {
+        name: "PowerShell (Windows)",
+        icon: "terminal",
+        code: `irm https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.ps1 | iex`,
+      },
+    ],
+  },
+  sdk: {
+    title: "SDK",
+    description: "多语言 SDK，支持 MoonBit 和 Node.js 生态",
+    moonbit: {
+      install: `moon add cogna/sdk`,
+      usage: `import cogna/sdk
+
+let client = @sdk.Client::new("http://localhost:8787")
+let result = client.query("github.com/example/package")!`,
+    },
+    node: {
+      npm: {
+        install: `npm install @cogna-dev/sdk`,
+        usage: `import { Client } from '@cogna-dev/sdk';
+
+const client = new Client('http://localhost:8787');
+const result = await client.query('github.com/example/package');`,
+      },
+      pnpm: {
+        install: `pnpm add @cogna-dev/sdk`,
+        usage: `import { Client } from '@cogna-dev/sdk';
+
+const client = new Client('http://localhost:8787');
+const result = await client.query('github.com/example/package');`,
+      },
+      yarn: {
+        install: `yarn add @cogna-dev/sdk`,
+        usage: `import { Client } from '@cogna-dev/sdk';
+
+const client = new Client('http://localhost:8787');
+const result = await client.query('github.com/example/package');`,
+      },
+      bun: {
+        install: `bun add @cogna-dev/sdk`,
+        usage: `import { Client } from '@cogna-dev/sdk';
+
+const client = new Client('http://localhost:8787');
+const result = await client.query('github.com/example/package');`,
+      },
+    },
+  },
+  vscode: {
+    title: "VSCode 插件",
+    description: "Visual Studio Code 官方扩展",
+    extensionId: "xaclabs.cogna",
+    features: [
+      "运行分析：按 build -> diff -> check 顺序调用本地 cogna",
+      "加载 diagnostics：读取 dist/check.sarif.json 并在编辑器中标注问题",
+      "打开规则文档：根据 SARIF 中的 helpUri 跳转到稳定的策略文档页",
+    ],
+    settings: [
+      { name: "cogna.cliPath", description: "CLI 可执行文件路径" },
+      { name: "cogna.workingDirectory", description: "工作目录路径" },
+      { name: "cogna.runOnSave", description: "保存时自动运行分析" },
+      { name: "cogna.autoOpenPolicyDocs", description: "自动打开规则文档" },
+    ],
+  },
+  ai: {
+    title: "AI",
+    description: "AI 集成工具，支持多种 AI 工作流",
+  },
+}
+---
+
+<Layout title="下载" description="下载 Cogna CLI、Desktop、SDK 和 VSCode 插件">
+  <div class="relative min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
+    <div class="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+
+    <div class="relative">
+      <div class="container mx-auto px-4 py-16 md:py-24">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
+            下载
+          </h1>
+          <p class="text-lg md:text-xl text-muted-foreground leading-relaxed">
+            选择适合你的安装方式，开始体验 Cogna 的强大功能
+          </p>
+        </div>
+
+        <DownloadTabs client:load data={downloadData} />
+      </div>
+    </div>
+  </div>
+</Layout>

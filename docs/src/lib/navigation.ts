@@ -16,6 +16,7 @@ export interface FooterGroup {
 export const topNavigation: NavItem[] = [
   { title: "用户文档", href: "/docs" },
   { title: "贡献者文档", href: "/contrib/introduction" },
+  { title: "下载", href: "/download" },
   { title: "GitHub", href: "https://github.com/cogna-dev/cogna" },
 ]
 
@@ -38,21 +39,23 @@ export const userSidebar: NavGroup[] = [
   {
     title: "集成",
     items: [
+      { title: "Desktop", href: "/docs/sdk" },
       { title: "CLI", href: "/docs/cli" },
+      { title: "SDK", href: "/docs/sdk" },
       { title: "IDE", href: "/docs/ide" },
-      { title: "Web", href: "/docs/web" },
+      { title: "SKILL", href: "/docs/skill" },
       { title: "MCP", href: "/docs/mcp" },
-      { title: "持续集成", href: "/docs/ci" },
+      { title: "CI & CD", href: "/docs/ci" },
     ],
   },
   {
     title: "生态系统",
     items: [
-      { title: "核心配置", href: "/docs/config" },
-      { title: "Go", href: "/docs/go" },
-      { title: "Rust", href: "/docs/rust" },
-      { title: "Terraform", href: "/docs/terraform" },
-      { title: "OpenAPI", href: "/docs/openapi" },
+      { title: "配置", href: "/docs/config" },
+      { title: "Go (beta)", href: "/docs/go" },
+      { title: "Rust (alpha)", href: "/docs/rust" },
+      { title: "Terraform (alpha)", href: "/docs/terraform" },
+      { title: "OpenAPI (alpha)", href: "/docs/openapi" },
     ],
   },
   {
@@ -70,6 +73,7 @@ export const contributorSidebar: NavGroup[] = [
     title: "开始",
     items: [
       { title: "贡献指南", href: "/contrib/introduction" },
+      { title: "开发进度", href: "/docs/progress" },
     ],
   },
   {
@@ -96,7 +100,7 @@ export const footerMenus: FooterGroup[] = [
       { title: "快速开始", href: "/docs/quickstart" },
       { title: "用户文档", href: "/docs" },
       { title: "CLI", href: "/docs/cli" },
-      { title: "支持范围", href: "/docs/providers" },
+      { title: "产品状态", href: "/docs/progress" },
     ],
   },
   {

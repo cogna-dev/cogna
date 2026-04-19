@@ -1,0 +1,133 @@
+---
+title: 开发进度
+description: Cogna 当前真实能力、当前 cleanup 阶段，以及计划与代码之间的 gap 对账。
+order: 12
+---
+
+# 开发进度
+
+> 最后更新时间：2026-04-18（本轮：继续推进 A005 cache-first architecture redesign。`spec/cache.md` 已从旧的 `manifest + blob` 方案重写为 **package-atomic bundle cache**：`get/put` 的原子单位现在明确为“一个 package 的完整 `bundle.ciq.tgz`”，并将 `storeDir` 上提为 `cache.storeDir`；`src/http/` 已抽出 shared HTTP/query helper，`src/cache/http/` 与 `src/cmd/serve/` 已切到新 helper；`src/cmd/serve/main_wbtest.mbt` 与 `src/cmd/build/local_index.mbt` 已修正为 cache-first config shape；legacy `src/cmd/publish/`、`src/cmd/registry/` 与 `src/registry/` 已删除；发布流程现已新增 Electron 桌面端安装包构建：`release.yml` 会在 tag release 时并行产出 Windows x64/arm64、macOS x64/arm64 与 Linux x64 的 installer artifacts，并与 CLI archives 一并挂到 GitHub Release；同时已补充 release integrity 收口：桌面包版本会在 workflow 中同步到 release tag，GitHub Actions 已固定到 commit SHA，checkout 只允许真实 tag ref，Electron 下载改回官方源；本轮还新增了 `cogna open <folder>` 命令与 Electron deep-link / single-instance workspace wake flow，桌面 app identity 已收口为 `dev.xaclabs.cogna`，并补充了 `spec/desktop.md` 统一定义 docs site、CLI、desktop 与 cache-first runtime 的整体关系；另外已新增 `spec/review.md`，把 `./e2e/repo/` 固定为本地人工验收基线，用于围绕 repo 联合验收 CLI 与 Desktop 的用户可见行为；本轮还新增 `spec/plan.md`，冻结下一轮 `src/sdk` / `src/cmd` / `integrations/sdk/node` / `integrations/desktop` 收口计划：目标是让 build/diff/query 真正归位 `src/sdk/`、删除 CLI query、用 `buf generate + moon build --target js` 重建自洽 Node SDK，并让 Desktop 通过 main/preload IPC 消费真实 `@cogna-dev/sdk`，最终移除 mock data。当前 active stage：A005 cache-first architecture redesign。）
+>
+> 本页是唯一的 progress source of truth。
+
+## 当前产品状态
+
+Cogna 当前以 **local-first / cache-driven** 方式工作：围绕 `cogna.yml`、本地 bundle、本地 cache、HTTP cache proxy、MCP 与 SARIF 输出形成单机闭环。A005 的设计冻结已经更新为 **package-atomic bundle cache**：`get/put` 的语义单位是完整 package bundle，而不是 manifest + 多 blob；build 在 `cache.type=http` 时采用 `local miss -> http hit -> 回填 local` 的 read-through 路径复用依赖结果。当前剩余工作主要是继续把代码、文档与辅助集成全面对齐到这份新设计真相源。
+
+| 能力 | 当前状态 |
+|------|----------|
+| 构建代码仓库 / API 规格 bundle | ✅ 已支持 |
+| 版本对比与结构化 diff | ✅ 已支持（Go / Rust / Terraform / OpenAPI） |
+| policy 检查与 SARIF 输出 | ✅ 已支持 |
+| CLI / MCP 查询 bundle 内容 | ✅ 已支持 |
+| native-vs-lsp parity | ✅ 已支持（同一 canonical 输出上零差异） |
+| 真实 benchmark reporting | ✅ 已支持（wall/cpu/RSS 均为 Python + `psutil` 实测） |
+| boundary cleanup | ✅ 已完成 |
+
+## 当前命令面（真实代码）
+
+- `cogna init`
+- `cogna build`
+- `cogna diff`
+- `cogna check`
+- `cogna serve`
+- `cogna open <folder>`
+- `cogna cache list|add|remove`
+- `cogna mcp serve|status`
+
+## 当前 cleanup 计划对账总览
+
+| 计划项 | 计划目标 | 当前代码 / 证据 | 状态 | 仍有 gap |
+|--------|----------|------------------|------|----------|
+| C0 | truth reset | `spec/plan.typ` 已改为 `lib = reusable only` 的 cleanup-first 计划；本页已切到 boundary cleanup 主线 | ✅ 已完成 | 后续只需继续让 active stage 与实际迁移同步 |
+| C1 | repo-noise cleanup | 已清掉当前分支中仍被追踪且命中 `.gitignore` 规则的顶层 `pkg.generated.mbti`；其余 `examples/*/snapshots/cogna/*` 当前仍以 fixture 形态存在，需与后续 fixture policy 一并收口 | ✅ 已完成 | 后续只需在更大清理阶段继续统一 fixture / generated policy |
+| C2 | `sbom -> src/sbom` | 已进一步完成反向收口：原本本地 `src/sbom/**` 已删除；dependency snapshot 能力现已继续收口到 `src/core/snapshot/**`；`src/cmd/build` 现改用外部 `cogna-dev/sbom@0.1.0` + 本地 snapshot helper | ✅ 已完成 | SPDX 产物现为外部库生成的 SPDX 2.3 JSON，而非旧的 SPDX 3.0 JSON-LD |
+| C3 | `policy_catalog -> src/policy` | `src/lib/policy_catalog/**` 已迁到 `src/policy/**`，且 `build` / `check` / `scripts/gendoc` 已改用新包路径 | ✅ 已完成 | 后续只需随 README / docs 统一收口 |
+| C4 | `extract -> src/extractors` | `src/lib/extract/**` 先迁到 `src/extractors/**`，本轮进一步把共享 record/text/state/emit helper 收口到 `src/core/extract/**`；`src/extractors/` 现只保留 language-specific subpackages，`src/cmd/build` 与各 extractor package 已同步改用新包路径 | ✅ 已完成 | 后续只需继续按更大阶段处理 Terraform/OpenAPI 与 runtime wrapper 收口 |
+| C5 | runtime wrapper 删除 | 已新增 `src/async/` 作为共享 native-only host adapter；`registry` / `publish` / `mcp` / `check` 已收口为 native-only；旧 runtime/shell wrapper 已删除；CLI/Docker integration entrypoint 已迁到 `integrations/`，并补上 detached spawn stdio 收口避免 native e2e hang | ✅ 已完成 | 后续只需在日常维护中继续守住 native-only 验证与 entrypoint 路径一致性 |
+| C6 | 删除 `src/native` | `extract_native()` 已收口为直接调用 in-repo MoonBit extractor（`collect_records()`）；`src/native/` 已删除；bench/e2e 的 `COGNA_NATIVE_*` override 路径已全部移除 | ✅ 已完成 | 后续只需继续保持 native author path 与 parity 验证稳定 |
+| C7 | README / warning / 待提交整理 | `src/` 与 `src/lib/` 的独立顶层 package README 已补齐；mixed-target warning 已通过 target-specific package、`supported_targets = "native"` 与安全 stub 引用收口；`src/cmd/**/tmp_*` 写路径已全部迁到 `/tmp/cogna-*`；旧 tracked generated artifacts 已清除 | ✅ 已完成 | — |
+
+## 已完成摘要（summary-only）
+
+- A003 已从旧 helper-binary / dual-snapshot 叙事收口为 single canonical output；
+- `src/e2e/bench.py` 已成为真实 benchmark harness，wall / CPU / RSS 均来自 Python + `psutil` 的子进程树实测；
+- `spec/A003-benchmark-report.typ` 已改为 `native vs lsp` 的真实时间 / CPU / 内存 / diff 对照；
+- Go native helper 已为 `--files` 场景加入 selected-file AST fast path，phase-5 benchmark 中 native 已反超 lsp；
+- `src/lib/parsec` 已删除；原本挂在其中的 extractor text helper 已先迁回 `src/extractors/`，本轮又进一步收口到 `src/core/extract/`；`src/lib/hcl` 当前改为直接依赖外部 `cogna-dev/parkit/nom`；同时 `src/cmd/build/extractor.mbt` 中的 Terraform / OpenAPI 逻辑已下沉到 `src/extractors/terraform/` 与 `src/extractors/openapi/`，build 入口改为 thin dispatch；MCP server 现直接由 `src/cmd/mcp/core` 基于外部 `cogna-dev/mcp-sdk` 装配，`src/lib/` 的复用库边界比之前更清晰；
+- `src/` 下遗留的 `derive(Show)` deprecated syntax 已全部收口为显式 `Show` impl，并补齐了 command / policy / sbom / e2e helper 等本轮触达包的调试输出；
+- runtime wrapper cleanup 已进一步完成：`src/lib/shell/` 与 `src/lib/server-runtime/` 已删除，相关 feature slice 直接改用 `moonbitlang/async`、`moonbitlang/async/process`、`moonbitlang/async/http` 与 `moonbitlang/async/socket`；
+- registry transport/layout cleanup 已完成：`src/async/` 与 `src/lib/registry/` 均已删除；新的 shared native-only transport adapter 位于 `src/shell/`；`src/registry/` 根目录已去掉 loose `.mbt` / `moon.pkg`，只保留 `client/` 与 `server/` 子 package；server 端 HTTP surface 现由 `cogna-dev/mapi` contract + 内联 accept loop 承载，repo 根目录也已补充 6-route `openapi.json`；
+- 仓库卫生清理已继续推进：已删除 tracked `src/**/pkg.generated.mbti`、`src/native/rust/target/**`、`src/native/go/go` 与 `src/cmd/registry/tmp_*`；当前 native 语义已完全收口到 in-repo MoonBit extractor，`src/native/` 目录本身也已删除。
+- C6 / C7 已完成：`extract_native()` 已重写为直接调用 in-repo MoonBit extractor（`collect_records()`），不再依赖任何外部 helper binary；native-only e2e 已拆到 `src/e2e/native/` 与 `src/e2e/review/native/`；此前的 `warn-list: "-29"` stopgap 已收口，`moon check --target wasm` / `moon check --target native`、`moon test --target wasm` / `moon test --target native`、`moon build --target native`、`pnpm build` 与 Typst compile 已全部通过。
+- `src/lib/hcl` 已从本地 `src/lib/parsec` line-combinator 实现进一步切到外部 `cogna-dev/x/hcl` 的 typed `Document` AST 作为主解析路径，并在本地 adapter 中补回 `line_no` / `signature` / immediate-attrs 兼容语义；对 `cogna-dev/x/hcl` 当前尚不接受的 Terraform 扩展表达式则保留 fallback 路径。`parse_hcl_file(lines)` 与 `HclFile` / `HclBlock` / `HclAttr` public API 保持不变，`moon test src/lib/hcl/parse_test.mbt --target native`、`moon test src/extractors --target native` 与 `moon test src/cmd/build/snapshot_test.mbt --target native` 已通过。
+- `spec/design.typ` 已补充为当前实现导向的设计说明草案：收口了当前 CLI surface、`cogna.yml` / `ciq-config/v2`、SPDX-first bundle 产物、`ciq-opa-bundle/v1`、registry `bundleId` / `downloadUrl` / `ETag` 语义，以及 MCP `serve|status` / `/rpc` / `/health` / tool surface 等真实 contract。
+- A004 JS SDK / CLI 边界第一批实现已落地：`integrations/sdk/node/` 已替换错误的 `integration/sdk/node/` 路径，repo 根目录已补 `pnpm-workspace.yaml`，`@cogna/sdk` 对外 `.d.ts` 中的大量 `unknown` 已收紧为 CIQ/local-index 相关结构，且 `node integrations/sdk/node/scripts/build.mjs`、Node smoke、`npm pack --dry-run` 与 `moon check src/sdk/contracts src/sdk/index src/sdk/query --target js` 均已通过。
+- A004 当前主线仍为 proto-only 五文件 contract，但 `Query` 已进入第二轮重构：不再继续围绕 selector/outlines 的专用接口增长，而是把 bundle 抽象成虚拟二维表，并通过 SQL 风格的 `QueryInput.sql` / `QueryResultSet` / `QueryCatalog` 暴露统一查询面。
+- SBOM 迁移已完成：`src/sbom/` 本地实现已删除；dependency bundle 所需的文件清单/摘要能力已从早期的 `src/lib/snapshot/` 继续收口到 `src/core/snapshot/`；`src/cmd/build` 已切换到外部 `cogna-dev/sbom@0.1.0` 扫描与 SPDX 导出，同时保留 Cogna 自定义 NDJSON schema。
+- desktop review demo 已落地：`spec/ui.md` 现已收口 `Build` / `Diff` / `FetchPackages` / `QueryOutlines` / `Query` 的桌面信息架构；`integrations/desktop/` 已从默认欢迎页替换为三栏 API explorer，包含 package tree、outlines/query pane、detail pane，并通过 `main/preload` IPC 接入真实 `@cogna-dev/sdk` 数据链路；当前 Node SDK 的 runtime 准备脚本仍依赖仓库内 `_build` 产物路径，后续可继续收口为更稳定的 runtime 定位方案。
+
+## 当前 active stage
+
+当前 active stage 是 #strong[`A005 cache-first architecture redesign（Stage A 设计冻结）`]。当前主线工作已从上一轮 proto-first / SDK surface 收口切到下一轮存储与分发模型重构：目标是废弃 `publish` / `registry` / registry-style bundle 工作流，把远程复用统一收口到 `cache.get` / `cache.put` 两个核心动作，并明确 `get/put` 的原子单位是**一个 package 的完整 `bundle.ciq.tgz`**；build 在默认 local cache 上运行，并在 `cache.type=http` 时采用“remote read-through -> local mirror”的方式复用依赖结果，而不是重新构建。为此，本轮已完成现状盘点，并重写 `spec/cache.md` 作为新的设计真相源。
+
+### 当前阶段目标
+
+冻结 registry -> cache 的目标形状，明确：
+
+1. 新的 config 应只保留 `cache`，且支持 `local` / `http` 两类 backend，并将本地落盘目录提升为 `cache.storeDir`；
+2. 新的命令面应删除 `cogna publish` 与 `cogna registry ...`，改为 `cogna serve` 与 `cogna cache list/add/remove`；
+3. `build` 对依赖的复用路径应改为 `local miss -> http hit -> 回填 local` 的 read-through 行为；
+4. 旧的 bundle upload / receipt / versions API 应退场，由“一个 package = 一个完整 bundle object”的 cache 模型替代。
+
+### 当前阶段执行清单
+
+- [x] 已完成：盘点 `src/cmd/main/main.mbt`，确认当前 CLI 仍包含 `publish`、`registry serve`、`registry status`，帮助文本与 dispatch 均仍以 registry/publish 为中心；
+- [x] 已完成：盘点 `src/config/types.mbt`、`src/config/defaults.mbt`、`src/config/load.mbt`、`src/config/validate.mbt` 与 `src/cmd/init/config.mbt`，确认当前配置模型仍内建 `PublishSettings` 与 `RegistrySettings`，且尚无 `cache` section；
+- [x] 已完成：盘点 `src/cmd/publish/`、`src/cmd/registry/`、`src/registry/client/`、`src/registry/server/` 与 `openapi.json`，确认当前远程 contract 仍深度耦合 bundle upload / resolve / receipt / bundleId / versions 语义；
+- [x] 已完成：盘点可复用实现，确认可复用 `src/registry/server/storage.mbt` 的 atomic write/lockdir 模式、`src/registry/client/http.mbt` 的 HTTP client、`src/registry/server/server.mbt` 的 router/server 模式，以及 `src/core/snapshot/main.mbt` 的 sha256/content digest helper；
+- [x] 已完成：重写 `spec/cache.md`，冻结 package-atomic cache-first 设计：核心 backend 接口仅 `get/put`，但原子单位为“一个 package 的完整 `bundle.ciq.tgz`”；`storeDir` 已提升为 `cache.storeDir`；`cogna serve` 改为 HTTP cache proxy，`cache list/add/remove` 先作为 local cache 管理面；
+- [x] 已完成：新增 `cogna open <folder>` command surface、Electron deep-link / single-instance workspace wake flow，以及 `spec/desktop.md` 的 docs/CLI/desktop 整体设计；
+- [x] 已完成：新增 `spec/review.md`，以 `./e2e/repo/` 为本地人工验收基线，明确 repo-centric 的 CLI / Desktop 手工验收步骤与失败判定；
+- [x] 已完成：长尾文档与辅助集成中的旧 registry/publish 叙事已完成清扫，并完成 targeted verification（以当前 docs/spec/repo grep 与关键构建/测试通过为准）。
+
+## 其他阶段（summary-only）
+
+| 阶段 | 目标 | 进入前提 |
+|------|------|----------|
+| C0 | truth reset | ✅ 已完成 |
+| C1 | repo-noise cleanup | ✅ 已完成 |
+| C2 | `sbom -> src/sbom` | ✅ 已完成 |
+| C3 | `policy_catalog -> src/policy` | ✅ 已完成 |
+| C4 | `extract -> src/extractors` | ✅ 已完成 |
+| C5 | runtime wrapper 删除 | ✅ 已完成 |
+| C6 | 删除 `src/native` | ✅ 已完成 |
+| C7 | README / warning / 待提交整理 | ✅ 已完成 |
+
+## 需要注意的当前 reality
+
+- `policy_catalog` 当前只服务本仓库的 build/check 与 docs 生成脚本，不适合作为 `src/lib/` 包继续存在；
+- `policy` / `snapshot` / shared extract helper / build-diff-query facade 已进一步完成 domain 收口：当前统一位于 `src/core/policy/`、`src/core/snapshot/`、`src/core/extract/`、`src/core/api/`；`src/core/` 根目录不再保留 loose `.mbt` / `moon.pkg`；
+- `src/extractors/` 现只保留 `go/`、`rust/`、`terraform/`、`openapi/` 四个 language-specific subpackages；共享 helper 已迁到 `src/core/extract/`，且 `src/cmd/build` 与各 extractor package 已切换到新包路径；
+- `src/cmd/build/extractor.mbt` 中一批纯转发 wrapper 已移除，Terraform / OpenAPI 解析逻辑也已迁到 `src/extractors/terraform/` 与 `src/extractors/openapi/`；当前保留的主要是 orchestration、policy extraction 与 backend probe；
+- 当前分支里已确认并删除一批 tracked repo-noise：`src/**/pkg.generated.mbti`、`src/native/rust/target/**`、`src/native/go/go` 与 `src/cmd/registry/tmp_*`；`examples/*/snapshots/cogna/*` 仍按 fixture / baseline 处理，当前不应盲删；
+- `src/sbom/` 已删除；dependency bundle 所需的文件清单与内容摘要能力现在位于 `src/core/snapshot/`；`src/cmd/build` 的 SBOM 扫描与 SPDX 导出则改由外部 `cogna-dev/sbom` 提供；
+- `src/lib/` 下旧的 reusable parser shim 已进一步收口：`src/lib/hcl` 已删除，Terraform extractor 现直接依赖 `cogna-dev/x/hcl@0.1.2`；`registry` 已整体迁回 `src/registry/client` + `src/registry/server` vertical，`src/lib/registry/` 已删除；`parsec` 已删除，手写 `json-schema` / `ciq-schema` 路线也已删除，不再作为仓库内复用库维护；
+- Terraform extractor 现直接消费 `cogna-dev/x/hcl@0.1.2` 的 typed AST 与 `Position { line, col }`，不再经过本地 `HclFile` adapter；canonical terraform snapshot baseline 已同步刷新，location / source_refs 现在会携带 upstream column metadata；
+- `src/` 下原有 `derive(Show)` deprecated warning 已全部清掉；此前 mixed-target 包上的 `warn-list: "-29"` stopgap 也已收口：当前策略是按需要拆 target-specific package、对 truly native-only 包使用 `supported_targets = "native"`，并在 wasm/js stub 中保留安全的 import liveness；
+- `moon test src/lib/hcl src/lib/registry` 与 `moon test src/cmd/mcp/core --target native` / `moon test src/cmd/mcp/main_test.mbt --target native` 已通过；MCP 相关逻辑现以标准 `/mcp` HTTP/SSE server 为准，由 `cmd/mcp/core` 的装配层测试覆盖；
+- registry / command transport 现统一通过 `src/shell/` 共享 package 暴露；`cmd/check`、`cmd/mcp`、`cmd/registry`、`cmd/build` 与 `bench` 已改用该 shared adapter，旧 `src/async/` 已删除；
+- C6 已完成：`src/native/` 已删除，`extract_native()` 现在直接调用 in-repo MoonBit extractor（`collect_records()`），不再有任何外部 binary 依赖；bench / e2e parity 仍然通过，因为 native 与 canonical 路径均调用同一 `collect_records()` 实现；`bench_wbtest.mbt` 已移除 `COGNA_NATIVE_*` override 逻辑；
+- `examples/*/snapshots/cogna/*` 当前是 snapshot test baseline，而不是本轮 C1 可盲删的 repo-noise；是否继续保留这组 fixture 需要与更大的 baseline policy 一并决定。
+- `moon check src/cmd/build`、`moon test src/cmd/build`、`moon test src/extractors`、`moon test src/e2e/extractor_parity_test.mbt`、`moon test src/e2e/lsp_extractor_test.mbt` 已通过；本轮 Terraform / OpenAPI extractor package split 之后，canonical snapshot baselines 也已同步刷新；
+- `moon check src/registry`、`moon check src/lib/registry`、`moon check src/cmd/registry`、`moon check src/e2e`、`moon check src/e2e/native`、`moon test src/cmd/registry --target wasm`、`moon test --target native` 已通过，说明当前 registry runtime slice 与 native-only e2e split 后行为保持稳定；
+- `moon check src/cmd/mcp/core src/cmd/mcp --target native`、`moon test src/cmd/mcp/core --target native` 与 `moon test src/cmd/mcp/main_test.mbt --target native` 已通过；当前 MCP 面已切到标准 `/mcp` endpoint 与 `streamable-http` descriptor 语义；
+- `moon check src/cmd/registry/shell`、`moon check src/cmd/registry`、`moon test src/cmd/registry --target wasm` 已通过，说明 registry shell slice 行为保持稳定；
+- `moon check src/cmd/check/shell`、`moon check src/cmd/check`、`moon test src/cmd/check` 已通过，说明 check shell slice 行为保持稳定；
+- `moon check src/cmd/build/shell`、`moon check src/cmd/build`、`moon test src/cmd/build` 已通过，说明 build shell slice 行为保持稳定；
+- `moon check src/e2e/shell`、`moon check src/e2e`、`moon check src/e2e/native`、`moon check src/e2e/review/native`、`moon test --target wasm`、`moon test --target native` 已通过，说明 portable / native-only e2e package split 后行为保持稳定；
+- `moon check src/scripts/benchmark/shell`、`moon check src/scripts/benchmark`、`moon test src/scripts/benchmark --target native` 已通过，说明 benchmark script shell slice 行为保持稳定；
+- `scripts/benchmark` 的 wbtest 已移除 `configure_native_engine_override` / `clear_native_engine_override`；benchmark harness 不再有 helper binary probe 路径；`moon check --target native` 0 error，`moon test src/cmd/build` 22/22 通过（C6 验证）；
+- 本轮结构收口后需重新验证 `src/core/snapshot` / `src/core/policy` / `src/core/extract` / `src/core/api` 与相关 command packages；验证完成后再更新这里的通过命令；
+- `moon test --target wasm`、`moon test --target native`、`moon build --target native`、`pnpm build` 与 `typst compile spec/plan.typ` / `typst compile spec/A003-native-extractor.typ` 已通过，说明本轮 generated cleanup、warning 收口与 docs/spec 同步未破坏行为。
+- A004 MoonBit 侧第一批已落地：`src/sdk/contracts/`、`src/sdk/index/`、`src/sdk/query/` 已创建；`cmd/query` 已重构为 `@sdk_query` 薄封装（10/10 wasm tests 通过）；`cmd/build` 的 `extract_canonical` / `extract_native` 已委托 `@sdk_index`，`profile_mode_native` 已从 `cmd/build` 删除（21/21 native tests 通过）。
