@@ -48,7 +48,6 @@ function ChangeRow({ change }: { change: DiffChange }) {
       aria-expanded={expanded}
       data-row-key={rowKey}
     >
-      {/* Compact row */}
       <div className="flex items-center gap-2 px-3 py-1.5">
         {hasSig ? (
           expanded
@@ -69,12 +68,11 @@ function ChangeRow({ change }: { change: DiffChange }) {
           {change.message}
         </span>
       </div>
-      {/* Expanded signatures */}
       {expanded && (
         <div className="flex flex-col gap-1 px-3 pb-2 ml-10">
           {change.beforeSignature && (
             <div className="flex gap-2 p-2 rounded bg-red-500/5 border border-red-500/10 text-xs font-mono overflow-x-auto">
-              <span className="text-red-500 select-none shrink-0">−</span>
+              <span className="text-red-500 select-none shrink-0">-</span>
               <pre className="text-foreground/80 whitespace-pre-wrap">{change.beforeSignature}</pre>
             </div>
           )}
@@ -97,7 +95,6 @@ function ChangeRow({ change }: { change: DiffChange }) {
 }
 
 interface DiffViewProps {
-  /** If true, the Run Diff and base/target inputs are disabled with a placeholder message */
   readonly?: boolean
   initialResult?: DiffResult | null
   onRunDiff?: (params: {
@@ -144,7 +141,6 @@ export function DiffView({
 
   return (
     <div className="flex flex-col flex-1 h-full overflow-hidden bg-background">
-      {/* Control Bar */}
       <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-border bg-muted/10 shrink-0">
         <div className="flex items-center gap-2">
           <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
@@ -195,19 +191,17 @@ export function DiffView({
         </div>
       ) : (
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Summary row - compact */}
           <div className="flex items-center gap-4 px-4 py-2 border-b border-border/50 bg-muted/5 shrink-0 text-xs">
             <span className="text-green-400 font-semibold">+{result.summary.added} added</span>
-            <span className="text-red-400 font-semibold">−{result.summary.removed} removed</span>
+            <span className="text-red-400 font-semibold">-{result.summary.removed} removed</span>
             <span className="text-blue-400 font-semibold">~{result.summary.changed} changed</span>
-            <span className="text-yellow-400 font-semibold">⚑{result.summary.deprecated} deprecated</span>
+            <span className="text-yellow-400 font-semibold">?{result.summary.deprecated} deprecated</span>
             <span className="ml-auto text-muted-foreground">
               {allChanges.length} total
               {filteredChanges.length !== allChanges.length && ` · ${filteredChanges.length} shown`}
             </span>
           </div>
 
-          {/* Filter + show-test-changes bar */}
           <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/30 shrink-0">
             <div className="flex gap-1.5">
               {(['all', 'added', 'removed', 'changed', 'deprecated'] as const).map((kind) => (
@@ -236,7 +230,6 @@ export function DiffView({
             </label>
           </div>
 
-          {/* Change list - high density */}
           <div className="flex-1 overflow-y-auto">
             {filteredChanges.length === 0 ? (
               <div className="text-center py-12 text-sm text-muted-foreground">

@@ -15,8 +15,7 @@ export default defineConfig({
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src'),
-        '@cogna/ui': resolve(__dirname, '../ui/src')
+        '@renderer': resolve('src/renderer/src')
       }
     },
     plugins: [react(), tailwindcss()]

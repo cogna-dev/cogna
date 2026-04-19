@@ -15,19 +15,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup MoonBit
-        uses: ./integrations/actions/setup-moonbit
+        uses: cogna-dev/moonbit-actions/setup@v0
 
       - name: Setup Cogna
         uses: ./integrations/actions/setup-cogna
 
       - name: Check
-        run: moon check
+        run: moon check --target native
 
       - name: Test
-        run: moon test
+        run: moon test --target native
 
       - name: Build
-        run: moon build
+        run: moon build --target native
 
       - name: Smoke test run-cogna action
         uses: ./integrations/actions/run-cogna
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup MoonBit
-        uses: ./integrations/actions/setup-moonbit
+        uses: cogna-dev/moonbit-actions/setup@v0
 
       - name: Verify moon.mod.json version is well-formed semver
         shell: bash
@@ -57,6 +57,7 @@ jobs:
           echo "Version format OK: $version"
 
       - name: Dry-run SDK publish
+        if: ${{ !env.ACT }}
         run: moon publish --dry-run
 
   sdk-check:
@@ -68,12 +69,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10 --activate
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'pnpm'

@@ -3,7 +3,6 @@ name: Release
 # Triggers on semver tags (v0.1.0, v1.2.3, etc.) or manual dispatch.
 # Produces:
 #   - GitHub Release with per-platform CLI archives as download assets
-#   - SDK published to mooncakes.io via cogna-dev/moonbit-actions/publish@v0
 on:
   push:
     tags:
@@ -49,7 +48,7 @@ jobs:
           }
 
       - name: Setup MoonBit
-        uses: cogna-dev/moonbit-actions/setup@11d02666d9a2577ab0e692ea8f9e68507d0669a5
+        uses: cogna-dev/moonbit-actions/setup@v0
 
       - name: Lint (moon check)
         run: moon check
@@ -114,7 +113,7 @@ jobs:
           ref: ${{ env.RELEASE_REF }}
 
       - name: Setup MoonBit
-        uses: cogna-dev/moonbit-actions/setup@11d02666d9a2577ab0e692ea8f9e68507d0669a5
+        uses: cogna-dev/moonbit-actions/setup@v0
 
       - name: Build CLI
         run: moon build
@@ -304,26 +303,3 @@ jobs:
           generate_release_notes: true
           files: dist/*
 
-  # -------------------------------------------------------------------------
-  # 5. Publish SDK to mooncakes.io
-  # -------------------------------------------------------------------------
-  publish-sdk:
-    name: Publish SDK to mooncakes.io
-    needs: pre-release-check
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ env.RELEASE_REF }}
-
-      - name: Setup MoonBit
-        uses: cogna-dev/moonbit-actions/setup@11d02666d9a2577ab0e692ea8f9e68507d0669a5
-
-      - name: Publish SDK
-        uses: cogna-dev/moonbit-actions/publish@11d02666d9a2577ab0e692ea8f9e68507d0669a5
-        with:
-          token: ${{ secrets.MOONCAKES_TOKEN }}

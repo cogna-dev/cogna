@@ -1,8 +1,8 @@
 /* eslint-disable */
 
 import { useMemo, useState, useEffect } from 'react'
-import type { Outline, PackageNode, QueryMatch, QueryMode, DiffResult } from '@cogna/ui'
-import { queryModes, PackageTree, DiffView } from '@cogna/ui'
+import type { Outline, PackageNode, QueryMatch, QueryMode, DiffResult } from './cogna-ui'
+import { queryModes, PackageTree, DiffView } from './cogna-ui'
 import {
   CommandDialog,
   CommandInput,
