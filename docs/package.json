@@ -5,7 +5,7 @@
   "scripts": {
     "sync:policy-docs": "node ./scripts/sync-policy-readme.mjs",
     "dev": "astro dev",
-    "build": "npx playwright install --with-deps && astro build",
+    "build": "astro build",
     "preview": "astro preview",
     "predev": "pnpm run sync:policy-docs",
     "prebuild": "pnpm run sync:policy-docs",
@@ -25,11 +25,9 @@
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.575.0",
     "motion": "^12.38.0",
-    "playwright": "^1.59.1",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "rehype-mermaid": "^3.0.0",
     "shiki": "^4.0.2",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.18"

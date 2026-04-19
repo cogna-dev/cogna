@@ -10,13 +10,7 @@ SARIF（Static Analysis Results Interchange Format）是一种标准化的静态
 
 ## 生成 SARIF 的完整步骤
 
-```mermaid
-flowchart LR
-    A["cogna build"] --> B["准备 dist/base / dist/target\ncogna diff"]
-    B --> C["cogna check\n读取 checks.policy"]
-    C --> D["check.sarif.json\n标准 SARIF 格式"]
-    D --> E["GitHub Code Scanning\n/ Azure DevOps\n/ 其他平台"]
-```
+
 
 ### 执行命令
 
