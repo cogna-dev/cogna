@@ -1,0 +1,375 @@
+{
+  "basePurl": "pkg:golang/e2e/go-changes@1.0.0",
+  "changes": [
+    {
+      "after": "func (g *Runner) Run(name string) error",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:go-module:go-module::main.go::Run",
+        "kind": "method",
+        "language_specific": {
+          "go": {
+            "methodSetTypes": [
+              "*Runner"
+            ],
+            "pointerReceiver": true,
+            "receiver": "Runner"
+          },
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 10,
+          "startLine": 10,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func (g *Runner) Run(name string) error"
+      },
+      "before": "func (g Greeter) Run(name string)",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:go-module:go-module::main.go::Run",
+        "kind": "method",
+        "language_specific": {
+          "go": {
+            "methodSetTypes": [
+              "Greeter",
+              "*Greeter"
+            ],
+            "pointerReceiver": false,
+            "receiver": "Greeter"
+          },
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 10,
+          "startLine": 10,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func (g Greeter) Run(name string)"
+      },
+      "id": "decl:go-module:go-module::main.go::Run",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "main.go",
+      "semanticDiff": {
+        "changedFields": [
+          "signature",
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "go-pointer-receiver-changed"
+          },
+          {
+            "code": "go-receiver-changed"
+          },
+          {
+            "code": "go-method-set-shrunk"
+          },
+          {
+            "code": "go-signature-changed"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "go": {
+              "methodSetTypes": [
+                "*Runner"
+              ],
+              "pointerReceiver": true,
+              "receiver": "Runner"
+            },
+            "profile": "go-module"
+          },
+          "before": {
+            "go": {
+              "methodSetTypes": [
+                "Greeter",
+                "*Greeter"
+              ],
+              "pointerReceiver": false,
+              "receiver": "Greeter"
+            },
+            "profile": "go-module"
+          }
+        }
+      }
+    },
+    {
+      "after": "func (g Greeter) Expand()",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:go-module:go-module::main.go::Expand",
+        "kind": "method",
+        "language_specific": {
+          "go": {
+            "methodSetTypes": [
+              "Greeter",
+              "*Greeter",
+              "Extra"
+            ],
+            "pointerReceiver": false,
+            "receiver": "Greeter"
+          },
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 20,
+          "startLine": 20,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func (g Greeter) Expand()"
+      },
+      "before": "func (g Greeter) Expand()",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:go-module:go-module::main.go::Expand",
+        "kind": "method",
+        "language_specific": {
+          "go": {
+            "methodSetTypes": [
+              "Greeter"
+            ],
+            "pointerReceiver": false,
+            "receiver": "Greeter"
+          },
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 20,
+          "startLine": 20,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func (g Greeter) Expand()"
+      },
+      "id": "decl:go-module:go-module::main.go::Expand",
+      "kind": "changed",
+      "level": "warning",
+      "path": "main.go",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "go-method-set-expanded"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "go": {
+              "methodSetTypes": [
+                "Greeter",
+                "*Greeter",
+                "Extra"
+              ],
+              "pointerReceiver": false,
+              "receiver": "Greeter"
+            },
+            "profile": "go-module"
+          },
+          "before": {
+            "go": {
+              "methodSetTypes": [
+                "Greeter"
+              ],
+              "pointerReceiver": false,
+              "receiver": "Greeter"
+            },
+            "profile": "go-module"
+          }
+        }
+      }
+    },
+    {
+      "afterRecord": {
+        "deprecated": true,
+        "id": "decl:go-module:go-module::main.go::OldApi",
+        "kind": "function",
+        "language_specific": {
+          "go": {},
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 30,
+          "startLine": 30,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func OldApi()"
+      },
+      "id": "decl:go-module:go-module::main.go::OldApi",
+      "kind": "deprecated",
+      "level": "warning",
+      "path": "main.go",
+      "semanticDiff": {
+        "findings": [
+          {
+            "code": "deprecated-declaration"
+          }
+        ]
+      }
+    },
+    {
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:go-module:go-module::main.go::AddedApi",
+        "kind": "function",
+        "language_specific": {
+          "go": {},
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 50,
+          "startLine": 50,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func AddedApi()"
+      },
+      "id": "decl:go-module:go-module::main.go::AddedApi",
+      "kind": "added",
+      "level": "note",
+      "path": "main.go",
+      "semanticDiff": {
+        "findings": [
+          {
+            "code": "new-declaration"
+          }
+        ]
+      }
+    },
+    {
+      "after": "component react@19.0.0",
+      "afterRecord": {
+        "componentType": "library",
+        "id": "comp:npm:react",
+        "kind": "component",
+        "name": "react",
+        "path": "sbom.spdx.json",
+        "purl": "pkg:npm/react@19.0.0",
+        "scope": "runtime",
+        "signature": "component react@19.0.0",
+        "version": "19.0.0"
+      },
+      "before": "component react@18.2.0",
+      "beforeRecord": {
+        "componentType": "library",
+        "id": "comp:npm:react",
+        "kind": "component",
+        "name": "react",
+        "path": "sbom.spdx.json",
+        "purl": "pkg:npm/react@18.2.0",
+        "scope": "runtime",
+        "signature": "component react@18.2.0",
+        "version": "18.2.0"
+      },
+      "componentDiff": {
+        "afterPurl": "pkg:npm/react@19.0.0",
+        "afterVersion": "19.0.0",
+        "beforePurl": "pkg:npm/react@18.2.0",
+        "beforeVersion": "18.2.0",
+        "changedFields": [
+          "version",
+          "purl"
+        ],
+        "upgradeKind": "version-upgrade"
+      },
+      "id": "comp:npm:react",
+      "kind": "changed",
+      "level": "warning",
+      "path": "sbom.spdx.json",
+      "semanticDiff": {
+        "changedFields": [
+          "signature"
+        ],
+        "findings": []
+      }
+    },
+    {
+      "after": "component left-pad metadata-updated",
+      "afterRecord": {
+        "componentType": "library",
+        "id": "comp:npm:leftpad",
+        "kind": "component",
+        "name": "left-pad",
+        "path": "sbom.spdx.json",
+        "purl": "pkg:npm/left-pad@1.3.0",
+        "scope": "runtime",
+        "signature": "component left-pad metadata-updated",
+        "version": "1.3.0"
+      },
+      "before": "component left-pad stable",
+      "beforeRecord": {
+        "componentType": "library",
+        "id": "comp:npm:leftpad",
+        "kind": "component",
+        "name": "left-pad",
+        "path": "sbom.spdx.json",
+        "purl": "pkg:npm/left-pad@1.3.0",
+        "scope": "runtime",
+        "signature": "component left-pad stable",
+        "version": "1.3.0"
+      },
+      "componentDiff": {
+        "afterPurl": "pkg:npm/left-pad@1.3.0",
+        "afterVersion": "1.3.0",
+        "beforePurl": "pkg:npm/left-pad@1.3.0",
+        "beforeVersion": "1.3.0",
+        "changedFields": [],
+        "upgradeKind": "metadata-change"
+      },
+      "id": "comp:npm:leftpad",
+      "kind": "changed",
+      "level": "warning",
+      "path": "sbom.spdx.json",
+      "semanticDiff": {
+        "changedFields": [
+          "signature"
+        ],
+        "findings": []
+      }
+    },
+    {
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:go-module:go-module::main.go::RemovedApi",
+        "kind": "function",
+        "language_specific": {
+          "go": {},
+          "profile": "go-module"
+        },
+        "location": {
+          "endLine": 40,
+          "startLine": 40,
+          "uri": "main.go"
+        },
+        "path": "main.go",
+        "signature": "func RemovedApi()"
+      },
+      "id": "decl:go-module:go-module::main.go::RemovedApi",
+      "kind": "removed",
+      "level": "breaking",
+      "path": "main.go",
+      "semanticDiff": {
+        "findings": [
+          {
+            "code": "removed-declaration"
+          }
+        ]
+      }
+    }
+  ],
+  "schemaVersion": "ciq-diff/v1",
+  "summary": {
+    "added": 1,
+    "changed": 4,
+    "deprecated": 1,
+    "removed": 1
+  },
+  "targetPurl": "pkg:golang/e2e/go-changes@2.0.0"
+}

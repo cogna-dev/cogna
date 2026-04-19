@@ -117,7 +117,7 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
     @fs.create_dir("./dist") catch {
       err =>
         return Err(
-          mcp_error("cannot create ./dist directory: \{err.to_string()}"),
+          mcp_error("cannot create ./dist directory: \{@debug.to_repr(err)}"),
         )
     }
     Ok(())
@@ -191,7 +191,7 @@ fn write_mcp_info(path : String, info : Json) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
     err =>
       return Err(
-        mcp_error("cannot write descriptor \{path}: \{err.to_string()}"),
+        mcp_error("cannot write descriptor \{path}: \{@debug.to_repr(err)}"),
       )
   }
   Ok(())
@@ -202,7 +202,7 @@ fn read_mcp_info(path : String) -> Result[McpDescriptor, @cli.CliError] {
   let text = @fs.read_file_to_string(path) catch {
     err =>
       return Err(
-        mcp_error("cannot read descriptor \{path}: \{err.to_string()}"),
+        mcp_error("cannot read descriptor \{path}: \{@debug.to_repr(err)}"),
       )
   }
   let parsed = try? @json.parse(text)
@@ -422,13 +422,13 @@ pub fn run_stop() -> @cli.CliResult[McpStopResult, @cli.CliError] {
     }
     @fs.remove_file(info_path) catch {
       err =>
-        return Err(mcp_error("cannot remove \{info_path}: \{err.to_string()}"))
+        return Err(mcp_error("cannot remove \{info_path}: \{@debug.to_repr(err)}"))
     }
     if @fs.path_exists(state_path) {
       @fs.remove_file(state_path) catch {
         err =>
           return Err(
-            mcp_error("cannot remove \{state_path}: \{err.to_string()}"),
+            mcp_error("cannot remove \{state_path}: \{@debug.to_repr(err)}"),
           )
       }
     }
@@ -438,7 +438,7 @@ pub fn run_stop() -> @cli.CliResult[McpStopResult, @cli.CliError] {
       @fs.remove_file(state_path) catch {
         err =>
           return Err(
-            mcp_error("cannot remove \{state_path}: \{err.to_string()}"),
+            mcp_error("cannot remove \{state_path}: \{@debug.to_repr(err)}"),
           )
       }
     }

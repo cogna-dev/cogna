@@ -219,6 +219,149 @@ function mapDiffResult(result: SdkDiffResult): DiffResult {
   }
 }
 
+type OutlineGroupNode = {
+  key: string
+  label: string
+  count: number
+  children: OutlineGroupNode[]
+}
+
+function normalizeKind(kind: string): string {
+  const value = kind.trim()
+  return value.length > 0 ? value : 'unknown'
+}
+
+function kindPrefix(kind: string): string {
+  const lower = kind.toLowerCase()
+  if (lower.includes('func') || lower.includes('method') || lower.includes('operation')) return 'func'
+  if (lower.includes('type') || lower.includes('struct') || lower.includes('class')) return 'type'
+  if (lower.includes('interface')) return 'interface'
+  if (lower.includes('const')) return 'const'
+  if (lower.includes('var') || lower.includes('field') || lower.includes('property')) return 'var'
+  return 'symbol'
+}
+
+function humanizedTail(raw: string): string {
+  const value = raw.trim()
+  if (!value) return 'Unknown'
+  const stripped = value.replace(/^decl:[^:]*:/, '').replace(/^pkg:[^/]+\//, '')
+  const parts = stripped.split(/[#:\s/]+/).filter(Boolean)
+  if (parts.length === 0) return stripped
+  const tail = parts[parts.length - 1]
+  return tail || stripped
+}
+
+function readableSymbol(kind: string, symbol: string, id: string): string {
+  const source = symbol.trim().length > 0 ? symbol : id
+  return `${kindPrefix(kind)} ${humanizedTail(source)}`
+}
+
+function isOpenApiPackageNode(pkg: PackageNode): boolean {
+  const eco = (pkg.ecosystem ?? '').toLowerCase()
+  const name = pkg.name.toLowerCase()
+  return eco.includes('openapi') || name.includes('openapi')
+}
+
+function extractOpenApiPath(item: Outline): string | null {
+  const candidates = [item.location.uri, item.symbol, item.id]
+  const matcher = /(\/[-a-zA-Z0-9._~%!$&'()*+,;=:@{}]+(?:\/[-a-zA-Z0-9._~%!$&'()*+,;=:@{}]+)*)/
+  for (const text of candidates) {
+    if (!text) continue
+    const m = text.match(matcher)
+    if (m && m[1].startsWith('/')) {
+      return m[1]
+    }
+  }
+  return null
+}
+
+function buildOpenApiGroupTree(items: Outline[]): OutlineGroupNode[] {
+  const roots: OutlineGroupNode[] = []
+  const map = new Map<string, OutlineGroupNode>()
+
+  const getOrCreate = (key: string, label: string): OutlineGroupNode => {
+    const found = map.get(key)
+    if (found) {
+      return found
+    }
+    const node: OutlineGroupNode = { key, label, count: 0, children: [] }
+    map.set(key, node)
+    return node
+  }
+
+  for (const item of items) {
+    const path = extractOpenApiPath(item)
+    if (!path) {
+      const other = getOrCreate('other', 'Other')
+      other.count += 1
+      if (!roots.includes(other)) {
+        roots.push(other)
+      }
+      continue
+    }
+
+    const segments = path.split('/').filter(Boolean)
+    if (segments.length === 0) continue
+
+    let parent: OutlineGroupNode | null = null
+    let currentPath = ''
+    for (const seg of segments) {
+      currentPath += `/${seg}`
+      const key = `path:${currentPath}`
+      const node = getOrCreate(key, seg)
+      node.count += 1
+      if (parent === null) {
+        if (!roots.includes(node)) {
+          roots.push(node)
+        }
+      } else if (!parent.children.includes(node)) {
+        parent.children.push(node)
+      }
+      parent = node
+    }
+  }
+
+  const sortNode = (node: OutlineGroupNode): void => {
+    node.children.sort((a, b) => a.label.localeCompare(b.label))
+    node.children.forEach(sortNode)
+  }
+
+  roots.sort((a, b) => a.label.localeCompare(b.label))
+  roots.forEach(sortNode)
+  return roots
+}
+
+function renderOutlineGroupNode(
+  node: OutlineGroupNode,
+  selectedKey: string | null,
+  onSelect: (key: string) => void,
+  depth = 0,
+): React.JSX.Element {
+  const isSelected = selectedKey === node.key
+  const isPath = node.key.startsWith('path:')
+
+  return (
+    <div key={node.key} className="space-y-1">
+      <button
+        type="button"
+        onClick={() => onSelect(node.key)}
+        className={`w-full flex items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors ${
+          isSelected
+            ? 'bg-accent text-accent-foreground font-medium'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+        }`}
+      >
+        <span className="truncate" style={{ paddingLeft: `${depth * 12}px` }}>
+          {isPath ? `/${node.label}` : node.label}
+        </span>
+        <span className="font-mono">{node.count}</span>
+      </button>
+
+      {node.children.map((child) => renderOutlineGroupNode(child, selectedKey, onSelect, depth + 1))}
+    </div>
+  )
+}
+
 function App(): React.JSX.Element {
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>(() => defaultWorkspace(''))
   const [packagesRoot, setPackagesRoot] = useState<PackageNode>({
@@ -232,6 +375,7 @@ function App(): React.JSX.Element {
   const [queryMode, setQueryMode] = useState<QueryMode>('fuzzy-text')
   const [queryText, setQueryText] = useState('effect cleanup')
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null)
+  const [selectedOutlineGroupKey, setSelectedOutlineGroupKey] = useState<string | null>(null)
   const [appView, setAppView] = useState<AppView>('explorer')
   const [policyTab, setPolicyTab] = useState<'loaded-policy'>('loaded-policy')
   const [commandOpen, setCommandOpen] = useState(false)
@@ -305,6 +449,56 @@ function App(): React.JSX.Element {
     [outlinesByPackage, selectedPackage.name]
   )
 
+  const isOpenApiSelected = useMemo(() => isOpenApiPackageNode(selectedPackage), [selectedPackage])
+
+  const outlineGroups = useMemo(() => {
+    if (isOpenApiSelected) {
+      return buildOpenApiGroupTree(outlines)
+    }
+    const byKind = new Map<string, number>()
+    for (const item of outlines) {
+      const kind = normalizeKind(item.kind)
+      byKind.set(kind, (byKind.get(kind) ?? 0) + 1)
+    }
+    return Array.from(byKind.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([kind, count]) => ({ key: `kind:${kind}`, label: kind, count, children: [] as OutlineGroupNode[] }))
+  }, [isOpenApiSelected, outlines])
+
+  const filteredOutlines = useMemo(() => {
+    if (!selectedOutlineGroupKey) return outlines
+
+    if (selectedOutlineGroupKey.startsWith('kind:')) {
+      const kind = selectedOutlineGroupKey.slice(5)
+      return outlines.filter((item) => normalizeKind(item.kind) === kind)
+    }
+
+    if (selectedOutlineGroupKey === 'other') {
+      return outlines.filter((item) => extractOpenApiPath(item) === null)
+    }
+
+    if (selectedOutlineGroupKey.startsWith('path:')) {
+      const prefix = selectedOutlineGroupKey.slice(5)
+      return outlines.filter((item) => {
+        const path = extractOpenApiPath(item)
+        return path ? path.startsWith(prefix) : false
+      })
+    }
+
+    return outlines
+  }, [outlines, selectedOutlineGroupKey])
+
+  const groupedOutlines = useMemo(() => {
+    const groups = new Map<string, Outline[]>()
+    for (const item of filteredOutlines) {
+      const key = normalizeKind(item.kind)
+      groups.set(key, [...(groups.get(key) ?? []), item])
+    }
+    return Array.from(groups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([kind, items]) => ({ kind, items }))
+  }, [filteredOutlines])
+
   const queryResponse = useMemo(
     () => ({
       package: selectedPackage.name,
@@ -314,16 +508,27 @@ function App(): React.JSX.Element {
     [queryMatchesByPackage, selectedPackage.name, queryMode]
   )
 
+  const groupedQueryMatches = useMemo(() => {
+    const groups = new Map<string, QueryMatch[]>()
+    for (const item of queryResponse.matches) {
+      const key = normalizeKind(item.kind)
+      groups.set(key, [...(groups.get(key) ?? []), item])
+    }
+    return Array.from(groups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([kind, items]) => ({ kind, items }))
+  }, [queryResponse.matches])
+
   const activeDetail = useMemo<DetailItem | null>(() => {
     if (tab === 'outlines') {
-      return outlines.find((item) => item.id === selectedDetailId) ?? outlines[0] ?? null
+      return filteredOutlines.find((item) => item.id === selectedDetailId) ?? filteredOutlines[0] ?? null
     }
     return (
       queryResponse.matches.find((item) => item.id === selectedDetailId) ??
       queryResponse.matches[0] ??
       null
     )
-  }, [outlines, queryResponse.matches, selectedDetailId, tab])
+  }, [filteredOutlines, queryResponse.matches, selectedDetailId, tab])
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -403,7 +608,12 @@ function App(): React.JSX.Element {
   useEffect(() => {
     setSelectedPackageName(packageList[0]?.name ?? 'workspace-app')
     setSelectedDetailId(null)
+    setSelectedOutlineGroupKey(null)
   }, [packageList])
+
+  useEffect(() => {
+    setSelectedOutlineGroupKey(null)
+  }, [selectedPackage.name])
 
   const isMac = useMemo(() => window.navigator.platform.toUpperCase().indexOf('MAC') >= 0, [])
 
@@ -706,6 +916,44 @@ function App(): React.JSX.Element {
                       setSelectedDetailId(null)
                     }}
                   />
+
+                  <Separator className="my-3" />
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between px-2">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Groups</span>
+                      <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                        {outlineGroups.length}
+                      </Badge>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedOutlineGroupKey(null)
+                        setSelectedDetailId(null)
+                      }}
+                      className={`w-full flex items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors ${
+                        selectedOutlineGroupKey === null
+                          ? 'bg-accent text-accent-foreground font-medium'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <span>All symbols</span>
+                      <span className="font-mono">{outlines.length}</span>
+                    </button>
+
+                    {outlineGroups.map((group) =>
+                      renderOutlineGroupNode(
+                        group,
+                        selectedOutlineGroupKey,
+                        (key) => {
+                          setSelectedOutlineGroupKey(key)
+                          setSelectedDetailId(null)
+                        },
+                      )
+                    )}
+                  </div>
                 </div>
               </ScrollArea>
             </aside>
@@ -714,6 +962,11 @@ function App(): React.JSX.Element {
               <div className="h-10 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold">{selectedPackage.name}</h2>
+                  {selectedPackage.ecosystem && (
+                    <Badge variant="outline" className="h-5 px-1.5 text-[10px] text-muted-foreground">
+                      {selectedPackage.ecosystem}
+                    </Badge>
+                  )}
                   <Badge variant="outline" className="h-5 px-1.5 text-[10px] text-muted-foreground">
                     {tab === 'outlines' ? 'Outlines' : 'Query'}
                   </Badge>
@@ -752,36 +1005,49 @@ function App(): React.JSX.Element {
               {tab === 'outlines' ? (
                 <ScrollArea className="flex-1">
                   <div className="p-4 flex flex-col gap-2">
-                    {outlines.length === 0 ? (
+                    {filteredOutlines.length === 0 ? (
                       <div className="text-center py-8 text-sm text-muted-foreground">No outlines found.</div>
                     ) : (
-                      outlines.map((item) => (
-                        <button
-                          key={item.id}
-                          className={`flex flex-col p-3 rounded-lg border text-left transition-all ${
-                            selectedDetailId === item.id
-                              ? 'bg-accent/50 border-accent-foreground/20 ring-1 ring-ring'
-                              : 'bg-card border-border hover:border-accent-foreground/20'
-                          }`}
-                          onClick={() => setSelectedDetailId(item.id)}
-                          type="button"
-                        >
-                          <div className="flex items-center justify-between w-full mb-1">
-                            <span className="font-mono text-sm font-semibold text-primary">{item.symbol}</span>
-                            <Badge variant="secondary" className="text-[10px] h-5">
-                              {item.kind}
+                      groupedOutlines.map((group) => (
+                        <div key={group.kind} className="space-y-2">
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{group.kind}</span>
+                            <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                              {group.items.length}
                             </Badge>
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{item.summary}</p>
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
-                            {item.deprecated && (
-                              <Badge variant="destructive" className="h-4 px-1">
-                                Deprecated
-                              </Badge>
-                            )}
-                            <span className="font-mono">{item.location.uri}</span>
-                          </div>
-                        </button>
+
+                          {group.items.map((item) => (
+                            <button
+                              key={item.id}
+                              className={`flex flex-col p-3 rounded-lg border text-left transition-all ${
+                                selectedDetailId === item.id
+                                  ? 'bg-accent/50 border-accent-foreground/20 ring-1 ring-ring'
+                                  : 'bg-card border-border hover:border-accent-foreground/20'
+                              }`}
+                              onClick={() => setSelectedDetailId(item.id)}
+                              type="button"
+                            >
+                              <div className="flex items-center justify-between w-full mb-1">
+                                <span className="text-sm font-semibold text-primary truncate">
+                                  {readableSymbol(item.kind, item.symbol, item.id)}
+                                </span>
+                                <Badge variant="secondary" className="text-[10px] h-5">
+                                  {item.kind}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{item.summary}</p>
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
+                                {item.deprecated && (
+                                  <Badge variant="destructive" className="h-4 px-1">
+                                    Deprecated
+                                  </Badge>
+                                )}
+                                <span className="font-mono truncate">{item.location.uri}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       ))
                     )}
                   </div>
@@ -826,33 +1092,46 @@ function App(): React.JSX.Element {
                   <ScrollArea className="flex-1">
                     <div className="p-4 flex flex-col gap-2">
                       {queryResponse.matches.length > 0 ? (
-                        queryResponse.matches.map((item) => (
-                          <button
-                            key={item.id}
-                            className={`flex flex-col p-3 rounded-lg border text-left transition-all ${
-                              selectedDetailId === item.id
-                                ? 'bg-accent/50 border-accent-foreground/20 ring-1 ring-ring'
-                                : 'bg-card border-border hover:border-accent-foreground/20'
-                            }`}
-                            onClick={() => setSelectedDetailId(item.id)}
-                            type="button"
-                          >
-                            <div className="flex items-center justify-between w-full mb-1">
-                              <span className="font-mono text-sm font-semibold text-primary">{item.symbol}</span>
-                              <Badge variant="secondary" className="text-[10px] h-5">
-                                {item.kind}
+                        groupedQueryMatches.map((group) => (
+                          <div key={group.kind} className="space-y-2">
+                            <div className="flex items-center justify-between px-1">
+                              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{group.kind}</span>
+                              <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                                {group.items.length}
                               </Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{item.summary}</p>
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70 font-mono">
-                              {item.score !== undefined ? (
-                                <span className="bg-muted px-1 rounded">Score: {item.score.toFixed(2)}</span>
-                              ) : (
-                                <span className="bg-muted px-1 rounded">Exact match</span>
-                              )}
-                              <span className="truncate">{item.location.uri}</span>
-                            </div>
-                          </button>
+
+                            {group.items.map((item) => (
+                              <button
+                                key={item.id}
+                                className={`flex flex-col p-3 rounded-lg border text-left transition-all ${
+                                  selectedDetailId === item.id
+                                    ? 'bg-accent/50 border-accent-foreground/20 ring-1 ring-ring'
+                                    : 'bg-card border-border hover:border-accent-foreground/20'
+                                }`}
+                                onClick={() => setSelectedDetailId(item.id)}
+                                type="button"
+                              >
+                                <div className="flex items-center justify-between w-full mb-1">
+                                  <span className="text-sm font-semibold text-primary truncate">
+                                    {readableSymbol(item.kind, item.symbol, item.id)}
+                                  </span>
+                                  <Badge variant="secondary" className="text-[10px] h-5">
+                                    {item.kind}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{item.summary}</p>
+                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70 font-mono">
+                                  {item.score !== undefined ? (
+                                    <span className="bg-muted px-1 rounded">Score: {item.score.toFixed(2)}</span>
+                                  ) : (
+                                    <span className="bg-muted px-1 rounded">Exact match</span>
+                                  )}
+                                  <span className="truncate">{item.location.uri}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
                         ))
                       ) : (
                         <div className="text-center py-12 flex flex-col items-center">
@@ -880,7 +1159,9 @@ function App(): React.JSX.Element {
                 {activeDetail ? (
                   <div className="p-5 flex flex-col gap-6">
                     <div>
-                      <h3 className="font-mono text-lg font-bold text-foreground mb-2 break-all">{activeDetail.symbol}</h3>
+                      <h3 className="text-lg font-bold text-foreground mb-2 break-all">
+                        {readableSymbol(activeDetail.kind, activeDetail.symbol, activeDetail.id)}
+                      </h3>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline">{activeDetail.kind}</Badge>
                         {isQueryMatch(activeDetail) && activeDetail.score !== undefined && (
@@ -896,6 +1177,11 @@ function App(): React.JSX.Element {
 
                     <div className="space-y-4">
                       <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-3 text-sm">
+                        <span className="text-muted-foreground">Symbol</span>
+                        <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                          {activeDetail.symbol}
+                        </code>
+
                         <span className="text-muted-foreground">ID</span>
                         <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded break-all">
                           {activeDetail.id}

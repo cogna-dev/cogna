@@ -47,7 +47,7 @@ fn write_diff(path : String, diff : Json) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, serialized) catch {
     err =>
       return Err(
-        diff_error("cannot write diff file \{path}: \{err.to_string()}"),
+        diff_error("cannot write diff file \{path}: \{@debug.to_repr(err)}"),
       )
   }
   Ok(())

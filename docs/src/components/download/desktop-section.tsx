@@ -1,6 +1,7 @@
 import { motion } from "motion/react"
 import { Download, Apple, Container, AppWindow } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface DesktopSectionProps {
@@ -56,7 +57,12 @@ export function DesktopSection({ data }: DesktopSectionProps) {
                   <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary group-hover:from-primary/20 group-hover:to-primary/10 transition-colors">
                     {platformIcons[platform.name]}
                   </div>
-                  <CardTitle className="text-lg">{platform.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{platform.name}</CardTitle>
+                    {platform.name === "macOS" && (
+                      <Badge variant="secondary" className="text-xs">人工测试</Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">

@@ -24,7 +24,7 @@ fn ensure_dir(path : String) -> Result[Unit, String] {
     Ok(())
   } else {
     @fs.create_dir(path) catch {
-      err => return Err("cannot create directory \{path}: \{err.to_string()}")
+      err => return Err("cannot create directory \{path}: \{@debug.to_repr(err)}")
     }
     Ok(())
   }
@@ -68,7 +68,7 @@ pub fn ensure_store(root : String) -> Result[Unit, String] {
     @fs.write_string_to_file(keys_index_path(root), "") catch {
       err =>
         return Err(
-          "cannot initialize cache index \{keys_index_path(root)}: \{err.to_string()}"
+          "cannot initialize cache index \{keys_index_path(root)}: \{@debug.to_repr(err)}"
         )
     }
   }
@@ -88,7 +88,7 @@ fn metadata_json(key : String, body : Bytes, content_type : String) -> Json {
 ///|
 fn append_key(root : String, key : String) -> Result[Unit, String] {
   let current = @fs.read_file_to_string(keys_index_path(root)) catch {
-    err => return Err("cannot read cache index: \{err.to_string()}")
+    err => return Err("cannot read cache index: \{@debug.to_repr(err)}")
   }
   let lines = if current == "" { [] } else { current.split("\n").to_array() }
   for i in 0..<lines.length() {
@@ -98,7 +98,7 @@ fn append_key(root : String, key : String) -> Result[Unit, String] {
   }
   let next = if current == "" { "\{key}\n" } else { "\{current}\{key}\n" }
   @fs.write_string_to_file(keys_index_path(root), next) catch {
-    err => return Err("cannot update cache index: \{err.to_string()}")
+    err => return Err("cannot update cache index: \{@debug.to_repr(err)}")
   }
   Ok(())
 }
@@ -113,13 +113,13 @@ pub fn put(
   let store_out = ensure_store(root)
   guard store_out is Ok(_) else { return Err(store_out.unwrap_err()) }
   @fs.write_bytes_to_file(object_path(root, key), body) catch {
-    err => return Err("cannot write cache object \{key}: \{err.to_string()}")
+    err => return Err("cannot write cache object \{key}: \{@debug.to_repr(err)}")
   }
   @fs.write_string_to_file(
     metadata_path(root, key),
     metadata_json(key, body, content_type).stringify(indent=2),
   ) catch {
-    err => return Err("cannot write cache metadata \{key}: \{err.to_string()}")
+    err => return Err("cannot write cache metadata \{key}: \{@debug.to_repr(err)}")
   }
   let index_out = append_key(root, key)
   guard index_out is Ok(_) else { return Err(index_out.unwrap_err()) }
@@ -139,10 +139,10 @@ pub fn get(root : String, key : String) -> Result[@cache.CacheObject?, String] {
     return Ok(None)
   }
   let body = @fs.read_file_to_bytes(body_path) catch {
-    err => return Err("cannot read cache object \{key}: \{err.to_string()}")
+    err => return Err("cannot read cache object \{key}: \{@debug.to_repr(err)}")
   }
   let metadata_text = @fs.read_file_to_string(meta_path) catch {
-    err => return Err("cannot read cache metadata \{key}: \{err.to_string()}")
+    err => return Err("cannot read cache metadata \{key}: \{@debug.to_repr(err)}")
   }
   let parsed = try? @json.parse(metadata_text)
   guard parsed is Ok(Object(metadata)) else {
@@ -188,7 +188,7 @@ pub fn list(root : String, prefix? : String = "") -> Result[Array[@cache.CacheEn
   let store_out = ensure_store(root)
   guard store_out is Ok(_) else { return Err(store_out.unwrap_err()) }
   let text = @fs.read_file_to_string(keys_index_path(root)) catch {
-    err => return Err("cannot read cache index: \{err.to_string()}")
+    err => return Err("cannot read cache index: \{@debug.to_repr(err)}")
   }
   let seen : Map[String, Bool] = {}
   let entries : Array[@cache.CacheEntry] = []
@@ -218,17 +218,17 @@ pub fn remove(root : String, key : String) -> Result[Bool, String] {
     @fs.path_exists(metadata_path(root, key))
   if @fs.path_exists(object_path(root, key)) {
     @fs.remove_file(object_path(root, key)) catch {
-      err => return Err("cannot remove cache object \{key}: \{err.to_string()}")
+      err => return Err("cannot remove cache object \{key}: \{@debug.to_repr(err)}")
     }
   }
   if @fs.path_exists(metadata_path(root, key)) {
     @fs.remove_file(metadata_path(root, key)) catch {
       err =>
-        return Err("cannot remove cache metadata \{key}: \{err.to_string()}")
+        return Err("cannot remove cache metadata \{key}: \{@debug.to_repr(err)}")
     }
   }
   let text = @fs.read_file_to_string(keys_index_path(root)) catch {
-    err => return Err("cannot read cache index: \{err.to_string()}")
+    err => return Err("cannot read cache index: \{@debug.to_repr(err)}")
   }
   let kept : Array[String] = []
   for raw_key in text.split("\n") {
@@ -239,7 +239,7 @@ pub fn remove(root : String, key : String) -> Result[Bool, String] {
   }
   let next = if kept.is_empty() { "" } else { kept.join("\n") + "\n" }
   @fs.write_string_to_file(keys_index_path(root), next) catch {
-    err => return Err("cannot rewrite cache index: \{err.to_string()}")
+    err => return Err("cannot rewrite cache index: \{@debug.to_repr(err)}")
   }
   Ok(existed)
 }

@@ -80,7 +80,7 @@ fn read_manifest(path : String) -> Result[Json, String] {
     err =>
       return Err(
         pipeline_diff_error(
-          "cannot read manifest \{path}: \{err.to_string()}",
+          "cannot read manifest \{path}: \{@debug.to_repr(err)}",
         ),
       )
   }

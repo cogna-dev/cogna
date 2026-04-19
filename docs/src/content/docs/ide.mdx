@@ -1,88 +1,188 @@
 ---
-title: IDE 集成
-description: 如何使用 Cogna VSCode 扩展运行 build/diff/check、加载 SARIF diagnostics，并跳转到规则文档。
+title: IDE 集成（VSCode）
+description: 在 VSCode 中通过 Cogna 扩展完成构建、变更检查和问题定位，在编码时即时看到合规诊断。
 order: 17
 ---
 
-# IDE 集成
+# IDE 集成（VSCode）
 
-Cogna 现在提供了仓库内的 **VSCode 扩展实现**（位于 `integrations/vscode/`）。它复用本地 `cogna` CLI，读取 `dist/check.sarif.json`，并把 policy 结果映射成编辑器 diagnostics。
+> **即将上线：** VSCode 扩展正在内测，功能已基本完整，预计近期发布到 Marketplace。如有兴趣提前体验，可下载 VSIX 手动安装，或在 [GitHub Issues](https://github.com/cogna-dev/cogna/issues) 关注发布动态。
 
-当前扩展覆盖三件事：
-
-1. **运行分析**：按 `build -> diff -> check` 顺序调用本地 `cogna`
-2. **加载 diagnostics**：读取 `dist/check.sarif.json` 并在编辑器中标注问题
-3. **打开规则文档**：根据 SARIF 中的 `helpUri` 跳转到稳定的策略文档页
+Cogna VSCode 扩展（扩展 ID：`xaclabs.cogna`）把完整的 Cogna 工作流嵌入编辑器，让你在写代码的同时就能看到接口兼容性问题，而不是等到 CI 失败才知道出了问题。
 
 ---
 
-## 支持的命令
+## 安装
 
-- `Cogna: Run Analysis`
-- `Cogna: Refresh Diagnostics`
-- `Cogna: Open Rule Documentation`
+### 方式一：VSCode Marketplace（推荐）
 
-## 支持的设置
+扩展发布后，在 VSCode 的扩展面板中搜索 **Cogna** 或直接通过扩展 ID 安装：
 
-- `cogna.cliPath`
-- `cogna.workingDirectory`
-- `cogna.runOnSave`
-- `cogna.autoOpenPolicyDocs`
-
-## 本地使用方式
-
-先在仓库内安装并编译扩展：
-
-```bash
-cd integrations/vscode
-npm install
-npm run compile
+```
+xaclabs.cogna
 ```
 
-然后在 VSCode Extension Development Host 中打开一个包含 `cogna.yml` 的工作区，并确保本机能执行 `cogna`。扩展会优先读取：
+或点击 [Marketplace 页面](https://marketplace.visualstudio.com/items?itemName=xaclabs.cogna) 安装。
 
-- `cogna.workingDirectory`（若已配置）
-- 否则读取当前第一个 workspace folder
+### 方式二：手动安装 VSIX
 
-分析完成后，扩展会从 `<working-directory>/dist/check.sarif.json` 读取结果并刷新 diagnostics。
+适合离线环境或希望提前体验：
 
-## 当前工作流
+1. 从 [GitHub Releases](https://github.com/cogna-dev/cogna/releases/latest/download/cogna-vscode.vsix) 下载 `.vsix` 文件
+2. 在 VSCode 中打开命令面板（`Ctrl/Cmd + Shift + P`）
+3. 输入 **「Extensions: Install from VSIX...」**，选择下载的文件
 
+### 前置条件
 
-
----
-
-## 本地验证
-
-扩展目录已带上最小验证脚本：
+扩展本身不包含 Cogna 运行时，需要先在系统中安装 CLI：
 
 ```bash
-cd integrations/vscode
-npm install
-npm run compile
-npm run test:unit
-npm run test:extension
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.sh | sh
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.ps1 | iex
 ```
 
-其中 `test:extension` 会准备一个临时 workspace、安装本地 `cogna` CLI、写入示例 SARIF，然后在 VSCode test host 中验证命令注册、diagnostics 刷新、文档跳转与完整分析流程。
-
----
-
-## 如果你更偏好 AI / MCP 工作流
-
-除了 VSCode 扩展，你仍然可以继续使用 MCP 让 AI 编程助手直接查询本地 bundle：
+安装完成后验证：
 
 ```bash
-cogna mcp serve --port 3000
+cogna --version
 ```
-
-- `cogna.query.outlines` — 列出所有公开符号路径
-- `cogna.query.symbol` — 查询某个函数的完整签名和文档
 
 ---
 
-## 下一步
+## 快速上手
 
-- 在 CI 中接入 SARIF 上传：[持续集成](/docs/ci)
-- 了解 SARIF 字段与规则文档：[启用 SARIF 集成](/docs/sarif)
-- 继续使用 MCP 查询 bundle：[AI 查询（MCP）](/docs/mcp)
+安装扩展后，打开一个包含 `cogna.yaml` 的项目目录：
+
+1. VSCode 侧边栏会出现 **Cogna** 图标面板
+2. 点击 **「Build」** 构建索引（首次构建需要一点时间）
+3. 构建完成后，点击 **「Diff」** 查看变更
+4. 点击 **「Check」** 执行策略检查
+5. 违规问题会以波浪线形式标注在对应源文件中，悬停可查看规则说明
+
+---
+
+## 功能详解
+
+### 一键运行完整工作流
+
+扩展在 VSCode 侧边栏提供按钮，顺序执行 `build → diff → check` 三个步骤：
+
+- **Build**：触发 `cogna build`，更新本地索引，读取 `dist/bundle.json`
+- **Diff**：触发 `cogna diff`，对比当前版本与基线版本的接口变化，写入 `dist/diff.json`
+- **Check**：触发 `cogna check`，对变更执行策略合规检查，写入 `dist/check.sarif.json`
+
+每个步骤的进度和日志会实时显示在输出面板（**输出 → Cogna**）中。
+
+### 内联诊断（Diagnostics）
+
+策略检查完成后，扩展会读取 `dist/check.sarif.json`，将所有违规条目以 VSCode Problems 的方式展示：
+
+- 在 **Problems 面板**（`Ctrl/Cmd + Shift + M`）中集中列出所有问题
+- 在源文件对应行**高亮标注**波浪线，悬停查看违规规则名称和简要说明
+- 点击问题条目直接**跳转到具体位置**
+
+这样你在写代码时就能实时感知接口兼容性风险，而不需要等到 CI 阶段。
+
+### 自动打开规则文档
+
+每条违规结果都包含一个 `helpUri`，指向对应的策略规则文档页面。开启 `cogna.autoOpenPolicyDocs` 后，点击违规条目会自动在浏览器中打开文档，帮助你快速理解：
+
+- 这条规则是什么含义
+- 为什么这个变更被标记为问题
+- 如何修复或通过合理理由豁免
+
+### 保存时自动分析
+
+开启 `cogna.runOnSave` 后，每次保存文件时扩展会自动触发完整的 `build → diff → check` 流程，Problems 面板随时保持最新状态。
+
+适合：开发节奏快、频繁提交的场景。不适合：大型仓库（构建时间较长时会影响编辑体验），建议手动触发。
+
+---
+
+## 配置选项
+
+在 VSCode 的 `settings.json` 中可以配置以下选项：
+
+| 设置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `cogna.cliPath` | `string` | `"cogna"` | CLI 可执行文件路径；若 `cogna` 不在 PATH 中，填写绝对路径 |
+| `cogna.workingDirectory` | `string` | 工作区根目录 | 执行命令的工作目录，需包含 `cogna.yaml` |
+| `cogna.runOnSave` | `boolean` | `false` | 保存文件时自动运行完整分析流程 |
+| `cogna.autoOpenPolicyDocs` | `boolean` | `false` | 点击违规条目时自动在浏览器打开规则文档 |
+
+**示例配置（`.vscode/settings.json`）：**
+
+```json
+{
+  "cogna.cliPath": "/usr/local/bin/cogna",
+  "cogna.workingDirectory": "${workspaceFolder}",
+  "cogna.runOnSave": false,
+  "cogna.autoOpenPolicyDocs": true
+}
+```
+
+> **团队共享配置：** 把 `.vscode/settings.json` 提交到版本库，确保团队成员的扩展行为一致。注意 `cliPath` 如果使用绝对路径，不同操作系统可能需要不同配置，建议保持 `"cogna"` 默认值，依赖系统 PATH。
+
+---
+
+## 与其他工具的配合
+
+### 与 CLI 配合
+
+扩展底层直接调用本地 CLI，两者完全兼容：
+
+- 在终端手动执行 `cogna build` 后，扩展可以直接读取已有的 `dist/` 产物，无需重新构建
+- 在扩展中触发的操作，其输出产物（`dist/diff.json`、`dist/check.sarif.json`）也可以被 CLI 或 CI 继续使用
+
+### 与 MCP 配合
+
+扩展执行 `cogna build` 后，你可以同时启动 MCP 服务，让 GitHub Copilot（或其他 AI 工具）查询当前仓库的接口事实：
+
+```bash
+cogna mcp serve --stdio
+```
+
+在 `.vscode/mcp.json` 中配置即可。详见 [AI 查询（MCP）](/docs/mcp)。
+
+---
+
+## 常见问题
+
+### 扩展找不到 cogna 命令
+
+检查 `cogna` 是否在 PATH 中：
+
+```bash
+which cogna    # macOS / Linux
+where cogna    # Windows
+```
+
+若不在 PATH，在 `settings.json` 中配置完整路径：
+
+```json
+{
+  "cogna.cliPath": "/usr/local/bin/cogna"
+}
+```
+
+### 诊断结果不更新
+
+诊断来自 `dist/check.sarif.json`，需要重新运行 Check 才会刷新。如已开启 `cogna.runOnSave`，检查保存时是否有构建错误（查看输出面板）。
+
+### 项目根目录没有 `cogna.yaml`
+
+打开 VSCode 命令面板，输入 **「Cogna: Init」**，或在终端执行 `cogna init`。
+
+---
+
+## 相关文档
+
+- [快速开始](/docs/quickstart)
+- [CLI 参考](/docs/cli)
+- [AI 查询（MCP）](/docs/mcp)
+- [SARIF 集成](/docs/sarif)
+- [内置策略规则](/docs/policies)
+- [持续集成](/docs/ci)

@@ -357,7 +357,7 @@ fn parse_config(content : String, path : String) -> Result[Config, ConfigError] 
 ///|
 pub fn load_from_path(path : String) -> Result[Config, ConfigError] {
   let file_content = @fs.read_file_to_string(path) catch {
-    err => return Err(ConfigError::FileReadError(path~, err.to_string()))
+    err => return Err(ConfigError::FileReadError(path~, @debug.to_string(err)))
   }
   let parsed = parse_config(file_content, path)
   guard parsed is Ok(config) else { return Err(parsed.unwrap_err()) }

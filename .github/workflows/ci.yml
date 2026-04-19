@@ -58,7 +58,15 @@ jobs:
 
       - name: Dry-run SDK publish
         if: ${{ !env.ACT }}
-        run: moon publish --dry-run
+        shell: bash
+        run: |
+          set -euo pipefail
+          creds_file="$HOME/.moon/credentials.json"
+          if [ ! -f "$creds_file" ]; then
+            echo "Skip moon publish --dry-run: no Moon credentials on runner ($creds_file)"
+            exit 0
+          fi
+          moon publish --dry-run
 
   sdk-check:
     name: JS SDK checks
@@ -146,3 +154,20 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci/run-cli-e2e.sh
+
+  changes-e2e:
+    name: Changes e2e snapshots
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: cogna-dev/moonbit-actions/setup@v0
+
+      - name: Run changes e2e
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run-changes-e2e.sh

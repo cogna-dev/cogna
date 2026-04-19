@@ -1,0 +1,94 @@
+{
+  "basePurl": "pkg:cargo/e2e/rust-changes@1.0.0",
+  "changes": [
+    {
+      "after": "pub unsafe extern \"C\" fn process<T>(value: T) -> i64 where T: Copy",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:rust-crate:rust-crate::lib.rs::process",
+        "kind": "function",
+        "language_specific": {
+          "profile": "rust-crate",
+          "rust": {
+            "externAbi": "C",
+            "unsafe": true,
+            "whereClause": "where T: Copy"
+          }
+        },
+        "location": {
+          "endLine": 12,
+          "startLine": 12,
+          "uri": "lib.rs"
+        },
+        "path": "lib.rs",
+        "signature": "pub unsafe extern \"C\" fn process<T>(value: T) -> i64 where T: Copy"
+      },
+      "before": "pub fn process<T>(value: T) -> i32",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:rust-crate:rust-crate::lib.rs::process",
+        "kind": "function",
+        "language_specific": {
+          "profile": "rust-crate",
+          "rust": {}
+        },
+        "location": {
+          "endLine": 12,
+          "startLine": 12,
+          "uri": "lib.rs"
+        },
+        "path": "lib.rs",
+        "signature": "pub fn process<T>(value: T) -> i32"
+      },
+      "id": "decl:rust-crate:rust-crate::lib.rs::process",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "lib.rs",
+      "semanticDiff": {
+        "changedFields": [
+          "signature",
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "rust-became-unsafe"
+          },
+          {
+            "code": "rust-extern-abi-added"
+          },
+          {
+            "code": "rust-extern-abi-changed"
+          },
+          {
+            "code": "rust-where-clause-changed"
+          },
+          {
+            "code": "rust-signature-changed"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "profile": "rust-crate",
+            "rust": {
+              "externAbi": "C",
+              "unsafe": true,
+              "whereClause": "where T: Copy"
+            }
+          },
+          "before": {
+            "profile": "rust-crate",
+            "rust": {}
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": "ciq-diff/v1",
+  "summary": {
+    "added": 0,
+    "changed": 1,
+    "deprecated": 0,
+    "removed": 0
+  },
+  "targetPurl": "pkg:cargo/e2e/rust-changes@2.0.0"
+}

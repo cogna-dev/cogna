@@ -223,7 +223,7 @@ test "query_outlines: fixture input parses into QueryOutlinesRequest" {
   let input : Json = { "package": "example/sdkacceptance" }
   let req = @generated.QueryOutlinesRequest::from_json(input)
   guard req is Some(r) else { fail("QueryOutlinesRequest should parse") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
 }
 
 ///|
@@ -267,7 +267,7 @@ test "query_outlines: fixture output parses into QueryOutlinesResponse" {
   }
   let resp = @generated.QueryOutlinesResponse::from_json(output)
   guard resp is Some(r) else { fail("QueryOutlinesResponse should parse") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   inspect(r.outlines.length(), content="4")
   inspect(r.outlines[0].symbol, content="Greeter")
   inspect(r.outlines[0].kind, content="type")
@@ -281,10 +281,10 @@ test "query_outlines: fixture output parses into QueryOutlinesResponse" {
 ///|
 test "query_outlines: api returns real outlines from ndjson" {
   setup_sdk_runtime_context()
-  let req : @generated.QueryOutlinesRequest = { package: "example/sdkacceptance" }
+  let req : @generated.QueryOutlinesRequest = { package_name: "example/sdkacceptance" }
   let resp = query_outlines(req)
   guard resp is Some(r) else { fail("query_outlines should return Some") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   inspect(r.outlines.length(), content="4")
   inspect(r.outlines[0].id, content="decl:go:example/sdkacceptance.Greeter")
   inspect(r.outlines[0].symbol, content="Greeter")
@@ -306,7 +306,7 @@ test "query exact-id: fixture input parses into QueryRequest" {
   }
   let req = @generated.QueryRequest::from_json(input)
   guard req is Some(r) else { fail("QueryRequest should parse") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   inspect(r.exact_id, content="Some(\"decl:go:example/sdkacceptance.Greeter\")")
   assert_true(r.exact_symbol is None)
   assert_true(r.text is None)
@@ -333,7 +333,7 @@ test "query exact-id: fixture output parses into QueryResponse" {
   }
   let resp = @generated.QueryResponse::from_json(output)
   guard resp is Some(r) else { fail("QueryResponse should parse") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   inspect(r.mode, content="exact-id")
   inspect(r.matches.length(), content="1")
   inspect(r.matches[0].symbol, content="Greeter")
@@ -344,7 +344,7 @@ test "query exact-id: fixture output parses into QueryResponse" {
 test "query exact-id: api routes to exact-id mode and returns Greeter match" {
   setup_sdk_runtime_context()
   let req : @generated.QueryRequest = {
-    package: "example/sdkacceptance",
+    package_name: "example/sdkacceptance",
     exact_id: Some("decl:go:example/sdkacceptance.Greeter"),
     exact_symbol: None,
     text: None,
@@ -353,7 +353,7 @@ test "query exact-id: api routes to exact-id mode and returns Greeter match" {
   }
   let resp = query(req)
   guard resp is Some(r) else { fail("query should return Some") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   inspect(r.mode, content="exact-id")
   assert_true(r.matches.length() >= 1)
   // First match must be Greeter (listed first in ndjson, matched at rank 2 by id substring)
@@ -370,7 +370,7 @@ test "query exact-symbol: fixture input parses into QueryRequest" {
   }
   let req = @generated.QueryRequest::from_json(input)
   guard req is Some(r) else { fail("QueryRequest should parse") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   assert_true(r.exact_id is None)
   inspect(r.exact_symbol, content="Some(\"Greeter.Greet\")")
 }
@@ -404,7 +404,7 @@ test "query exact-symbol: fixture output parses into QueryResponse" {
 test "query exact-symbol: api routes to exact-symbol mode and returns Greeter.Greet" {
   setup_sdk_runtime_context()
   let req : @generated.QueryRequest = {
-    package: "example/sdkacceptance",
+    package_name: "example/sdkacceptance",
     exact_id: None,
     exact_symbol: Some("Greeter.Greet"),
     text: None,
@@ -429,7 +429,7 @@ test "query fuzzy-text: fixture input parses into QueryRequest" {
   }
   let req = @generated.QueryRequest::from_json(input)
   guard req is Some(r) else { fail("QueryRequest should parse") }
-  inspect(r.package, content="example/sdkacceptance")
+  inspect(r.package_name, content="example/sdkacceptance")
   inspect(r.text, content="Some(\"label\")")
   inspect(r.limit, content="Some(5)")
   assert_true(r.exact_id is None)
@@ -477,7 +477,7 @@ test "query fuzzy-text: fixture output parses into QueryResponse" {
 test "query fuzzy-text: api routes to fuzzy-text mode and matches BuildLabels" {
   setup_sdk_runtime_context()
   let req : @generated.QueryRequest = {
-    package: "example/sdkacceptance",
+    package_name: "example/sdkacceptance",
     exact_id: None,
     exact_symbol: None,
     // "BuildLabel" appears in the signature of BuildLabels (substring match at rank 3)

@@ -37,37 +37,6 @@ fn trim_spaces(value : String) -> String {
 }
 
 ///|
-fn line_before_comment(value : String) -> String {
-  match value.find("//") {
-    Some(idx) => value[0:idx].to_string()
-    None => value
-  }
-}
-
-///|
-fn first_token(text : String) -> String {
-  let trimmed = trim_spaces(text)
-  if trimmed == "" {
-    return ""
-  }
-  let mut end = 0
-  while end < trimmed.length() {
-    let c = trimmed.code_unit_at(end)
-    if c == ' ' ||
-      c == '\t' ||
-      c == '(' ||
-      c == '{' ||
-      c == '[' ||
-      c == ':' ||
-      c == ',' ||
-      c == ';' {
-      break
-    }
-    end = end + 1
-  }
-  trimmed[0:end].to_string()
-}
-
 ///|
 fn recursive_pattern(pattern : String) -> (String, String)? {
   let normalized = if pattern.has_prefix("./") {
@@ -177,92 +146,6 @@ fn resolve_backend_override() -> String {
 }
 
 ///|
-fn last_code_unit_index(value : String, target : UInt16) -> Int? {
-  let mut i = value.length()
-  while i > 0 {
-    i = i - 1
-    if value.code_unit_at(i) == target {
-      return Some(i)
-    }
-  }
-  None
-}
-
-///|
-fn normalize_inventory_name(profile : String, name : String) -> String {
-  let trimmed = trim_spaces(name)
-  if profile == "go-module" {
-    match last_code_unit_index(trimmed, '.') {
-      Some(idx) if idx + 1 < trimmed.length() =>
-        trim_spaces(trimmed[idx + 1:].to_string())
-      _ => trimmed
-    }
-  } else if profile == "rust-crate" {
-    match trimmed.find("<") {
-      Some(idx) => trim_spaces(trimmed[0:idx].to_string())
-      None => trimmed
-    }
-  } else {
-    trimmed
-  }
-}
-
-///|
-fn is_go_exported_name(name : String) -> Bool {
-  if name == "" {
-    return false
-  }
-  let first = name.code_unit_at(0)
-  first >= 'A' && first <= 'Z'
-}
-
-///|
-fn comparable_inventory_kind(kind : String) -> String? {
-  match kind {
-    "callable" => Some("callable")
-    "function" => Some("callable")
-    "method" => Some("callable")
-    "struct" => Some("struct")
-    "interface" => Some("interface")
-    "enum" => Some("enum")
-    "union" => Some("union")
-    "trait" => Some("trait")
-    "type_alias" => Some("type_alias")
-    "const" => Some("const")
-    "static" => Some("static")
-    "var" => Some("var")
-    "module" => Some("module")
-    "macro" => Some("macro")
-    _ => None
-  }
-}
-
-///|
-fn inventory_key(profile : String, kind : String, name : String) -> String? {
-  guard comparable_inventory_kind(kind) is Some(normalized_kind) else {
-    return None
-  }
-  let normalized_name = normalize_inventory_name(profile, name)
-  if normalized_name == "" {
-    return None
-  }
-  if profile == "go-module" && !is_go_exported_name(normalized_name) {
-    return None
-  }
-  Some("\{normalized_kind}|\{normalized_name}")
-}
-
-///|
-fn inventory_validation_path_allowed(profile : String, path : String) -> Bool {
-  if path == "" {
-    return true
-  }
-  if profile == "go-module" && path.has_suffix("_test.go") {
-    return false
-  }
-  true
-}
-
 ///|
 fn profile_language(profile : String) -> String {
   match profile {
@@ -422,6 +305,21 @@ fn collect_records_from_view(
 }
 
 ///|
+pub fn inventory_validation_declarations(
+  profile : String,
+  declarations : Array[Json]
+) -> Array[Json] {
+  if profile == "go-module" {
+    declarations.filter(fn(decl) {
+      let path = @extract.field_string(decl, "path")
+      !path.has_suffix("_test.go")
+    })
+  } else {
+    declarations
+  }
+}
+
+///|
 fn local_package_view(repo : String) -> Result[@vp.ReadonlyPackageView, @cli.CliError] {
   let package_out = @source.resolve_source(
     @vp.SourceSpec::LocalWorkspace({ root_dir: repo }),
@@ -547,16 +445,3 @@ fn extract_build(
 }
 
 ///|
-fn inventory_validation_declarations(
-  profile : String,
-  declarations : Array[Json]
-) -> Array[Json] {
-  if profile == "go-module" {
-    declarations.filter(fn(decl) {
-      let path = @extract.field_string(decl, "path")
-      !path.has_suffix("_test.go")
-    })
-  } else {
-    declarations
-  }
-}

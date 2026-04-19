@@ -80,20 +80,20 @@ pub fn FetchPackagesResponse::from_json_string(
 
 ///|
 pub(all) struct QueryOutlinesRequest {
-  package : String
+  package_name : String
 } derive(Eq)
 
 ///|
 pub fn QueryOutlinesRequest::to_json(self : QueryOutlinesRequest) -> Json {
   let obj : Map[String, Json] = {}
-  obj["package"] = Json::string(self.package)
+  obj["package"] = Json::string(self.package_name)
   Json::object(obj)
 }
 
 ///|
 pub fn QueryOutlinesRequest::from_json(j : Json) -> QueryOutlinesRequest? {
   guard j is Object(obj) else { return None }
-  let package : String = match obj.get("package") {
+  let package_name : String = match obj.get("package") {
     Some(value) =>
       match
         (match value {
@@ -105,7 +105,7 @@ pub fn QueryOutlinesRequest::from_json(j : Json) -> QueryOutlinesRequest? {
       }
     None => return None
   }
-  Some({ package, })
+  Some({ package_name, })
 }
 
 ///|
@@ -129,14 +129,14 @@ pub fn QueryOutlinesRequest::from_json_string(
 
 ///|
 pub(all) struct QueryOutlinesResponse {
-  package : String
+  package_name : String
   outlines : Array[Outline]
 } derive(Eq)
 
 ///|
 pub fn QueryOutlinesResponse::to_json(self : QueryOutlinesResponse) -> Json {
   let obj : Map[String, Json] = {}
-  obj["package"] = Json::string(self.package)
+  obj["package"] = Json::string(self.package_name)
   obj["outlines"] = Json::array(self.outlines.map(fn(item) { item.to_json() }))
   Json::object(obj)
 }
@@ -144,7 +144,7 @@ pub fn QueryOutlinesResponse::to_json(self : QueryOutlinesResponse) -> Json {
 ///|
 pub fn QueryOutlinesResponse::from_json(j : Json) -> QueryOutlinesResponse? {
   guard j is Object(obj) else { return None }
-  let package : String = match obj.get("package") {
+  let package_name : String = match obj.get("package") {
     Some(value) =>
       match
         (match value {
@@ -177,7 +177,7 @@ pub fn QueryOutlinesResponse::from_json(j : Json) -> QueryOutlinesResponse? {
       }
     None => []
   }
-  Some({ package, outlines })
+  Some({ package_name, outlines })
 }
 
 ///|
@@ -201,7 +201,7 @@ pub fn QueryOutlinesResponse::from_json_string(
 
 ///|
 pub(all) struct QueryRequest {
-  package : String
+  package_name : String
   exact_id : String?
   exact_symbol : String?
   text : String?
@@ -212,7 +212,7 @@ pub(all) struct QueryRequest {
 ///|
 pub fn QueryRequest::to_json(self : QueryRequest) -> Json {
   let obj : Map[String, Json] = {}
-  obj["package"] = Json::string(self.package)
+  obj["package"] = Json::string(self.package_name)
   match self.exact_id {
     Some(value) => obj["exact_id"] = Json::string(value)
     None => ()
@@ -240,7 +240,7 @@ pub fn QueryRequest::to_json(self : QueryRequest) -> Json {
 ///|
 pub fn QueryRequest::from_json(j : Json) -> QueryRequest? {
   guard j is Object(obj) else { return None }
-  let package : String = match obj.get("package") {
+  let package_name : String = match obj.get("package") {
     Some(value) =>
       match
         (match value {
@@ -308,7 +308,7 @@ pub fn QueryRequest::from_json(j : Json) -> QueryRequest? {
       }
     None => None
   }
-  Some({ package, exact_id, exact_symbol, text, limit, cursor })
+  Some({ package_name, exact_id, exact_symbol, text, limit, cursor })
 }
 
 ///|
@@ -332,7 +332,7 @@ pub fn QueryRequest::from_json_string(
 
 ///|
 pub(all) struct QueryResponse {
-  package : String
+  package_name : String
   mode : String
   matches : Array[QueryMatch]
   cursor : String?
@@ -341,7 +341,7 @@ pub(all) struct QueryResponse {
 ///|
 pub fn QueryResponse::to_json(self : QueryResponse) -> Json {
   let obj : Map[String, Json] = {}
-  obj["package"] = Json::string(self.package)
+  obj["package"] = Json::string(self.package_name)
   obj["mode"] = Json::string(self.mode)
   obj["matches"] = Json::array(self.matches.map(fn(item) { item.to_json() }))
   match self.cursor {
@@ -354,7 +354,7 @@ pub fn QueryResponse::to_json(self : QueryResponse) -> Json {
 ///|
 pub fn QueryResponse::from_json(j : Json) -> QueryResponse? {
   guard j is Object(obj) else { return None }
-  let package : String = match obj.get("package") {
+  let package_name : String = match obj.get("package") {
     Some(value) =>
       match
         (match value {
@@ -407,7 +407,7 @@ pub fn QueryResponse::from_json(j : Json) -> QueryResponse? {
       }
     None => None
   }
-  Some({ package, mode, matches, cursor })
+  Some({ package_name, mode, matches, cursor })
 }
 
 ///|

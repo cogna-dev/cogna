@@ -19,7 +19,7 @@ fn ensure_dir(path : String) -> Result[Unit, String] {
   } else {
     @fs.create_dir(path) catch {
       err =>
-        return Err("cannot create directory \{path}: \{err.to_string()}")
+        return Err("cannot create directory \{path}: \{@debug.to_repr(err)}")
     }
     Ok(())
   }
@@ -28,7 +28,7 @@ fn ensure_dir(path : String) -> Result[Unit, String] {
 ///|
 fn write_text(path : String, content : String) -> Result[Unit, String] {
   @fs.write_string_to_file(path, content) catch {
-    err => return Err("cannot write file \{path}: \{err.to_string()}")
+    err => return Err("cannot write file \{path}: \{@debug.to_repr(err)}")
   }
   Ok(())
 }
@@ -36,7 +36,7 @@ fn write_text(path : String, content : String) -> Result[Unit, String] {
 ///|
 fn write_bytes(path : String, content : Bytes) -> Result[Unit, String] {
   @fs.write_bytes_to_file(path, content) catch {
-    err => return Err("cannot write file \{path}: \{err.to_string()}")
+    err => return Err("cannot write file \{path}: \{@debug.to_repr(err)}")
   }
   Ok(())
 }
@@ -708,7 +708,7 @@ fn store_bundle_in_local_cache(
   let bundle_path = "\{dist_dir}/bundle.ciq.tgz"
   let bundle_bytes = @fs.read_file_to_bytes(bundle_path) catch {
     err =>
-      return Err("cannot read bundle file \{bundle_path}: \{err.to_string()}")
+      return Err("cannot read bundle file \{bundle_path}: \{@debug.to_repr(err)}")
   }
   let cache_root = pipeline_cache_root_dir(config, root_dir)
   let put_out = @local_cache.put(

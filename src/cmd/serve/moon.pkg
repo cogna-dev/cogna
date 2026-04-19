@@ -8,6 +8,7 @@ import {
   "moonbitlang/async" @mbasync,
   "moonbitlang/async/http" @http,
   "moonbitlang/async/socket" @socket,
+  "moonbitlang/core/debug" @debug,
   "moonbitlang/core/encoding/utf8" @utf8,
   "shu-kitamura/sha256" @sha256,
 }

@@ -2,6 +2,7 @@ import { useState } from "react"
 import { motion } from "motion/react"
 import { Monitor, Terminal, Package, Code2, Bot, Download } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { DesktopSection } from "./desktop-section"
 import { CliSection } from "./cli-section"
 import { SdkSection } from "./sdk-section"
@@ -57,11 +58,11 @@ interface DownloadTabsProps {
 }
 
 const tabItems = [
-  { id: "desktop", label: "Desktop", icon: Monitor },
-  { id: "cli", label: "CLI", icon: Terminal },
-  { id: "sdk", label: "SDK", icon: Package },
-  { id: "vscode", label: "VSCode", icon: Code2 },
-  { id: "ai", label: "AI", icon: Bot },
+  { id: "desktop", label: "Desktop", icon: Monitor, badge: null },
+  { id: "cli", label: "CLI", icon: Terminal, badge: null },
+  { id: "sdk", label: "SDK", icon: Package, badge: null },
+  { id: "vscode", label: "VSCode", icon: Code2, badge: "即将上线" },
+  { id: "ai", label: "AI", icon: Bot, badge: null },
 ]
 
 export function DownloadTabs({ data }: DownloadTabsProps) {
@@ -81,6 +82,11 @@ export function DownloadTabs({ data }: DownloadTabsProps) {
               >
                 <Icon className="h-4 w-4" />
                 <span>{item.label}</span>
+                {item.badge && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 leading-4 border-muted-foreground/40 text-muted-foreground">
+                    {item.badge}
+                  </Badge>
+                )}
               </TabsTrigger>
             )
           })}

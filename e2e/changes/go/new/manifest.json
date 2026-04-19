@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "ciq-bundle/v1",
+  "purl": "pkg:golang/e2e/go-changes@2.0.0",
+  "profile": "go-module",
+  "source": {
+    "repo": "https://github.com/example/go-changes",
+    "ref": "main",
+    "commit": "new"
+  },
+  "artifacts": [
+    { "path": "declarations.ndjson", "sha256": "<computed>", "compression": "none" }
+  ]
+}

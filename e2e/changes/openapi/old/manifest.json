@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "ciq-bundle/v1",
+  "purl": "pkg:openapi/e2e/openapi-changes@1.0.0",
+  "profile": "openapi-spec",
+  "source": {
+    "repo": "https://github.com/example/openapi-changes",
+    "ref": "main",
+    "commit": "old"
+  },
+  "artifacts": [
+    { "path": "declarations.ndjson", "sha256": "<computed>", "compression": "none" }
+  ]
+}

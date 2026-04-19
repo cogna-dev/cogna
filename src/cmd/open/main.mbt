@@ -60,7 +60,7 @@ fn ensure_directory(path : String) -> Result[Unit, @cli.CliError] {
   match dir_out {
     Ok(true) => Ok(())
     Ok(false) => Err(open_error("path is not a directory: \{path}"))
-    Err(err) => Err(open_error("cannot inspect \{path}: \{err.to_string()}"))
+    Err(err) => Err(open_error("cannot inspect \{path}: \{@debug.to_repr(err)}"))
   }
 }
 

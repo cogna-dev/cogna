@@ -12,7 +12,7 @@ fn ensure_dir(path : String) -> Result[Unit, String] {
     return Ok(())
   }
   @fs.create_dir(path) catch {
-    err => return Err("cannot create directory \{path}: \{err.to_string()}")
+    err => return Err("cannot create directory \{path}: \{@debug.to_repr(err)}")
   }
   Ok(())
 }
@@ -361,7 +361,7 @@ fn write_text(path : String, text : String) -> Result[Unit, String] {
   let parent_out = ensure_parent_dirs(path)
   guard parent_out is Ok(_) else { return Err(parent_out.unwrap_err()) }
   @fs.write_string_to_file(path, text) catch {
-    err => return Err("cannot write file \{path}: \{err.to_string()}")
+    err => return Err("cannot write file \{path}: \{@debug.to_repr(err)}")
   }
   Ok(())
 }

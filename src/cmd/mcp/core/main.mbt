@@ -32,7 +32,7 @@ fn ensure_dist_dir() -> Result[Unit, @cli.CliError] {
     @fs.create_dir("./dist") catch {
       err =>
         return Err(
-          mcp_error("cannot create ./dist directory: \{err.to_string()}"),
+          mcp_error("cannot create ./dist directory: \{@debug.to_repr(err)}"),
         )
     }
     Ok(())
@@ -49,7 +49,7 @@ fn write_descriptor(path : String, info : Json) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, info.stringify(indent=2)) catch {
     err =>
       return Err(
-        mcp_error("cannot write descriptor \{path}: \{err.to_string()}"),
+        mcp_error("cannot write descriptor \{path}: \{@debug.to_repr(err)}"),
       )
   }
   Ok(())
@@ -196,7 +196,7 @@ fn write_tools_state(
   }
   @fs.write_string_to_file(path, state.stringify(indent=2)) catch {
     err =>
-      return Err("cannot write mcp tools state \{path}: \{err.to_string()}")
+      return Err("cannot write mcp tools state \{path}: \{@debug.to_repr(err)}")
   }
   Ok(())
 }

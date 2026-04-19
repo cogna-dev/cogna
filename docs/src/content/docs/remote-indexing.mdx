@@ -1,83 +1,55 @@
 ---
 title: 远程索引
-description: 远程托管索引功能尚未支持。本页说明今天如何用本地 cache proxy 和 MCP 替代，以及未来规划。
+description: 通过 HTTP cache 在团队和 CI 之间共享构建结果，减少重复工作。
 order: 16
 ---
 
 # 远程索引
 
-<span style="display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:6px;padding:4px 12px;font-size:0.9rem;font-weight:600;">⚠️ 尚未支持</span>
+远程索引的核心目标是：把一次构建结果复用给更多人和更多流水线。
 
-Cogna 目前不提供云端托管的索引服务。所有的 build、index 和 query 操作都在本地完成。
+## 快速搭建
 
----
-
-## 未来规划
-
-我们计划支持以下远程索引能力：
-
-- **托管索引服务** — 把 build 的结果推送到云端，团队成员无需本地构建就能查询
-- **远端统一检索** — 在一个集中的地方搜索所有已发布的 bundle
-- **多版本历史** — 在线对比任意两个版本的 API 变化
-- **团队协作** — 多人共享同一套 cache proxy，统一管理访问权限
-
----
-
-## 今天怎么替代
-
-虽然远程索引还没上线，但你可以用以下方式在团队内部共享和检索 bundle。
-
-### 场景一：团队内部共享 bundle
-
-在你的机器或内网服务器上运行 cache proxy：
+在一台共享机器上：
 
 ```bash
-# 先构建 bundle
-cd ./sdk
-cogna build
-
-# 启动 HTTP server，让团队其他人访问
 cogna serve --port 8787
 ```
 
-其他人通过 HTTP 下载：
+在业务仓库里配置：
 
-```bash
-curl "http://localhost:8787/cache/v1/object?key=blob%2Fsha256%2Fexample"
+```yaml
+cache:
+  type: http
+  storeDir: .cogna/cache
+  http:
+    endpoint: http://cache.internal:8787
 ```
 
-### 场景二：让 AI 查询其他人已经构建的 bundle
-
-先把目标 bundle 下载到本机，再启动 MCP：
+之后照常执行：
 
 ```bash
-# 先从 cache proxy 下载 bundle object
-curl -o bundle.ciq.tgz "http://localhost:8787/cache/v1/object?key=blob%2Fsha256%2Fexample"
-
-# 启动 MCP（会自动加载已物化的 bundle）
-cogna mcp serve --port 3000
+cogna build
 ```
 
-现在你的 AI 工具可以查询 `tokio@1.43.0` 的函数签名，就像查本地代码一样。
+## 你会得到什么
 
-### 场景三：CI 从统一位置拉取 bundle
+- 本地 miss 时自动读取远端缓存
+- 命中后回填本地缓存
+- CI 和本地共享同一份索引事实
 
-在 CI pipeline 中，从内网 cache proxy 下载特定版本的 bundle：
+## 适合谁
 
-```bash
-# CI 脚本中
-curl -o policy.bundle.ciq.tgz \
-  "http://localhost:8787/cache/v1/object?key=blob%2Fsha256%2Fpolicy"
+- 多人协作项目
+- 分支较多、重复构建频繁的团队
+- 希望降低 CI 时间与成本的仓库
 
-# 把下载得到的 policy bundle 路径写入 cogna.yml -> checks.policy，然后执行检查
-cd ./sdk
-cogna check
-```
+## 与下载页的关系
 
----
+如果你希望非终端用户也参与使用，可在 [/download](/download) 安装 Desktop 版本，由桌面端消费同样的索引结果。
 
-## 下一步
+## 相关文档
 
-- 了解本地构建与 bundle 产物：[构建索引](/docs/build-indexes)
-- 查看 MCP 接口能力：[AI 查询（MCP）](/docs/mcp)
-- 了解当前完整支持范围：[开发进度](/docs/progress)
+- [配置与 PURL](/docs/config)
+- [持续集成](/docs/ci)
+- [AI 查询（MCP）](/docs/mcp)

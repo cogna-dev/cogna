@@ -1,0 +1,184 @@
+---
+title: Desktop 应用
+description: 下载并安装 Cogna Desktop 图形客户端，在原生界面中完成构建、对比与检查。
+order: 8
+---
+
+# Desktop 应用
+
+Cogna Desktop 是一款原生桌面应用，为个人开发者和团队提供与 CLI 等价的完整工作流，并以可视化方式呈现构建结果、变更对比和策略检查报告。如果你不喜欢记忆命令参数、希望一眼看清 breaking change 分布，Desktop 是更直观的入口。
+
+## 下载
+
+选择你的平台下载最新版本：
+
+### macOS
+
+| 版本 | 下载 |
+|------|------|
+| Apple Silicon（M1 / M2 / M3） | [Cogna-darwin-arm64.dmg](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-darwin-arm64.dmg) |
+| Intel | [Cogna-darwin-x64.dmg](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-darwin-x64.dmg) |
+
+> **说明：** macOS 版本当前处于人工测试阶段，功能完整、可日常使用，但如遇到问题欢迎在 [GitHub Issues](https://github.com/cogna-dev/cogna/issues) 反馈。
+
+安装步骤：
+1. 下载对应架构的 `.dmg` 文件
+2. 双击挂载，将 **Cogna** 图标拖入 **Applications** 文件夹
+3. 首次打开时，若 macOS 弹出"未经验证的开发者"提示，前往 **系统设置 → 隐私与安全 → 仍然打开**
+
+### Linux
+
+| 版本 | 下载 |
+|------|------|
+| AppImage（x64，免安装） | [Cogna-linux-x86_64.AppImage](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-linux-x86_64.AppImage) |
+| deb（x64） | [Cogna-linux-amd64.deb](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-linux-amd64.deb) |
+| rpm（x64） | [Cogna-linux-x86_64.rpm](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-linux-x86_64.rpm) |
+
+```bash
+# AppImage（免安装，推荐先试用）
+chmod +x Cogna-linux-x86_64.AppImage
+./Cogna-linux-x86_64.AppImage
+
+# deb
+sudo dpkg -i Cogna-linux-amd64.deb
+
+# rpm
+sudo rpm -i Cogna-linux-x86_64.rpm
+```
+
+### Windows
+
+| 版本 | 下载 |
+|------|------|
+| 安装包（x64） | [Cogna-win32-x64.exe](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-win32-x64.exe) |
+| 绿色版（x64，解压即用） | [Cogna-win32-x64-portable.zip](https://github.com/cogna-dev/cogna/releases/latest/download/Cogna-win32-x64-portable.zip) |
+
+下载 `.exe` 安装包，双击按向导完成安装；如不希望写注册表，可下载 `.zip` 绿色版解压后直接运行。
+
+所有平台的历史版本可在 [GitHub Releases](https://github.com/cogna-dev/cogna/releases) 中找到。
+
+---
+
+## 快速上手
+
+如果你是第一次接触 Cogna，建议先阅读 [快速开始](/docs/quickstart) 了解核心概念，再回到这里用 Desktop 操作。
+
+安装完成后，整个上手流程大约只需 5 分钟：
+
+### 第一步：打开并添加项目
+
+启动 Desktop，点击主界面的 **「+ 添加项目」**，选择你的本地仓库目录。
+
+- 如果仓库内**已有** `cogna.yaml`，Desktop 会自动识别并加载配置
+- 如果**还没有** `cogna.yaml`，点击 **「初始化」**，填写包名（PURL 格式）和语言配置，Desktop 会帮你生成配置文件
+
+### 第二步：执行构建
+
+进入项目后，点击 **「构建」** 按钮。Desktop 会在后台运行与 `cogna build` 等价的操作：
+
+- 读取 `cogna.yaml` 中的 `purl` 和 `inputs` 配置，确定要提取哪些文件
+- 提取公开声明（函数、类型、接口等），生成结构化索引
+- 结果写入项目根目录下的 `dist/` 文件夹
+
+构建过程中可以实时看到日志输出，通常在几秒到数十秒内完成，取决于项目规模。
+
+> **缓存提速：** 如果团队配置了远端 HTTP cache，构建时 Desktop 会优先从缓存恢复，不必每次重新提取——大型项目可节省大量时间。
+
+### 第三步：查看变更
+
+构建完成后，切换到 **「变更」** 标签页。
+
+这里展示的是 `cogna diff` 的结果——相较于上一个稳定版本，当前代码的公开接口有哪些变化：
+
+| 变更类型 | 含义 |
+|---------|------|
+| 新增（Added） | 新的公开声明，对调用方无影响 |
+| 删除（Removed） | 已删除的声明，**可能破坏现有调用** |
+| 修改（Changed） | 签名发生变化，需确认是否兼容 |
+| 废弃（Deprecated） | 标记为废弃，建议调用方迁移 |
+
+每条变更都有严重级别（`breaking` / `compatible`）标注，点击条目可跳转到对应的源文件位置。
+
+### 第四步：策略检查
+
+切换到 **「检查」** 标签页，Desktop 会用项目目录下的 Rego 策略文件（`policies/`）对变更结果进行合规审查，等价于 `cogna check`。
+
+- **全部通过**：绿色✓，可以安心发布
+- **存在违规**：列出违规规则名称、所在位置和修复建议；点击规则名可直接查看文档
+
+如果你不熟悉内置规则，可参考 [内置策略规则](/docs/policies) 了解每条规则的触发条件。
+
+---
+
+## 主要功能详解
+
+### 多项目管理
+
+Desktop 支持在左侧面板中同时管理多个项目，每个项目独立保存：
+
+- 构建历史记录（可回溯对比任意两个版本的变更）
+- 缓存配置（本地缓存路径 / 远端 HTTP cache 地址）
+- 运行状态（上次构建时间、结果摘要）
+
+项目之间一键切换，无需重新选择目录。
+
+### 历史对比
+
+Desktop 保存每次构建的快照。你可以选择任意两个历史版本做横向对比，直观看出某次提交引入了哪些接口变化，而不仅仅是与上一版本的差异。
+
+这在 code review 或发布回溯时特别有用：不需要分别切换 Git 分支重新构建，在 Desktop 里直接选时间点即可。
+
+### 可视化依赖树
+
+构建完成后，**「依赖」** 标签页展示当前项目的完整包依赖树，包括每个包的：
+
+- 名称和版本
+- 生态系统（Go module、npm、Rust crate 等）
+- 关系类型（直接依赖 / 间接依赖 / 开发依赖）
+- 已知漏洞摘要（需配合 SCA 功能）
+
+### 远端缓存配置
+
+在 **「项目设置」** 中可配置 HTTP cache 服务地址，无需手动编辑 `cogna.yaml`：
+
+```
+缓存服务器地址: http://cache.internal:8787
+```
+
+配置后，下次构建时 Desktop 会自动尝试从远端缓存恢复，命中后还会回填本地缓存。
+
+---
+
+## 与 CLI 的关系
+
+Desktop 与 CLI 共享同一份 `cogna.yaml`，产出结果完全一致，随时可以混用：
+
+| 场景 | 推荐工具 |
+|------|---------|
+| 初次探索、学习、快速查看报告 | Desktop |
+| CI/CD 流水线、自动化脚本 | CLI |
+| 精细控制参数、批量操作 | CLI |
+| 向非技术成员演示结果 | Desktop |
+| 本地开发日常检查 | 两者皆可 |
+
+Desktop 改动的配置（如缓存地址）会直接写入 `cogna.yaml`，CLI 下次运行时同样生效。
+
+---
+
+## 系统要求
+
+| 平台 | 最低版本 |
+|------|---------|
+| macOS | 11 Big Sur |
+| Linux | Ubuntu 20.04 / glibc 2.31+ |
+| Windows | Windows 10（64 位） |
+
+---
+
+## 相关文档
+
+- [快速开始](/docs/quickstart)
+- [CLI 参考](/docs/cli)
+- [配置与 PURL](/docs/config)
+- [远程索引](/docs/remote-indexing)
+- [下载页面](/download)

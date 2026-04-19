@@ -48,7 +48,7 @@ fn explicit_case_id(case_obj : Map[String, Json]) -> String? {
 ///|
 fn read_manifest(path : String) -> Result[Json, String] {
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err("cannot read manifest \{path}: \{err.to_string()}")
+    err => return Err("cannot read manifest \{path}: \{@debug.to_repr(err)}")
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(value) else {
@@ -203,7 +203,7 @@ fn extract_cases_from_manifest(path : String) -> Result[Array[E2eCase], String] 
 ///|
 pub fn load_cases() -> Result[Array[E2eCase], String] {
   let manifests = @fs.read_dir("./e2e/extractors") catch {
-    err => return Err("cannot read e2e manifest directory: \{err.to_string()}")
+    err => return Err("cannot read e2e manifest directory: \{@debug.to_repr(err)}")
   }
   let all_cases : Array[E2eCase] = []
   manifests.sort()

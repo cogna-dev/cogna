@@ -111,7 +111,7 @@ fn sbom_collect_recursive(
     "\{repo}/\{relative_dir}"
   }
   let entries = @fs.read_dir(dir_path) catch {
-    err => return Err("cannot read directory \{dir_path}: \{err.to_string()}")
+    err => return Err("cannot read directory \{dir_path}: \{@debug.to_repr(err)}")
   }
   entries.sort()
   for i in 0..<entries.length() {
@@ -482,7 +482,7 @@ fn build_scan_npm_components(
     return Ok(())
   }
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err("cannot read package.json: \{err.to_string()}")
+    err => return Err("cannot read package.json: \{@debug.to_repr(err)}")
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(Object(object)) else {
@@ -779,7 +779,7 @@ fn build_read_optional_file(path : String) -> Result[String?, String] {
     return Ok(None)
   }
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err("cannot read \{path}: \{err.to_string()}")
+    err => return Err("cannot read \{path}: \{@debug.to_repr(err)}")
   }
   Ok(Some(text))
 }
@@ -787,7 +787,7 @@ fn build_read_optional_file(path : String) -> Result[String?, String] {
 ///|
 fn build_read_required_file(path : String) -> Result[String, String] {
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err("cannot read \{path}: \{err.to_string()}")
+    err => return Err("cannot read \{path}: \{@debug.to_repr(err)}")
   }
   Ok(text)
 }
@@ -803,7 +803,7 @@ fn build_collect_terraform_files(
   for i in 0..<paths.length() {
     let path = paths[i]
     let text = @fs.read_file_to_string("\{repo}/\{path}") catch {
-      err => return Err("cannot read \{repo}/\{path}: \{err.to_string()}")
+      err => return Err("cannot read \{repo}/\{path}: \{@debug.to_repr(err)}")
     }
     files.push((path, text))
   }

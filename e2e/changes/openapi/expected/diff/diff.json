@@ -1,0 +1,362 @@
+{
+  "basePurl": "pkg:openapi/e2e/openapi-changes@1.0.0",
+  "changes": [
+    {
+      "after": "operation createPayment",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::createPayment",
+        "kind": "operation",
+        "language_specific": {
+          "openapi": {
+            "httpMethod": "PUT",
+            "mediaTypes": [
+              "application/json",
+              "application/xml"
+            ],
+            "required": true,
+            "statusCodes": [
+              "200",
+              "201"
+            ]
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 20,
+          "startLine": 20,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "operation createPayment"
+      },
+      "before": "operation createPayment",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::createPayment",
+        "kind": "operation",
+        "language_specific": {
+          "openapi": {
+            "httpMethod": "POST",
+            "mediaTypes": [
+              "application/json"
+            ],
+            "required": false,
+            "statusCodes": [
+              "200"
+            ]
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 20,
+          "startLine": 20,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "operation createPayment"
+      },
+      "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::createPayment",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "openapi/payment.yaml",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "openapi-http-method-changed"
+          },
+          {
+            "code": "openapi-became-required"
+          },
+          {
+            "code": "openapi-status-codes-added"
+          },
+          {
+            "code": "openapi-media-types-added"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "openapi": {
+              "httpMethod": "PUT",
+              "mediaTypes": [
+                "application/json",
+                "application/xml"
+              ],
+              "required": true,
+              "statusCodes": [
+                "200",
+                "201"
+              ]
+            },
+            "profile": "openapi-spec"
+          },
+          "before": {
+            "openapi": {
+              "httpMethod": "POST",
+              "mediaTypes": [
+                "application/json"
+              ],
+              "required": false,
+              "statusCodes": [
+                "200"
+              ]
+            },
+            "profile": "openapi-spec"
+          }
+        }
+      }
+    },
+    {
+      "after": "operation getPayment",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::getPayment",
+        "kind": "operation",
+        "language_specific": {
+          "openapi": {
+            "mediaTypes": [
+              "application/json"
+            ],
+            "statusCodes": [
+              "200"
+            ]
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 40,
+          "startLine": 40,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "operation getPayment"
+      },
+      "before": "operation getPayment",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::getPayment",
+        "kind": "operation",
+        "language_specific": {
+          "openapi": {
+            "mediaTypes": [
+              "application/json"
+            ],
+            "statusCodes": [
+              "200",
+              "404"
+            ]
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 40,
+          "startLine": 40,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "operation getPayment"
+      },
+      "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::getPayment",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "openapi/payment.yaml",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "openapi-response-status-removed"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "openapi": {
+              "mediaTypes": [
+                "application/json"
+              ],
+              "statusCodes": [
+                "200"
+              ]
+            },
+            "profile": "openapi-spec"
+          },
+          "before": {
+            "openapi": {
+              "mediaTypes": [
+                "application/json"
+              ],
+              "statusCodes": [
+                "200",
+                "404"
+              ]
+            },
+            "profile": "openapi-spec"
+          }
+        }
+      }
+    },
+    {
+      "after": "oneOf:",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::Payment.oneOf",
+        "kind": "oneOf",
+        "language_specific": {
+          "openapi": {
+            "memberRefs": [
+              "#/components/schemas/CardPayment"
+            ]
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 80,
+          "startLine": 80,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "oneOf:"
+      },
+      "before": "oneOf:",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::Payment.oneOf",
+        "kind": "oneOf",
+        "language_specific": {
+          "openapi": {
+            "memberRefs": [
+              "#/components/schemas/CardPayment",
+              "#/components/schemas/BankPayment"
+            ]
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 80,
+          "startLine": 80,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "oneOf:"
+      },
+      "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::Payment.oneOf",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "openapi/payment.yaml",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "openapi-response-schema-narrowed"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "openapi": {
+              "memberRefs": [
+                "#/components/schemas/CardPayment"
+              ]
+            },
+            "profile": "openapi-spec"
+          },
+          "before": {
+            "openapi": {
+              "memberRefs": [
+                "#/components/schemas/CardPayment",
+                "#/components/schemas/BankPayment"
+              ]
+            },
+            "profile": "openapi-spec"
+          }
+        }
+      }
+    },
+    {
+      "after": "operation ping",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::ping",
+        "kind": "operation",
+        "language_specific": {
+          "openapi": {
+            "operationId": "ping",
+            "x-note": "b"
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 100,
+          "startLine": 100,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "operation ping"
+      },
+      "before": "operation ping",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::ping",
+        "kind": "operation",
+        "language_specific": {
+          "openapi": {
+            "operationId": "ping",
+            "x-note": "a"
+          },
+          "profile": "openapi-spec"
+        },
+        "location": {
+          "endLine": 100,
+          "startLine": 100,
+          "uri": "openapi/payment.yaml"
+        },
+        "path": "openapi/payment.yaml",
+        "signature": "operation ping"
+      },
+      "id": "decl:openapi-spec:openapi-spec::openapi/payment.yaml::ping",
+      "kind": "changed",
+      "level": "warning",
+      "path": "openapi/payment.yaml",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "openapi-operation-changed"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "openapi": {
+              "operationId": "ping",
+              "x-note": "b"
+            },
+            "profile": "openapi-spec"
+          },
+          "before": {
+            "openapi": {
+              "operationId": "ping",
+              "x-note": "a"
+            },
+            "profile": "openapi-spec"
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": "ciq-diff/v1",
+  "summary": {
+    "added": 0,
+    "changed": 4,
+    "deprecated": 0,
+    "removed": 0
+  },
+  "targetPurl": "pkg:openapi/e2e/openapi-changes@2.0.0"
+}

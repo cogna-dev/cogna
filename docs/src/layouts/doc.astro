@@ -17,7 +17,7 @@ const currentPath = Astro.url.pathname
 
 <Base title={title} description={description}>
 	<Header client:load header={{
-		title: "CodeIQ",
+			 title: "Cogna",
 		description: "面向声明与变更治理的本地工作流",
 		menus: topNavigation,
 		homeHref: "/",
@@ -33,9 +33,9 @@ const currentPath = Astro.url.pathname
 		<slot />
 	</DocsLayout>
 	<Footer client:load footer={{
-		title: "CodeIQ",
+			 title: "Cogna",
 		description: "Tutorials / How-to / Reference / Explanation",
 		menus: footerMenus,
-		copyright: "CodeIQ",
+			 copyright: "Cogna",
 	}} socials={{}} />
 </Base>

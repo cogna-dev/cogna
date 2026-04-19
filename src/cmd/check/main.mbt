@@ -45,7 +45,7 @@ fn check_error(message : String) -> @cli.CliError {
 fn read_json_file(path : String, kind : String) -> Result[Json, @cli.CliError] {
   let text = @fs.read_file_to_string(path) catch {
     err =>
-      return Err(check_error("cannot read \{kind} \{path}: \{err.to_string()}"))
+      return Err(check_error("cannot read \{kind} \{path}: \{@debug.to_repr(err)}"))
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(value) else {
@@ -90,7 +90,7 @@ fn read_rego_from_dir(policies_dir : String) -> Result[String, @cli.CliError] {
   let entries = @fs.read_dir(policies_dir) catch {
     err =>
       return Err(
-        check_error("cannot read policies directory: \{err.to_string()}"),
+        check_error("cannot read policies directory: \{@debug.to_repr(err)}"),
       )
   }
   let rego_files : Array[String] = []
@@ -105,7 +105,7 @@ fn read_rego_from_dir(policies_dir : String) -> Result[String, @cli.CliError] {
     let content = @fs.read_file_to_string("\{policies_dir}/\{filename}") catch {
       err =>
         return Err(
-          check_error("cannot read policy file \{filename}: \{err.to_string()}"),
+          check_error("cannot read policy file \{filename}: \{@debug.to_repr(err)}"),
         )
     }
     text = text + content + "\n"
@@ -418,7 +418,7 @@ fn write_temp_json(
   @fs.write_string_to_file(path, content.stringify(indent=2)) catch {
     err =>
       return Err(
-        check_error("cannot write temp file \{path}: \{err.to_string()}"),
+        check_error("cannot write temp file \{path}: \{@debug.to_repr(err)}"),
       )
   }
   Ok(())
@@ -667,7 +667,7 @@ fn write_sarif(path : String, sarif : Json) -> Result[Unit, @cli.CliError] {
   @fs.write_string_to_file(path, sarif.stringify(indent=2)) catch {
     err =>
       return Err(
-        check_error("cannot write sarif file \{path}: \{err.to_string()}"),
+        check_error("cannot write sarif file \{path}: \{@debug.to_repr(err)}"),
       )
   }
   Ok(())

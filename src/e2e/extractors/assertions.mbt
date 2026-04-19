@@ -1,7 +1,7 @@
 ///|
 fn read_file_bytes(path : String) -> Result[Bytes, String] {
   let bytes = @fs.read_file_to_bytes(path) catch {
-    err => return Err("cannot read file \{path}: \{err.to_string()}")
+    err => return Err("cannot read file \{path}: \{@debug.to_repr(err)}")
   }
   Ok(bytes)
 }

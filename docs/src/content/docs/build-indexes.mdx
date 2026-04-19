@@ -1,154 +1,53 @@
 ---
 title: 构建索引
-description: 把你的代码仓库或 API 规格文件构建成可对比、可检查、可查询的 Cogna bundle。
+description: 把代码或 API 规格转换为可对比、可检索、可检查的 Cogna 索引产物。
 order: 13
 ---
 
 # 构建索引
 
-**构建索引**是 Cogna 的第一步，也是所有后续操作的基础。执行 `cogna build` 之后，你会在 `dist/` 目录下得到一个标准化的 bundle 文件——无论是版本对比、策略检查、AI 查询，还是团队共享，都从这个 bundle 开始。
+`cogna build` 是你后续一切操作的起点。只有先构建索引，才能继续做 diff、check、MCP 查询。
 
----
-
-## 第一步：初始化配置
-
-在仓库根目录执行：
+## 典型流程
 
 ```bash
 cogna init
-```
-
-这会生成一个 `cogna.yml` 文件，内容大致如下：
-
-```yaml
-# cogna.yml（Go 模块示例）
-schemaVersion: ciq-config/v2
-profile: go-module
-purl: pkg:golang/github.com/acme/sdk@v1.2.0
-source:
-  repo: https://github.com/acme/sdk
-  ref: main
-inputs:
-  include:
-    - "**/*.go"
-```
-
-关键字段说明：
-
-| 字段 | 作用 | 常见值 |
-|------|------|--------|
-| `profile` | 告诉 Cogna 这是哪种类型的仓库 | `go-module` / `rust-crate` / `terraform-module` / `openapi-spec` / `policy-bundle` |
-| `purl` | 这个仓库的唯一标识符（Package URL） | `pkg:golang/github.com/acme/sdk@v1.2.0` |
-| `inputs` | 要扫描的路径 | 默认为当前目录 `.` |
-
----
-
-## 第二步：构建普通仓库
-
-```bash
-cd ./sdk
 cogna build
 ```
 
-构建完成后，`dist/` 目录结构如下：
+## 构建后会得到什么
 
-```text
-./sdk/dist/
-├── bundle.ciq.tgz          ← 主 bundle，后续所有命令的入口
-├── declarations.ndjson      ← 所有公开 API 声明（函数、类型、接口等）
-├── manifest.json            ← bundle 元信息（版本、profile、文件哈希等）
-└── checksums.txt            ← 所有文件的 SHA-256 校验和
-```
+`dist/` 目录通常包含：
 
-SPDX 文件写入项目根目录：
+- `bundle.ciq.tgz`
+- `declarations.ndjson`
+- `manifest.json`
+- `metadata.json`
+- `checksums.txt`
 
-```text
-./sdk/.cogna/sbom.spdx.json
-```
+其中最重要的是 `bundle.ciq.tgz`，它是可复用的标准输入。
 
-你最常用到的是 **`bundle.ciq.tgz`**，它是其他所有命令的统一入口。
+## 常见问题
 
----
+### 构建很慢怎么办？
 
-## 第三步：构建 policy 仓库
+- 先确认 `inputs.include` 不要过宽。
+- 使用本地 cache，避免重复计算。
+- 团队场景可接入 HTTP cache（见 [远程索引](/docs/remote-indexing)）。
 
-如果你在维护一套规则（Rego policy），把 `profile` 设成 `policy-bundle` 后执行同样的命令：
+### 构建失败怎么办？
 
-```bash
-cd ./policy
-cogna build
-```
+- 先检查 `profile` 与仓库类型是否一致。
+- 再检查仓库路径、分支和权限。
 
-此时 `dist/` 目录会有所不同：
+## 推荐实践
 
-```text
-./policy/dist/
-├── bundle.ciq.tgz       ← 给 `checks.policy` 引用的 policy bundle
-├── opa-bundle.tar.gz    ← OPA 原生 bundle，可直接用于 opa eval
-├── policy.rules.json    ← 规则目录（名称、描述、帮助链接），供人工查阅
-├── manifest.json
-└── checksums.txt
-```
+- 每次发布前固定执行一次 `cogna build`。
+- 把 `dist/bundle.ciq.tgz` 作为可追溯工件保存。
+- 与 `diff`、`check` 一起放进 CI。
 
-使用 policy bundle：
+## 相关文档
 
-```bash
-# 在 SDK 仓库目录里执行检查
-cd ./sdk
-cogna check
-```
-
----
-
-## 构建成功的标志
-
-只要看到以下三个文件，就说明构建成功：
-
-1. ✅ `dist/manifest.json` 已生成
-2. ✅ `dist/bundle.ciq.tgz` 已生成
-3. ✅ 终端输出显示 `build successful`
-
----
-
-## 典型场景
-
-### 准备发版检查
-
-构建完成后，准备 `dist/base` 与 `dist/target` 两套产物，再执行 diff：
-
-```bash
-cd ./sdk
-cogna build
-cogna diff
-# 输出 dist/diff.json，列出所有 breaking change
-```
-
-### 接入 AI 助手
-
-构建后启动 MCP 服务，让 Claude / Cursor 等工具直接查询你的 API：
-
-```bash
-cogna build
-cogna mcp serve --port 3000
-# 此后 AI 工具可以通过 cogna.query.symbol 等工具查询 bundle
-```
-
-### 分享给团队
-
-把 bundle 放进 cache 并通过 proxy 共享给团队：
-
-```bash
-cd ./sdk
-cogna build
-cogna serve --port 8787
-# 其他机器可通过 HTTP cache object API 读取对象
-```
-
----
-
-## 下一步
-
-- 了解 bundle 产物结构：[构建索引](/docs/build-indexes)
-- 对比两个版本的变化：[版本变化分析](/docs/analyze-changes)
-- 做发版前的策略检查：[持续集成](/docs/ci)
-- 把 bundle 用于远程复用：[远程索引](/docs/remote-indexing)
+- [配置与 PURL](/docs/config)
+- [分析变更](/docs/analyze-changes)
+- [持续集成](/docs/ci)

@@ -1,98 +1,32 @@
 ---
 title: SCA 与 SBOM
-description: Cogna 当前输出 SPDX-only SBOM，以及如何把它接入现有的 SCA 工作流。
+description: 使用 Cogna 输出 SPDX SBOM，并接入你的安全与合规流程。
 order: 24
 ---
 
 # SCA 与 SBOM
 
-`cogna build` 除了生成 API bundle，也会同时生成依赖清单与 SPDX SBOM。当前版本已经收口为 **SPDX-only**：不再生成 CycloneDX 文件。
+除了接口兼容性，很多团队还需要依赖合规与漏洞追踪。Cogna 产出的 SBOM 可直接用于这类流程。
 
----
+## 你会得到什么
 
-## 构建后会生成哪些组件产物
+构建后可获得 SPDX 相关产物，便于与现有 SCA 平台对接。
+
+## 推荐做法
+
+- 在 CI 中保存 SBOM 产物
+- 与 `diff.json`、`check.sarif.json` 一起归档
+- 发布前做一次统一审计
+
+## 典型流程
 
 ```bash
 cogna build
+# 保存 dist/ 中的 SBOM 相关输出
 ```
 
-构建完成后，会包含：
+## 相关文档
 
-```text
-.cogna/sbom.spdx.json            ← SPDX JSON SBOM
-```
-
-如果配置里启用了本地依赖 bundle（默认开启），并且项目中存在可解析的本地依赖，还会额外看到：
-
-```text
-dist/dependencies/<safe-purl>/
-├── manifest.json
-├── package.files.json
-├── metadata.json
-├── checksums.txt
-└── bundle.ciq.tgz
-```
-
----
-
-## SPDX 里包含什么
-
-`sbom.spdx.json` 会包含：
-
-- 根仓库组件
-- 已解析的软件依赖组件
-- 本地依赖的 evidence path
-- 基于本地内容快照生成的校验信息（`verifiedUsing`）
-
-这使得 Cogna 后续的 `diff` 和 dependency bundle 编排都能使用同一套组件事实来源。
-
----
-
-## 组件变化（componentChanges）
-
-`cogna diff` 不只比较 API，也比较组件版本变化。例如依赖从 `1.0.195` 升到 `1.0.197` 时，`diff.json` 里会出现：
-
-```json
-{
-  "componentChanges": [
-    {
-      "kind": "changed",
-      "name": "serde",
-      "beforePurl": "pkg:cargo/serde@1.0.195",
-      "afterPurl": "pkg:cargo/serde@1.0.197",
-      "beforeVersion": "1.0.195",
-      "afterVersion": "1.0.197"
-    }
-  ]
-}
-```
-
----
-
-## 接入已有工具
-
-### 上传到制品库 / 归档
-
-```yaml
-- name: Upload SBOM
-  uses: actions/upload-artifact@v4
-  with:
-    name: sbom
-    path: ./sdk/.cogna/sbom.spdx.json
-```
-
-### 作为 release 附件
-
-```bash
-cp ./sdk/.cogna/sbom.spdx.json ./release-assets/
-```
-
-如果你的 SCA 平台只接受 CycloneDX，那么当前需要在 Cogna 之外做一次 SPDX → CycloneDX 转换；Cogna 自身不再直接生成 `sbom.cdx.json`。
-
----
-
-## 下一步
-
-- 了解 bundle 产物与构建流程：[构建索引](/docs/build-indexes)
-- 理解 dependency bundle 的远程复用：[远程索引](/docs/remote-indexing)
-- 查看完整的当前命令面：[CLI 参考](/docs/cli)
+- [持续集成](/docs/ci)
+- [启用 SARIF 集成](/docs/sarif)
+- [内置策略规则](/docs/policies)

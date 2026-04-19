@@ -104,7 +104,7 @@ pub fn resolve_terraform_package(
     }
     let lock_file = "\{workspace_root}/.terraform.lock.hcl"
     let bytes = @fs.read_file_to_bytes(lock_file) catch {
-      err => return Err("cannot read file \{lock_file}: \{err.to_string()}")
+      err => return Err("cannot read file \{lock_file}: \{@debug.to_repr(err)}")
     }
     let virtual_file_out = @vp.virtual_file(".terraform.lock.hcl", bytes)
     guard virtual_file_out is Ok(file) else {

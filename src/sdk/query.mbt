@@ -1124,7 +1124,7 @@ pub fn query_outlines(
   req : @generated.QueryOutlinesRequest,
 ) -> @generated.QueryOutlinesResponse? {
   @generated.QueryOutlinesResponse::from_json(
-    query_outlines_for_package(req.package),
+    query_outlines_for_package(req.package_name),
   )
 }
 
@@ -1133,7 +1133,7 @@ pub fn query_outlines(
 pub fn query(req : @generated.QueryRequest) -> @generated.QueryResponse? {
   @generated.QueryResponse::from_json(
     query_package(
-      req.package,
+      req.package_name,
       req.exact_id,
       req.exact_symbol,
       req.text,

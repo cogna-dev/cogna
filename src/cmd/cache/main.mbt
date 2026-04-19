@@ -101,7 +101,7 @@ pub fn run_add(
   let root_out = cache_root()
   guard root_out is Ok(root) else { return Err(root_out.unwrap_err()) }
   let body = @fs.read_file_to_bytes(params.file_path) catch {
-    err => return Err(cache_error("cannot read \{params.file_path}: \{err.to_string()}"))
+    err => return Err(cache_error("cannot read \{params.file_path}: \{@debug.to_repr(err)}"))
   }
   let put_out = @local_cache.put(root, params.key, body)
   guard put_out is Ok(entry) else { return Err(cache_error(put_out.unwrap_err())) }

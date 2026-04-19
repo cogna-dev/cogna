@@ -1,225 +1,38 @@
 ---
 title: Rust
-description: 如何用 Cogna 追踪 Rust crate 的公开 API 变化，以及什么样的代码改动会触发什么检查结果。
+description: 在 Rust crate 中用 Cogna 追踪 public API 演进，避免升级破坏。
 order: 21
 ---
 
 # Rust
 
-Cogna 能帮你追踪 Rust crate 的公开 API 变化——不是代码风格，而是真正影响调用方的契约变化：函数签名、`unsafe` 状态、extern ABI、where clause 等。
+如果你维护 Rust crate，Cogna 可以帮你把“代码改动”转换成“对调用方的影响”。
 
-## 配置
-
-在你的 Rust crate 根目录创建 `cogna.yml`：
+## 推荐配置
 
 ```yaml
-schemaVersion: ciq-config/v2
 profile: rust-crate
-purl: pkg:cargo/my-crate@0.2.0
-source:
-  repo: https://github.com/your-org/my-crate
-  ref: main
 inputs:
   include:
     - "**/*.rs"
-checks:
-  format: sarif
 ```
 
-## 能检测哪些变化？
-
-### 1. 函数签名变化（`rust-signature-changed`）
-
-**代码变化：**
-
-```rust
-// 之前（v0.1.0）
-pub fn process(data: &[u8]) -> Result<Output, Error> { ... }
-
-// 之后（v0.2.0）
-pub fn process(data: &[u8], opts: Options) -> Result<Output, Error> { ... }
-```
-
-**Cogna diff 输出：**
-
-```json
-{
-  "id": "my_crate::process",
-  "kind": "changed",
-  "level": "warning",
-  "path": "src/lib.rs",
-  "semanticDiff": {
-    "findings": [{ "code": "rust-signature-changed" }]
-  }
-}
-```
-
-**SARIF 检查结果：**
-
-```json
-{
-  "ruleId": "compat.rust.signature-changed",
-  "level": "warning",
-  "message": { "text": "Rust public signature changed." },
-  "locations": [{
-    "physicalLocation": {
-      "artifactLocation": { "uri": "src/lib.rs" },
-      "region": { "startLine": 15 }
-    }
-  }]
-}
-```
-
----
-
-### 2. 变成 unsafe（`rust-became-unsafe`）
-
-**代码变化：**
-
-```rust
-// 之前
-pub fn read_raw(ptr: *const u8) -> u8 { ... }
-
-// 之后
-pub unsafe fn read_raw(ptr: *const u8) -> u8 { ... }
-```
-
-**diff 输出（`level: error`，这是 breaking change）：**
-
-```json
-{
-  "id": "my_crate::read_raw",
-  "kind": "changed",
-  "level": "error",
-  "semanticDiff": {
-    "findings": [{ "code": "rust-became-unsafe" }]
-  }
-}
-```
-
-调用方必须在调用处加 `unsafe {}`，否则编译失败——这是 breaking change，所以 level 是 `error`。
-
----
-
-### 3. Extern ABI 变化（`rust-extern-abi-changed` / `rust-extern-abi-added`）
-
-**代码变化：**
-
-```rust
-// 之前
-pub extern "C" fn ffi_init() -> i32 { ... }
-
-// 之后
-pub extern "stdcall" fn ffi_init() -> i32 { ... }
-```
-
-**diff 输出：**
-
-```json
-{
-  "semanticDiff": {
-    "findings": [{ "code": "rust-extern-abi-changed" }]
-  }
-}
-```
-
-ABI 变化对 FFI 调用方来说是 breaking change。
-
----
-
-### 4. Where clause 变化（`rust-where-clause-changed`）
-
-**代码变化：**
-
-```rust
-// 之前：无约束
-pub fn transform<T>(value: T) -> T { ... }
-
-// 之后：新增 trait bound
-pub fn transform<T: Clone + Send>(value: T) -> T { ... }
-```
-
-**diff 输出：**
-
-```json
-{
-  "semanticDiff": {
-    "findings": [{ "code": "rust-where-clause-changed" }]
-  }
-}
-```
-
-新增 trait bound 可能导致原本能编译的调用方报错。
-
----
-
-### 5. Public item 被删除（`removed-declaration`）
-
-**代码变化：**
-
-```rust
-// 之前
-pub fn legacy_api() -> String { ... }
-
-// 之后：函数被删除
-```
-
-**diff 输出（`level: error`）：**
-
-```json
-{
-  "id": "my_crate::legacy_api",
-  "kind": "removed",
-  "level": "error",
-  "semanticDiff": {
-    "findings": [{ "code": "removed-declaration" }]
-  }
-}
-```
-
----
-
-## 典型工作流
-
-### 发版前检查
+## 使用步骤
 
 ```bash
-# 1. 构建当前版本快照
-cd ./my-crate
 cogna build
-
-# 2. 准备 dist/base 与 dist/target 后对比
 cogna diff
-
-# 3. 运行 policy 检查
 cogna check
 ```
 
-### 升级依赖前评估风险
+## 重点关注变化
 
-```bash
-# 先看 tokio 的公开 API 长什么样
-cd ./my-crate
-cogna build
-cogna mcp serve --port 3000
-# 让 AI Agent 查询 tokio::sync::Mutex::lock 的签名
-```
+- `pub` 类型和函数签名变化
+- trait 对外行为变化
+- 删除或重命名公开 API
 
-## 完整内置检查规则
+## 相关文档
 
-| 规则 ID | 默认级别 | 触发时机 |
-|---------|---------|---------|
-| `compat.rust.became-unsafe` | error | public item 从普通变成 unsafe |
-| `compat.rust.extern-abi-added` | error | 新增 extern ABI 标注 |
-| `compat.rust.extern-abi-changed` | error | extern ABI 发生改变 |
-| `compat.rust.where-clause-changed` | warning | where clause 发生改变 |
-| `compat.rust.signature-changed` | warning | public 函数签名变化 |
-| `compat.core.removed-declaration` | error | public item 被删除 |
-| `compat.core.new-declaration` | note | 新增 public item |
-| `compat.core.deprecated-declaration` | note | public item 被标记 deprecated |
-
-## 注意事项
-
-- Cogna 关注的是**公开 API 面**（`pub` item），不分析 private 实现
-- `unsafe` 状态变化始终是 `error` 级别，因为调用方必须修改代码
-- 如果你只是改了实现、没有改公开签名，diff 通常是空的
+- [构建索引](/docs/build-indexes)
+- [分析变更](/docs/analyze-changes)
+- [启用 SARIF 集成](/docs/sarif)

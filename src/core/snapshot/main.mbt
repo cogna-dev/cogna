@@ -182,7 +182,7 @@ fn collect_snapshot_paths(
     err => {
       visiting[current_key] = false
       return Err(
-        "cannot read package directory \{current_dir}: \{err.to_string()}",
+        "cannot read package directory \{current_dir}: \{@debug.to_repr(err)}",
       )
     }
   }
@@ -248,7 +248,7 @@ pub fn snapshot_files(root_path : String) -> Result[Array[PackageFile], String] 
     let bytes = @fs.read_file_to_bytes(absolute_path) catch {
       err =>
         return Err(
-          "cannot read package file \{absolute_path}: \{err.to_string()}",
+          "cannot read package file \{absolute_path}: \{@debug.to_repr(err)}",
         )
     }
     files.push({
@@ -276,7 +276,7 @@ pub fn read_json_object(
   label : String,
 ) -> Result[Map[String, Json], String] {
   let text = @fs.read_file_to_string(path) catch {
-    err => return Err("cannot read \{label}: \{err.to_string()}")
+    err => return Err("cannot read \{label}: \{@debug.to_repr(err)}")
   }
   let parsed = try? @json.parse(text)
   guard parsed is Ok(Object(object)) else {

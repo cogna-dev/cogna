@@ -1,35 +1,44 @@
 ---
 title: 快速开始
-description: 跟着这份教程，用 15 分钟跑完 init → build → diff → check 完整流程。
+description: 从安装到首次分析，10 分钟完成一次可复用的 Cogna 工作流。
 order: 2
 ---
 
 # 快速开始
 
-这份教程会带你从零跑完一次完整的本地 Cogna 工作流。完成后你手里会有：一份配置文件、一个 bundle 快照、一份 diff 报告、一份 SARIF 检查结果。
+这是一条面向新用户的最短路径：安装 Cogna、初始化配置、构建索引、分析变更、执行检查。
 
-## 前置条件
+## 1. 安装 Cogna
 
-- 已安装 `cogna` CLI
-- 有一个本地仓库（Go / Rust / Terraform / OpenAPI 都可以）
-- 如果要运行 `check`，需要额外安装 [`opa`](https://www.openpolicyagent.org/docs/latest/#running-opa)
+你可以从下载页选择最适合自己的方式：
 
----
+- Desktop：图形界面体验
+- CLI：适合终端、脚本和 CI
+- SDK / VSCode：适合集成到开发流程
 
-## 第 1 步：初始化配置
+入口：[/download](/download)
 
-在你的仓库根目录运行：
+如果你只想先走 CLI，推荐：
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.sh | sh
+```
+
+## 2. 在项目里初始化
+
+进入你的仓库根目录：
 
 ```bash
 cogna init
 ```
 
-这会生成一个 `cogna.yml`。打开它，先确认这几个字段：
+会生成 `cogna.yml`。最小示例：
 
 ```yaml
 schemaVersion: ciq-config/v2
-profile: go-module          # 改成你仓库对应的类型
-purl: pkg:golang/github.com/your-org/your-lib@1.0.0   # 改成你的 PURL
+profile: go-module
+purl: pkg:golang/github.com/your-org/your-lib@1.0.0
 source:
   repo: https://github.com/your-org/your-lib
   ref: main
@@ -42,151 +51,39 @@ cache:
     storeDir: .cogna/cache
 ```
 
-`profile` 决定 Cogna 如何理解你的代码。支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`、`policy-bundle`。
-
----
-
-## 第 2 步：构建 bundle
+## 3. 构建索引
 
 ```bash
-cd ./your-lib
 cogna build
 ```
 
-构建完成后，`dist/` 目录会有这些文件：
+产物在 `dist/`：
 
-```text
-dist/
-├── manifest.json           ← bundle 的元数据描述
-├── declarations.ndjson     ← 公开声明（函数、类型、接口等）
-├── metadata.json
-├── checksums.txt
-└── bundle.ciq.tgz          ← 完整归档，后续步骤用的就是它
-```
+- `bundle.ciq.tgz`：核心归档
+- `declarations.ndjson`：声明索引
+- `manifest.json`：元信息
 
-`bundle.ciq.tgz` 是你所有后续操作的基础——diff、check，以及后续 cache 复用都会用到它。
+## 4. 分析版本变化
 
----
-
-## 第 3 步：生成 diff
-
-假设你已经准备好了基线版本和当前版本两套产物，想看它们之间改了什么：
+准备好 `dist/base` 和 `dist/target` 后：
 
 ```bash
-cd ./your-lib
-# 先把旧版本产物放到 dist/base，把当前产物放到 dist/target
 cogna diff
 ```
 
-这会生成 `dist/diff.json`。打开它，你会看到类似这样的结构：
+输出 `dist/diff.json`，用于判断“升级会不会影响调用方”。
 
-```json
-{
-  "summary": {
-    "total": 3,
-    "added": 1,
-    "removed": 0,
-    "changed": 2
-  },
-  "changes": [
-    {
-      "id": "github.com/your-org/your-lib.Client.Do",
-      "kind": "changed",
-      "level": "warning",
-      "path": "pkg/client/client.go",
-      "semanticDiff": {
-        "findings": [
-          { "code": "go-signature-changed" }
-        ]
-      }
-    }
-  ]
-}
-```
-
-`semanticDiff.findings` 是最重要的字段——它告诉你这次变化在语义上属于哪种类型（比如函数签名变了、方法集收缩了、参数变成必填了）。
-
----
-
-## 第 4 步：准备 policy bundle（可选，用于 check）
-
-`check` 命令需要一个 policy bundle 来判断哪些变化是可接受的。最简单的方式是用内置规则：
-
-**新建一个 policy 仓库**，配置 `cogna.yml`：
-
-```yaml
-schemaVersion: ciq-config/v2
-profile: policy-bundle
-purl: pkg:generic/your-org/compat-policy@1.0.0
-source:
-  repo: https://github.com/your-org/compat-policy
-  ref: main
-inputs:
-  include:
-    - "**/*.rego"
-cache:
-  type: local
-  local:
-    storeDir: .cogna/cache
-```
-
-然后构建它：
+## 5. 执行兼容性检查
 
 ```bash
-cd ./compat-policy
-cogna build
-```
-
-你会得到 `./compat-policy/dist/bundle.ciq.tgz`，这就是传给 `check` 的 policy bundle。
-
----
-
-## 第 5 步：运行检查
-
-```bash
-cd ./your-lib
 cogna check
 ```
 
-这会生成 `./your-lib/dist/check.sarif.json`。SARIF 是行业标准格式，可以被 GitHub Code Scanning、Azure DevOps、各种代码审查平台直接消费。
+输出 `dist/check.sarif.json`，可直接接入代码扫描平台。
 
-打开 `check.sarif.json`，最值得关注的是：
+## 下一步
 
-```json
-{
-  "runs": [{
-    "results": [
-      {
-        "ruleId": "compat.go.signature-changed",
-        "level": "warning",
-        "message": { "text": "Go public signature changed." },
-        "locations": [{
-          "physicalLocation": {
-            "artifactLocation": { "uri": "pkg/client/client.go" },
-            "region": { "startLine": 42 }
-          }
-        }]
-      }
-    ]
-  }]
-}
-```
-
-`level` 有三档：`error`（可能破坏调用方）、`warning`（需要评估）、`note`（纯信息）。
-
----
-
-## 你现在有了什么？
-
-```text
-your-lib/dist/
-├── bundle.ciq.tgz      ← 当前版本的公开接口快照
-├── diff.json           ← 与上个版本的结构化变更
-└── check.sarif.json    ← policy 检查结果（SARIF）
-```
-
-## 接下来
-
-- 想把检查接进 CI？看[持续集成](/docs/ci)
-- 想让 AI 查询接口？看 [AI 查询 / MCP](/docs/mcp)
-- 想深入了解每个命令的参数？看 [CLI 参考](/docs/cli)
+1. 继续看 [构建索引](/docs/build-indexes)
+2. 学会读 [分析变更](/docs/analyze-changes)
+3. 把结果接入 [持续集成](/docs/ci)
+4. 想要图形化体验，使用 [/download](/download) 中的 Desktop 版本

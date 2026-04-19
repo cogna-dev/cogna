@@ -19,7 +19,7 @@ fn collect_directory_files(
     "\{root_dir}/\{relative_dir}"
   }
   let entries = @fs.read_dir(dir_path) catch {
-    err => return Err("cannot read directory \{dir_path}: \{err.to_string()}")
+    err => return Err("cannot read directory \{dir_path}: \{@debug.to_repr(err)}")
   }
   entries.sort()
   for i in 0..<entries.length() {
@@ -42,7 +42,7 @@ fn collect_directory_files(
     let file_out = try? @fs.is_file(absolute_path)
     if file_out is Ok(true) {
       let bytes = @fs.read_file_to_bytes(absolute_path) catch {
-        err => return Err("cannot read file \{absolute_path}: \{err.to_string()}")
+        err => return Err("cannot read file \{absolute_path}: \{@debug.to_repr(err)}")
       }
       let virtual_file_out = @vp.virtual_file(relative_path, bytes)
       guard virtual_file_out is Ok(file) else {

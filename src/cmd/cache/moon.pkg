@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/debug" @debug,
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/cache/local" @local_cache,
   "cogna-dev/cogna/cli" @cli,

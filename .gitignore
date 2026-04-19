@@ -10,6 +10,7 @@ trace.json
 .claude/settings*
 .claude/worktrees/
 .sisyphus/
+.tmp/
 src/cmd/**/tmp_*/
 src/cmd/registry/tmp_sig_consts/
 src/cmd/registry/tmp_registry_sigcheck/

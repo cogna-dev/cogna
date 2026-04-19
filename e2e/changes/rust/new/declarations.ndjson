@@ -1,0 +1,1 @@
+{"id":"decl:rust-crate:rust-crate::lib.rs::process","kind":"function","path":"lib.rs","signature":"pub unsafe extern \"C\" fn process<T>(value: T) -> i64 where T: Copy","deprecated":false,"language_specific":{"profile":"rust-crate","rust":{"unsafe":true,"externAbi":"C","whereClause":"where T: Copy"}},"location":{"uri":"lib.rs","startLine":12,"endLine":12}}

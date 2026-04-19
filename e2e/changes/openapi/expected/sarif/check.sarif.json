@@ -1,0 +1,660 @@
+{
+  "runs": [
+    {
+      "invocation": {
+        "commandLine": "cogna check --policies ././.cogna/policies",
+        "executionSuccessful": true
+      },
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 80,
+                  "startLine": 80
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected changed change for openapi/payment.yaml (decl:openapi-spec:openapi-spec::openapi/payment.yaml::Payment.oneOf) [openapi-response-schema-narrowed]"
+          },
+          "ruleId": "compat.changed"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 20,
+                  "startLine": 20
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected changed change for openapi/payment.yaml (decl:openapi-spec:openapi-spec::openapi/payment.yaml::createPayment) [openapi-http-method-changed]"
+          },
+          "ruleId": "compat.changed"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 40,
+                  "startLine": 40
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected changed change for openapi/payment.yaml (decl:openapi-spec:openapi-spec::openapi/payment.yaml::getPayment) [openapi-response-status-removed]"
+          },
+          "ruleId": "compat.changed"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 100,
+                  "startLine": 100
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected changed change for openapi/payment.yaml (decl:openapi-spec:openapi-spec::openapi/payment.yaml::ping) [openapi-operation-changed]"
+          },
+          "ruleId": "compat.changed"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI field or parameter became required."
+          },
+          "ruleId": "compat.openapi.became-required"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI HTTP method changed."
+          },
+          "ruleId": "compat.openapi.http-method-changed"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI media types were added."
+          },
+          "ruleId": "compat.openapi.media-types-added"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI operation changed."
+          },
+          "ruleId": "compat.openapi.operation-changed"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI response schema narrowed and clients may fail to parse it."
+          },
+          "ruleId": "compat.openapi.response-schema-narrowed"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI response status code was removed."
+          },
+          "ruleId": "compat.openapi.response-status-removed"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "openapi/payment.yaml"
+                },
+                "region": {
+                  "endLine": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "OpenAPI status codes were added."
+          },
+          "ruleId": "compat.openapi.status-codes-added"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "cogna-check",
+          "rules": [
+            {
+              "fullDescription": {
+                "text": "Maps declaration-level compatibility diff entries to SARIF diagnostics."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies",
+              "id": "compat.changed",
+              "properties": {
+                "category": "compatibility",
+                "source": "cogna-diff"
+              },
+              "shortDescription": {
+                "text": "Compatibility change requires policy review"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-component-metadata-changed",
+              "id": "compat.component.metadata-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Software component metadata changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-component-version-upgrade",
+              "id": "compat.component.version-upgrade",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Software component version changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-deprecated-declaration",
+              "id": "compat.core.deprecated-declaration",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Public declaration became deprecated."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-new-declaration",
+              "id": "compat.core.new-declaration",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Public declaration was added."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-core-removed-declaration",
+              "id": "compat.core.removed-declaration",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Public declaration was removed and callers will break."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-method-set-expanded",
+              "id": "compat.go.method-set-expanded",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Go method set expanded and needs review."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-method-set-shrunk",
+              "id": "compat.go.method-set-shrunk",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Go method set shrank."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-pointer-receiver-changed",
+              "id": "compat.go.pointer-receiver-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Go pointer receiver compatibility changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-receiver-changed",
+              "id": "compat.go.receiver-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Go receiver type changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed",
+              "id": "compat.go.signature-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Go public signature changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-became-required",
+              "id": "compat.openapi.became-required",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI field or parameter became required."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-http-method-changed",
+              "id": "compat.openapi.http-method-changed",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI HTTP method changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-media-types-added",
+              "id": "compat.openapi.media-types-added",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI media types were added."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-operation-changed",
+              "id": "compat.openapi.operation-changed",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI operation changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-response-schema-narrowed",
+              "id": "compat.openapi.response-schema-narrowed",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI response schema narrowed and clients may fail to parse it."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-response-status-removed",
+              "id": "compat.openapi.response-status-removed",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI response status code was removed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Policy decision produced by OPA evaluation for CIQ diff entries."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-openapi-status-codes-added",
+              "id": "compat.openapi.status-codes-added",
+              "properties": {
+                "category": "policy",
+                "source": "opa-policy"
+              },
+              "shortDescription": {
+                "text": "OpenAPI status codes were added."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-became-unsafe",
+              "id": "compat.rust.became-unsafe",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Rust public item became unsafe."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-extern-abi-added",
+              "id": "compat.rust.extern-abi-added",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Rust extern ABI was added."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-extern-abi-changed",
+              "id": "compat.rust.extern-abi-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Rust extern ABI changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-signature-changed",
+              "id": "compat.rust.signature-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Rust public signature changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-rust-where-clause-changed",
+              "id": "compat.rust.where-clause-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Rust where-clause changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-create-before-destroy-added",
+              "id": "compat.terraform.create-before-destroy-added",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform create_before_destroy was added."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-ignore-changes-expanded",
+              "id": "compat.terraform.ignore-changes-expanded",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform ignore_changes expanded."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-input-became-required",
+              "id": "compat.terraform.input-became-required",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform input became required and callers must update configuration."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-lifecycle-changed",
+              "id": "compat.terraform.lifecycle-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform lifecycle metadata changed."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-output-removed",
+              "id": "compat.terraform.output-removed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform output was removed and downstream references can break."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-prevent-destroy-added",
+              "id": "compat.terraform.prevent-destroy-added",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform prevent_destroy was added."
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Built-in or generated policy catalog rule shipped with the CIQ policy bundle."
+              },
+              "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-terraform-provider-ref-changed",
+              "id": "compat.terraform.provider-ref-changed",
+              "properties": {
+                "category": "policy",
+                "source": "policy-catalog"
+              },
+              "shortDescription": {
+                "text": "Terraform provider reference changed."
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

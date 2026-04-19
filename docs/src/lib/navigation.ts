@@ -15,8 +15,6 @@ export interface FooterGroup {
 
 export const topNavigation: NavItem[] = [
   { title: "用户文档", href: "/docs" },
-  { title: "贡献者文档", href: "/contrib/introduction" },
-  { title: "下载", href: "/download" },
   { title: "GitHub", href: "https://github.com/cogna-dev/cogna" },
 ]
 
@@ -30,16 +28,15 @@ export const userSidebar: NavGroup[] = [
   {
     title: "操作指南",
     items: [
-      { title: "构建索引", href: "/docs/build-indexes" },
-      { title: "检索函数签名", href: "/docs/query-signatures" },
-      { title: "分析变更", href: "/docs/analyze-changes" },
+      { title: "文档检索", href: "/docs/build-indexes" },
+      { title: "变更审查", href: "/docs/analyze-changes" },
       { title: "远程索引", href: "/docs/remote-indexing" },
     ],
   },
   {
     title: "集成",
     items: [
-      { title: "Desktop", href: "/docs/sdk" },
+      { title: "Desktop", href: "/docs/desktop" },
       { title: "CLI", href: "/docs/cli" },
       { title: "SDK", href: "/docs/sdk" },
       { title: "IDE", href: "/docs/ide" },
@@ -68,31 +65,6 @@ export const userSidebar: NavGroup[] = [
   },
 ]
 
-export const contributorSidebar: NavGroup[] = [
-  {
-    title: "开始",
-    items: [
-      { title: "贡献指南", href: "/contrib/introduction" },
-      { title: "开发进度", href: "/docs/progress" },
-    ],
-  },
-  {
-    title: "数据模型",
-    items: [
-      { title: "变更", href: "/contrib/changes" },
-      { title: "策略", href: "/contrib/policy" },
-    ],
-  },
-  {
-    title: "附录",
-    items: [
-      { title: "开源协议", href: "/contrib/license" },
-      { title: "行为准则", href: "/contrib/code-of-conduct" },
-      { title: "CLA", href: "/contrib/cla" },
-    ],
-  },
-]
-
 export const footerMenus: FooterGroup[] = [
   {
     title: "用户文档",
@@ -101,14 +73,6 @@ export const footerMenus: FooterGroup[] = [
       { title: "用户文档", href: "/docs" },
       { title: "CLI", href: "/docs/cli" },
       { title: "产品状态", href: "/docs/progress" },
-    ],
-  },
-  {
-    title: "附录",
-    children: [
-      { title: "开源协议", href: "/contrib/license" },
-      { title: "行为准则", href: "/contrib/code-of-conduct" },
-      { title: "CLA", href: "/contrib/cla" },
     ],
   },
 ]

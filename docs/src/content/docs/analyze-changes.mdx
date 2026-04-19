@@ -1,159 +1,62 @@
 ---
 title: 分析变更
-description: 如何生成 diff 并阅读语义化的变更发现，把"这次改了什么代码"转换成"这次破坏了哪些 API 契约"。
+description: 用结构化 diff 判断升级风险，快速定位会影响调用方的 API 变化。
 order: 15
 ---
 
 # 分析变更
 
-`git diff` 告诉你哪些文件被改了，但它不能告诉你这次改动是否会破坏调用方。Cogna 的 `diff` 命令提取的是公开 API 契约层面的变化——不是文本级别的行差异，而是语义级别的声明变化：这个函数的签名变了，那个 output 被删了，这个参数从可选变成了必填。
+`cogna diff` 用来比较两个版本的公开接口，回答一个关键问题：
 
----
+“这次改动会不会破坏使用者？”
 
-## 第一步：构建 bundle
+## 准备输入
 
-```bash
-cd ./sdk
-cogna build
-```
+你需要两套产物：
 
-构建会把仓库中的公开声明、符号、依赖关系提取出来，生成 `dist/bundle.ciq.tgz`。
+- `dist/base`：基线版本
+- `dist/target`：目标版本
 
----
-
-## 第二步：生成 diff
+然后执行：
 
 ```bash
-# 准备 dist/base 与 dist/target 两套产物后执行
 cogna diff
 ```
 
-结果保存在：
+## 输出文件
 
-```text
-./sdk/dist/diff.json
-```
+- `dist/diff.json`
 
-如果你还想检查测试文件中引用的 API 是否也发生了变化：
+重点看三类信息：
 
-`testChanges` 是否写入 diff 由 `cogna.yml -> diff.includeTestChanges` 决定；当前 CLI 不再提供 `--test-changes` 覆盖参数。
+- 新增（added）
+- 删除（removed）
+- 变更（changed）
 
----
+## 如何快速判断风险
 
-## 第三步：读懂 diff.json
+优先看这些类型：
 
-### 顶层结构
+- 函数/方法签名变化
+- 参数从可选变必填
+- 返回结构收窄
+- 已公开符号被删除
 
-```json
-{
-  "summary": {
-    "added": 3,
-    "changed": 2,
-    "removed": 1
-  },
-  "changes": [ ... ],
-  "componentChanges": [ ... ]
-}
-```
+这些通常意味着升级风险更高。
 
-### 单个 change 的关键字段
+## 与 check 的关系
 
-| 字段 | 含义 |
-|------|------|
-| `kind` | `added` / `changed` / `removed` |
-| `level` | `error`（破坏性）/ `warning`（需确认）/ `note`（提示） |
-| `path` | 声明路径，例如 `Client.Do`、`variable.instance_type` |
-| `semanticDiff.findings` | 具体的语义发现列表，每条含 `ruleId` 和 `message` |
-| `beforeRecord` | 变化前的源文件位置（`uri` + `startLine`） |
-| `afterRecord` | 变化后的源文件位置 |
-| `componentDiff` | 依赖变化（如果有） |
+- `diff` 告诉你“变了什么”
+- `check` 告诉你“这些变化是否违反规则”
 
-### 示例：一个 change 可以有多个 finding
+所以推荐顺序：
 
-```json
-{
-  "kind": "changed",
-  "level": "error",
-  "path": "Client.Do",
-  "semanticDiff": {
-    "findings": [
-      {
-        "ruleId": "compat.go.signature-changed",
-        "level": "error",
-        "message": "parameter 'ctx context.Context' was added"
-      },
-      {
-        "ruleId": "compat.go.receiver-changed",
-        "level": "warning",
-        "message": "receiver changed from value to pointer"
-      }
-    ]
-  }
-}
-```
+1. `build`
+2. `diff`
+3. `check`
 
-一次函数变化可以同时产生多条 finding——签名变化、receiver 变化可以分别被不同的 policy 规则命中。
+## 相关文档
 
----
-
-## 各生态的常见 breaking change
-
-### Go
-
-| 变化类型 | 典型场景 |
-|----------|---------|
-| 签名变化 | 添加或删除参数、返回值变化 |
-| receiver 变化 | value receiver → pointer receiver |
-| method set 变化 | 接口的方法被删除或修改 |
-| unsafe 变化 | 函数变成 `unsafe` |
-
-### Rust
-
-| 变化类型 | 典型场景 |
-|----------|---------|
-| public item 变化 | pub 函数/类型被删除或修改 |
-| extern ABI 变化 | `extern "C"` 签名变化 |
-| where clause 变化 | 泛型约束变严格 |
-| unsafe 变化 | 函数从 safe 变成 `unsafe` |
-
-### Terraform
-
-| 变化类型 | 典型场景 |
-|----------|---------|
-| `input-became-required` | variable 的 default 被删除 |
-| `output-removed` | output 被删除 |
-| provider ref 变化 | provider 依赖变化 |
-
-### OpenAPI
-
-| 变化类型 | 典型场景 |
-|----------|---------|
-| `parameter-became-required` | query/path 参数变必填 |
-| `response-status-removed` | 某个 HTTP 状态码被删除 |
-| `response-schema-narrowed` | response body 字段减少 |
-
----
-
-## 完整分析工作流
-
-```bash
-# 分析变更
-cd ./sdk
-cogna build
-cogna diff
-
-# 执行 policy 检查，生成 SARIF
-cogna check
-
-# 用 AI 查询某个具体声明的当前状态
-cogna mcp serve --port 3000
-# 然后调用 cogna.query.symbol 查询
-```
-
----
-
-## 下一步
-
-- 发版检查自动化流程：[持续集成](/docs/ci)
-- 查看 SARIF 报告：[启用 SARIF 集成](/docs/sarif)
-- 用 AI 查询具体声明：[AI 查询（MCP）](/docs/mcp)
+- [AI 查询（MCP）](/docs/mcp)
+- [启用 SARIF 集成](/docs/sarif)
+- [持续集成](/docs/ci)

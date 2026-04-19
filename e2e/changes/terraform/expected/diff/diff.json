@@ -1,0 +1,282 @@
+{
+  "basePurl": "pkg:terraform/e2e/terraform-changes@1.0.0",
+  "changes": [
+    {
+      "after": "resource \"aws_vpc\" \"main\" {",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::main.tf::aws_vpc.main",
+        "kind": "resource",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {
+            "createBeforeDestroy": true,
+            "ignoreChanges": [
+              "tags"
+            ],
+            "preventDestroy": true,
+            "providerRef": "aws.east"
+          }
+        },
+        "location": {
+          "endLine": 10,
+          "startLine": 10,
+          "uri": "main.tf"
+        },
+        "path": "main.tf",
+        "signature": "resource \"aws_vpc\" \"main\" {"
+      },
+      "before": "resource \"aws_vpc\" \"main\" {",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::main.tf::aws_vpc.main",
+        "kind": "resource",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {
+            "createBeforeDestroy": false,
+            "ignoreChanges": [],
+            "preventDestroy": false,
+            "providerRef": "aws.main"
+          }
+        },
+        "location": {
+          "endLine": 10,
+          "startLine": 10,
+          "uri": "main.tf"
+        },
+        "path": "main.tf",
+        "signature": "resource \"aws_vpc\" \"main\" {"
+      },
+      "id": "decl:terraform-module:terraform-module::main.tf::aws_vpc.main",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "main.tf",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "terraform-provider-ref-changed"
+          },
+          {
+            "code": "terraform-prevent-destroy-added"
+          },
+          {
+            "code": "terraform-create-before-destroy-added"
+          },
+          {
+            "code": "terraform-ignore-changes-expanded"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "profile": "terraform-module",
+            "terraform": {
+              "createBeforeDestroy": true,
+              "ignoreChanges": [
+                "tags"
+              ],
+              "preventDestroy": true,
+              "providerRef": "aws.east"
+            }
+          },
+          "before": {
+            "profile": "terraform-module",
+            "terraform": {
+              "createBeforeDestroy": false,
+              "ignoreChanges": [],
+              "preventDestroy": false,
+              "providerRef": "aws.main"
+            }
+          }
+        }
+      }
+    },
+    {
+      "after": "variable \"env\" {",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::vars.tf::env",
+        "kind": "variable",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {
+            "required": true
+          }
+        },
+        "location": {
+          "endLine": 3,
+          "startLine": 1,
+          "uri": "vars.tf"
+        },
+        "path": "vars.tf",
+        "signature": "variable \"env\" {"
+      },
+      "before": "variable \"env\" {",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::vars.tf::env",
+        "kind": "variable",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {
+            "required": false
+          }
+        },
+        "location": {
+          "endLine": 3,
+          "startLine": 1,
+          "uri": "vars.tf"
+        },
+        "path": "vars.tf",
+        "signature": "variable \"env\" {"
+      },
+      "id": "decl:terraform-module:terraform-module::vars.tf::env",
+      "kind": "changed",
+      "level": "breaking",
+      "path": "vars.tf",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "terraform-input-became-required"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "profile": "terraform-module",
+            "terraform": {
+              "required": true
+            }
+          },
+          "before": {
+            "profile": "terraform-module",
+            "terraform": {
+              "required": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "after": "resource \"aws_subnet\" \"side\" {",
+      "afterRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::lifecycle.tf::aws_subnet.side",
+        "kind": "resource",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {
+            "dependsOn": [
+              "module.net2"
+            ]
+          }
+        },
+        "location": {
+          "endLine": 5,
+          "startLine": 5,
+          "uri": "lifecycle.tf"
+        },
+        "path": "lifecycle.tf",
+        "signature": "resource \"aws_subnet\" \"side\" {"
+      },
+      "before": "resource \"aws_subnet\" \"side\" {",
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::lifecycle.tf::aws_subnet.side",
+        "kind": "resource",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {
+            "dependsOn": [
+              "module.net"
+            ]
+          }
+        },
+        "location": {
+          "endLine": 5,
+          "startLine": 5,
+          "uri": "lifecycle.tf"
+        },
+        "path": "lifecycle.tf",
+        "signature": "resource \"aws_subnet\" \"side\" {"
+      },
+      "id": "decl:terraform-module:terraform-module::lifecycle.tf::aws_subnet.side",
+      "kind": "changed",
+      "level": "warning",
+      "path": "lifecycle.tf",
+      "semanticDiff": {
+        "changedFields": [
+          "language_specific"
+        ],
+        "findings": [
+          {
+            "code": "terraform-lifecycle-changed"
+          }
+        ],
+        "languageSpecificDiff": {
+          "after": {
+            "profile": "terraform-module",
+            "terraform": {
+              "dependsOn": [
+                "module.net2"
+              ]
+            }
+          },
+          "before": {
+            "profile": "terraform-module",
+            "terraform": {
+              "dependsOn": [
+                "module.net"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "beforeRecord": {
+        "deprecated": false,
+        "id": "decl:terraform-module:terraform-module::outputs.tf::vpc_id",
+        "kind": "output",
+        "language_specific": {
+          "profile": "terraform-module",
+          "terraform": {}
+        },
+        "location": {
+          "endLine": 2,
+          "startLine": 1,
+          "uri": "outputs.tf"
+        },
+        "path": "outputs.tf",
+        "signature": "output \"vpc_id\" {"
+      },
+      "id": "decl:terraform-module:terraform-module::outputs.tf::vpc_id",
+      "kind": "removed",
+      "level": "breaking",
+      "path": "outputs.tf",
+      "semanticDiff": {
+        "findings": [
+          {
+            "code": "removed-declaration"
+          },
+          {
+            "code": "terraform-output-removed"
+          }
+        ]
+      }
+    }
+  ],
+  "schemaVersion": "ciq-diff/v1",
+  "summary": {
+    "added": 0,
+    "changed": 3,
+    "deprecated": 0,
+    "removed": 1
+  },
+  "targetPurl": "pkg:terraform/e2e/terraform-changes@2.0.0"
+}

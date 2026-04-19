@@ -1,282 +1,41 @@
 ---
 title: OpenAPI
-description: 如何用 Cogna 检测 OpenAPI 规格的 breaking change，包括参数必填性、response 状态码删除、schema 收窄等，保护 API 调用方。
+description: 对 OpenAPI 规格做兼容性检查，提前识别破坏性接口变更。
 order: 23
 ---
 
 # OpenAPI
 
-当你在迭代 REST API 时，哪些改动会破坏调用方？很多时候不是删掉了整个接口，而是悄悄把一个参数变成了必填、删掉了某个 response 状态码，或者把返回体的 schema 收窄了。Cogna 帮你在发版前把这些细小但危险的变化找出来，生成可供人工审查和 CI 消费的报告。
+对于 API 平台团队，OpenAPI 的 breaking change 往往直接影响客户端。Cogna 可以在发布前自动识别风险。
 
-## Cogna 能检测哪些变化？
-
-对 `profile: openapi-spec` 的仓库，Cogna 会提取以下契约信息：
-
-| 类别 | 说明 |
-|------|------|
-| `paths` | API 路径声明 |
-| `operations` | 每个路径下的 HTTP 方法（GET / POST / PUT 等） |
-| `parameters` | path / query / header / cookie 参数及其 required 状态 |
-| `requestBody` | 请求体结构与必填性 |
-| `responses` | 响应状态码及 schema |
-| `schemas` | 数据模型定义 |
-
-以下是当前内置 policy 覆盖的高价值 breaking change 类型：
-
-| rule id | 含义 |
-|---------|------|
-| `compat.openapi.parameter-became-required` | 某个参数从 optional 变成 required |
-| `compat.openapi.response-status-removed` | 某个 HTTP 响应状态码被删除 |
-| `compat.openapi.response-schema-narrowed` | response schema 字段减少（收窄） |
-| `compat.openapi.media-type-changed` | 请求或响应的 media type 变化 |
-| `compat.openapi.operation-removed` | 整个 operation（路径+方法）被删除 |
-| `compat.openapi.path-removed` | 整个 API 路径被删除 |
-| `compat.openapi.request-body-became-required` | requestBody 从可选变成必填 |
-
----
-
-## 示例：参数从 optional 变为 required
-
-### 修改前（openapi.yaml）
+## 推荐配置
 
 ```yaml
-paths:
-  /users:
-    get:
-      parameters:
-        - name: filter
-          in: query
-          required: false
-          schema:
-            type: string
+profile: openapi-spec
+inputs:
+  include:
+    - "**/*.yaml"
+    - "**/*.yml"
+    - "**/*.json"
 ```
 
-### 修改后
+## 常见高风险变化
 
-```yaml
-paths:
-  /users:
-    get:
-      parameters:
-        - name: filter
-          in: query
-          required: true   # 变成必填
-          schema:
-            type: string
-```
+- 删除已有 endpoint
+- 删除响应状态码
+- 参数从可选改为必填
+- schema 收窄导致旧请求不再合法
 
-### 运行检查
+## 使用步骤
 
 ```bash
-cd ./api
 cogna build
 cogna diff
 cogna check
 ```
 
-### diff.json 中会出现（节选）
+## 相关文档
 
-```json
-{
-  "changes": [
-    {
-      "kind": "changed",
-      "level": "error",
-      "path": "paths./users.get.parameters.filter",
-      "semanticDiff": {
-        "findings": [
-          {
-            "ruleId": "compat.openapi.parameter-became-required",
-            "level": "error",
-            "message": "parameter 'filter' in GET /users became required"
-          }
-        ]
-      }
-    }
-  ]
-}
-```
-
-### check.sarif.json 中会出现（节选）
-
-```json
-{
-  "runs": [{
-    "results": [
-      {
-        "ruleId": "compat.openapi.parameter-became-required",
-        "level": "error",
-        "message": {
-          "text": "parameter 'filter' in GET /users became required"
-        },
-        "locations": [{
-          "physicalLocation": {
-            "artifactLocation": { "uri": "openapi.yaml" },
-            "region": { "startLine": 5 }
-          }
-        }]
-      }
-    ]
-  }]
-}
-```
-
----
-
-## 示例：response 状态码被删除
-
-### 修改前
-
-```yaml
-paths:
-  /users/{id}:
-    get:
-      responses:
-        '200':
-          description: User found
-        '404':
-          description: User not found
-```
-
-### 修改后
-
-```yaml
-paths:
-  /users/{id}:
-    get:
-      responses:
-        '200':
-          description: User found
-        # 404 被删除
-```
-
-### diff.json 中会出现（节选）
-
-```json
-{
-  "changes": [
-    {
-      "kind": "removed",
-      "level": "error",
-      "path": "paths./users/{id}.get.responses.404",
-      "semanticDiff": {
-        "findings": [
-          {
-            "ruleId": "compat.openapi.response-status-removed",
-            "level": "error",
-            "message": "response status '404' was removed from GET /users/{id}"
-          }
-        ]
-      }
-    }
-  ]
-}
-```
-
----
-
-## 示例：response schema 收窄
-
-### 修改前
-
-```yaml
-components:
-  schemas:
-    User:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        email:
-          type: string
-```
-
-### 修改后
-
-```yaml
-components:
-  schemas:
-    User:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        # email 字段被删除
-```
-
-### diff.json 中会出现（节选）
-
-```json
-{
-  "changes": [
-    {
-      "kind": "changed",
-      "level": "warning",
-      "path": "components.schemas.User",
-      "semanticDiff": {
-        "findings": [
-          {
-            "ruleId": "compat.openapi.response-schema-narrowed",
-            "level": "warning",
-            "message": "schema 'User' lost property 'email'"
-          }
-        ]
-      }
-    }
-  ]
-}
-```
-
----
-
-## 完整工作流
-
-```bash
-# 1. 初始化配置（首次使用）
-cogna init
-# 选择 profile: openapi-spec，填写 PURL，例如：
-# purl: pkg:oci/myorg/api@2.1.0
-
-# 2. 构建 bundle
-cd ./api
-cogna build
-
-# 3. 准备 dist/base 与 dist/target 两套产物后对比
-cogna diff
-
-# 4. 执行兼容性检查，生成 SARIF
-cogna check
-
-# 5. 查看结果
-cat ./dist/diff.json
-cat ./dist/check.sarif.json
-```
-
----
-
-## 配合 AI 助手查询 API 契约
-
-如果你想让 AI 查询某个 operation 的当前参数和响应定义：
-
-```bash
-cd ./api
-cogna build
-cogna mcp serve --port 3000
-```
-
-然后在 AI 工具中依次调用：
-
-1. `cogna.query.outlines` — 列出所有 path 和 operation
-2. `cogna.query.symbol` — 精确查询某个 operation 的参数列表、request body 和 response schema
-
----
-
-## 下一步
-
-- 发版前检查：[分析变更](/docs/analyze-changes)
-- 检索 API 签名：[检索函数签名](/docs/query-signatures)
-- 定制 policy 规则：[内置策略规则](/docs/policies)
+- [分析变更](/docs/analyze-changes)
+- [启用 SARIF 集成](/docs/sarif)
+- [持续集成](/docs/ci)

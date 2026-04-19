@@ -1,181 +1,299 @@
 ---
 title: CLI 参考
-description: 当前 Cogna CLI 的真实命令面、默认行为，以及各命令会读取或生成哪些文件。
+description: Cogna 命令行工具完整参考——参数说明、用法示例与推荐工作流。
 order: 6
 ---
 
 # CLI 参考
 
-当前版本的 Cogna CLI 以 `cogna.yml` 为中心：`build`、`diff`、`check`、`serve`、`cache ...`、`mcp serve` 都优先读取当前工作目录对应仓库的配置，而不是要求你在命令行里重复传路径。
+Cogna CLI 是本地工作流的核心入口。本页列出所有子命令的参数说明与使用示例，可作为日常速查手册。
+
+## 安装
+
+参见 [下载页面](/download)，一行命令完成安装：
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.sh | sh
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/cogna-dev/cogna/v0.1.0/install.ps1 | iex
+```
+
+验证安装：
+
+```bash
+cogna --version
+```
 
 ---
 
-## `cogna init`
+## cogna init
 
-生成一个新的 `cogna.yml` 模板：
+在当前目录生成 `cogna.yaml` 配置文件与默认策略目录，是所有后续命令的前置步骤。
 
 ```bash
 cogna init
+cogna init --output ./cogna.yaml
 ```
 
-默认输出到当前目录的 `./cogna.yml`。
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--output` | `string` | `cogna.yaml` | 输出配置文件的路径 |
+
+执行后 Cogna 会在当前目录写入：
+
+- `cogna.yaml`：项目配置，包含 `purl`、`profile`、`source`、`inputs` 等字段
+- `policies/`：默认内置策略文件（Rego 格式）
+
+初始化完成后，请编辑 `cogna.yaml`，至少填写正确的 `purl` 和 `profile`。
 
 ---
 
-## `cogna build`
+## cogna build
 
-读取当前仓库的 `cogna.yml`，生成 `dist/` 下的 bundle 与索引产物：
+读取当前目录的 `cogna.yaml`，提取源码或远端包的声明信息，生成结构化索引并写入 `dist/`。
 
 ```bash
 cogna build
+cogna build --repo /path/to/project
 ```
 
-典型输出：
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--repo` | `string` | `.`（当前目录） | 指定目标仓库路径，必须包含有效的 `cogna.yaml` |
 
-```text
-dist/
-├── manifest.json
-├── declarations.ndjson
-├── metadata.json
-├── checksums.txt
-├── bundle.ciq.tgz
-└── dependencies/              ← 仅在可解析本地依赖时出现
-```
+**输出产物：**
 
-另外会写入：
+- `dist/bundle.json`：完整的符号声明 bundle
+- `dist/declarations.ndjson`：逐行 JSON 的符号声明记录
 
-```text
-.cogna/sbom.spdx.json
-```
+**缓存策略：**
 
-如果 `profile: policy-bundle`，还会额外生成：
-
-```text
-dist/
-├── opa-bundle.tar.gz
-└── policy.rules.json
-```
+Cogna 会自动检查本地缓存（`.cogna/cache/`）及远端 HTTP 缓存，命中时直接恢复，跳过重复提取，显著缩短后续构建时间。
 
 ---
 
-## `cogna diff`
+## cogna diff
 
-根据当前仓库配置和 `dist/base` / `dist/target` 产物生成结构化 diff：
+对比两个版本的 bundle，输出变更列表（新增 / 删除 / 修改 / 废弃）。
 
 ```bash
 cogna diff
+cogna diff --repo /path/to/project
+cogna diff --since v1.2.0
+cogna diff --include-test-changes
 ```
 
-输出文件：
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--repo` | `string` | `.` | 目标仓库路径 |
+| `--since` | `string` | 上一次稳定版本 | 对比基线，可填版本号或 Git ref |
+| `--include-test-changes` | `bool` | `false` | 是否纳入测试文件的变更 |
 
-```text
-dist/diff.json
+**输出产物：**
+
+- `dist/diff.json`：结构化变更记录，含 `kind`（`added`/`removed`/`changed`/`deprecated`）、`level`（`breaking`/`compatible`）和 `message`
+
+**典型用途：**
+
+```bash
+# 发布前检查本版本相对上一版本的变更
+cogna build && cogna diff
+
+# 只看非测试代码的 breaking change
+cogna diff --since v1.0.0
 ```
 
 ---
 
-## `cogna check`
+## cogna check
 
-读取 `cogna.yml` 里的 `checks.policy` 并对 `dist/diff.json` 执行 policy 检查：
+读取 `dist/diff.json`，用 Rego 策略文件对变更进行合规检查，输出通过/违规结果。
 
 ```bash
 cogna check
+cogna check --diff dist/diff.json --policies ./policies
 ```
 
-输出文件：
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--diff` | `string` | `dist/diff.json` | 变更数据文件路径（`cogna diff` 的输出） |
+| `--policies` | `string` | `policies/` | 策略目录路径 |
 
-```text
-dist/check.sarif.json
+**输出产物：**
+
+- `dist/check.sarif.json`：SARIF 格式的检查结果，可被 VS Code 插件、CI 工具直接消费
+
+**执行检查后：**
+
+- 所有策略通过：退出码 `0`
+- 存在违规：退出码非零，并输出违规规则与位置
+
+**CI 推荐用法：**
+
+```bash
+cogna build && cogna diff && cogna check
+# 任意一步失败即阻断流水线
 ```
-
-> `check` 依赖本机可用的 `opa eval`。
 
 ---
 
-## `cogna serve`
+## cogna serve
 
-启动本地 HTTP cache proxy：
+启动一个 HTTP 缓存服务，允许团队成员和 CI 共享已构建的索引，避免重复提取。
 
 ```bash
+cogna serve
 cogna serve --port 8787
 ```
 
-当前实现暴露两个 cache object 端点：
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--port` | `int` | `8787` | 监听端口 |
 
-- `GET /health`
-- `GET /cache/v1/object?key=...`
-- `PUT /cache/v1/object?key=...`
+服务启动后，在各个客户端的 `cogna.yaml` 中配置：
+
+```yaml
+cache:
+  type: http
+  http:
+    endpoint: http://cache.internal:8787
+```
+
+之后执行 `cogna build` 时，若本地缓存缺失，会自动从远端拉取；命中后回填本地缓存。
 
 ---
 
-## `cogna cache`
+## cogna mcp serve
 
-### `cache list`
-
-列出当前 workspace local cache 中的对象：
+以 MCP 服务端模式运行，让 AI 编程工具（Cursor、Claude Code 等）直接查询本地索引。
 
 ```bash
-cogna cache list
-```
-
-也可以按前缀过滤：
-
-```bash
-cogna cache list --prefix blob/
-```
-
-
-### `cache add`
-
-把一个本地文件加入当前 workspace 的 local cache：
-
-```bash
-cogna cache add --key blob/sha256/example --file ./dist/bundle.ciq.tgz
-```
-
-### `cache remove`
-
-从当前 workspace 的 local cache 删除对象：
-
-```bash
-cogna cache remove --key blob/sha256/example
-```
-
----
-
-## `cogna mcp`
-
-### `mcp serve`
-
-在前台运行 MCP server：
-
-```bash
+cogna mcp serve
 cogna mcp serve --port 3000
+cogna mcp serve --stdio
 ```
 
-### `mcp status`
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--port` | `int` | `3000` | HTTP 模式的监听端口 |
+| `--stdio` | `bool` | `false` | 以 stdio 模式运行（适合 Claude Code、Cursor 等直接子进程调用） |
 
-查看 MCP server descriptor 和健康状态：
+详细的 AI 工具配置方式见 [AI 查询（MCP）](/docs/mcp)。
+
+---
+
+## cogna mcp status
+
+查询当前 MCP 服务的运行状态。
 
 ```bash
 cogna mcp status
 ```
 
+无额外参数。输出当前服务端口、工具注册状态和活跃连接数。
+
 ---
 
-## 当前推荐工作流
+## cogna cache list
+
+列出本地缓存中的所有条目。
 
 ```bash
-cogna init
-cogna build
-cogna diff
-cogna check
-cogna serve --port 8787
 cogna cache list
+cogna cache list --prefix pkg:golang/
 ```
 
-另一个终端里，如果要给 AI / Agent 使用：
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--prefix` | `string` | `""` | 按 key 前缀过滤，支持 PURL 前缀 |
+
+---
+
+## cogna cache add
+
+向本地缓存手动添加一条条目（适合离线环境预热）。
 
 ```bash
-cogna mcp serve --port 3000
+cogna cache add --key <cache-key> --file ./bundle.zip
 ```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `--key` | `string` | ✓ | 缓存键，通常为 PURL + 内容哈希 |
+| `--file` | `string` | ✓ | 要写入缓存的文件路径 |
+
+---
+
+## cogna cache remove
+
+从本地缓存删除指定条目。
+
+```bash
+cogna cache remove --key <cache-key>
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `--key` | `string` | ✓ | 要删除的缓存键 |
+
+---
+
+## cogna open
+
+在默认浏览器中打开 Cogna 相关页面（如本地 serve 地址或文档）。
+
+```bash
+cogna open
+```
+
+---
+
+## 推荐工作流
+
+### 首次上手
+
+```bash
+# 在项目根目录
+cogna init
+# 编辑 cogna.yaml，填写 purl 和 profile
+cogna build
+```
+
+### 日常开发循环
+
+```bash
+# 每次提交/发布前
+cogna build       # 刷新索引
+cogna diff        # 查看变更
+cogna check       # 策略合规检查
+```
+
+### 团队协作
+
+```bash
+# 在共享机器上
+cogna serve --port 8787
+
+# 在 cogna.yaml 里配置 cache.http.endpoint 后，其他机器直接：
+cogna build  # 自动复用远端缓存
+```
+
+### 配合 AI 工具
+
+```bash
+cogna build
+cogna mcp serve --port 3000
+# 在 Cursor / Claude Code 等工具中配置 MCP 端点
+```
+
+---
+
+## 相关文档
+
+- [快速开始](/docs/quickstart)
+- [配置与 PURL](/docs/config)
+- [持续集成](/docs/ci)
+- [AI 查询（MCP）](/docs/mcp)
+- [远程索引](/docs/remote-indexing)

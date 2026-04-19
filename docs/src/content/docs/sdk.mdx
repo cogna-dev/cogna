@@ -1,9 +1,211 @@
 ---
 title: SDK 使用指南
-description: 如何在项目中使用 Cogna SDK。
+description: 在 Node.js 应用中通过 @cogna-dev/sdk 查询已构建仓库的符号与包结构。
 order: 18
 ---
 
 # SDK 使用指南
 
-文档编写中...
+`@cogna-dev/sdk` 是一个纯查询 SDK。它让你的 Node.js 程序直接读取 Cogna 在本地构建产物中生成的结构化索引，无需网络调用，亦无需独立服务进程。
+
+## 前置条件
+
+SDK 只能查询**已经初始化并构建过**的仓库。在目标项目根目录中，必须先完成：
+
+```bash
+cogna init      # 生成 cogna.yaml 与默认策略
+cogna build     # 构建索引，写入 dist/
+```
+
+如果 `dist/` 目录不存在或已过期，查询将返回空结果。
+
+## 安装
+
+选择你习惯的包管理器：
+
+```bash
+npm install @cogna-dev/sdk   # npm
+pnpm add @cogna-dev/sdk      # pnpm
+yarn add @cogna-dev/sdk      # yarn
+bun add @cogna-dev/sdk       # bun
+```
+
+## API 概览
+
+SDK 导出三个查询函数，均为**同步调用**（基于 Wasm 运行时，在进程内执行）：
+
+| 函数 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `fetchPackages()` | 无 | `FetchPackagesResponse \| undefined` | 获取当前仓库的完整包依赖树 |
+| `queryOutlines(req)` | `{ package: string }` | `QueryOutlinesResponse \| undefined` | 列举指定包内所有公开符号的概要信息 |
+| `query(req)` | `QueryRequest` | `QueryResponse \| undefined` | 按 ID、符号名或自由文本搜索符号 |
+
+### `fetchPackages`
+
+返回整棵包依赖树，每个节点包含 `name`、`version`、`ecosystem`、`relation` 等字段。
+
+```ts
+import { fetchPackages } from "@cogna-dev/sdk"
+
+const result = fetchPackages()
+if (result) {
+  console.log(result.root.name)      // 根包名
+  console.log(result.root.version)   // 版本
+  console.log(result.root.children)  // 直接依赖列表
+}
+```
+
+### `queryOutlines`
+
+列出某个包下所有**公开声明**（函数、类型、接口等）的简要元数据，适合做符号索引或导航。
+
+```ts
+import { queryOutlines } from "@cogna-dev/sdk"
+
+const result = queryOutlines({
+  package: "pkg:golang/github.com/example/mylib@v1.2.0",
+})
+if (result) {
+  for (const outline of result.outlines) {
+    console.log(`${outline.kind} ${outline.symbol}`)
+    // 示例输出: "function HandleRequest"
+  }
+}
+```
+
+每个 `Outline` 条目的字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `string` | 全局唯一声明 ID |
+| `symbol` | `string` | 符号名称 |
+| `kind` | `string` | 声明类型（`function`、`type`、`interface` 等） |
+| `summary` | `string?` | 文档摘要（若有） |
+| `deprecated` | `boolean` | 是否已废弃 |
+| `location` | `SourceLocation?` | 源文件位置（`uri`、`startLine`、`endLine`） |
+
+### `query`
+
+对已构建的索引执行精确或模糊搜索，是三个函数中功能最丰富的。
+
+```ts
+import { query } from "@cogna-dev/sdk"
+
+// 按符号名精确搜索
+const exact = query({
+  package: "pkg:golang/github.com/example/mylib@v1.2.0",
+  exactSymbol: "HandleRequest",
+})
+
+// 按声明 ID 精确搜索
+const byId = query({
+  package: "pkg:golang/github.com/example/mylib@v1.2.0",
+  exactId: "golang:github.com/example/mylib.HandleRequest",
+})
+
+// 自由文本模糊搜索（支持翻页）
+const fuzzy = query({
+  package: "pkg:golang/github.com/example/mylib@v1.2.0",
+  text: "request handler",
+  limit: 10,
+})
+
+if (fuzzy) {
+  for (const match of fuzzy.matches) {
+    console.log(`[${match.kind}] ${match.symbol}`)
+    if (match.signature) console.log(`  签名: ${match.signature}`)
+    if (match.summary)   console.log(`  摘要: ${match.summary}`)
+  }
+  // 翻页
+  if (fuzzy.cursor) {
+    const next = query({
+      package: "pkg:golang/github.com/example/mylib@v1.2.0",
+      text: "request handler",
+      limit: 10,
+      cursor: fuzzy.cursor,
+    })
+  }
+}
+```
+
+`QueryRequest` 参数说明：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `package` | `string` | ✓ | 目标包的 PURL，与 `cogna.yaml` 中一致 |
+| `exactId` | `string?` | — | 按声明 ID 精确匹配 |
+| `exactSymbol` | `string?` | — | 按符号名精确匹配 |
+| `text` | `string?` | — | 自由文本模糊搜索 |
+| `limit` | `number?` | — | 最大返回条数 |
+| `cursor` | `string?` | — | 翻页游标（上次结果中的 `cursor` 字段） |
+
+`QueryMatch` 结果字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `string` | 声明 ID |
+| `symbol` | `string` | 符号名 |
+| `kind` | `string` | 声明类型 |
+| `signature` | `string?` | 完整签名字符串 |
+| `summary` | `string?` | 简短文档摘要 |
+| `docs` | `string?` | 完整文档注释 |
+| `score` | `number?` | 模糊搜索相关性得分（越高越相关） |
+| `location` | `SourceLocation?` | 源文件位置 |
+
+## 完整示例
+
+以下脚本展示了三个 API 的协同用法——为仓库生成符号概览报告：
+
+```ts
+import { fetchPackages, queryOutlines, query } from "@cogna-dev/sdk"
+
+// 1. 获取所有包
+const packages = fetchPackages()
+if (!packages) {
+  console.error("未找到索引，请先执行 cogna init && cogna build")
+  process.exit(1)
+}
+
+const root = packages.root
+console.log(`项目: ${root.name}${root.version ? ` v${root.version}` : ""}`)
+console.log(`生态: ${root.ecosystem ?? "unknown"}`)
+
+// 2. 列出根包的所有公开符号
+const outlines = queryOutlines({ package: root.name })
+if (outlines) {
+  console.log(`\n共 ${outlines.outlines.length} 个公开声明：`)
+  for (const o of outlines.outlines) {
+    const deprecated = o.deprecated ? " [deprecated]" : ""
+    console.log(`  ${o.kind.padEnd(12)} ${o.symbol}${deprecated}`)
+  }
+}
+
+// 3. 搜索包含特定关键词的符号
+const result = query({ package: root.name, text: "parse", limit: 5 })
+if (result?.matches.length) {
+  console.log(`\n包含 "parse" 的符号（前 5 条）：`)
+  for (const m of result.matches) {
+    console.log(`  ${m.symbol} — ${m.summary ?? "(无摘要)"}`)
+  }
+}
+```
+
+## 典型集成场景
+
+- **IDE 插件**：构建后读取索引，在编辑器侧边栏展示符号列表与文档
+- **文档生成**：从 outlines 提取签名与注释，自动生成 API 参考页
+- **变更分析脚本**：结合 `cogna diff` 的结果与 symbol 查询，自动汇总 breaking change 影响面
+- **AI 上下文注入**：在提示词中精确引用当前版本函数签名，减少幻觉
+
+## 注意事项
+
+- SDK 读取的是**上次构建的快照**，不会实时感知源码变化；每次重要改动后请重新执行 `cogna build`。
+- `package` 参数采用 PURL 格式（如 `pkg:golang/github.com/example/pkg@v1.0.0`），与 `cogna.yaml` 的 `purl` 字段保持一致。
+- 所有函数均可能返回 `undefined`（索引缺失或格式异常时），请在调用处做判空处理。
+
+## 相关文档
+
+- [快速开始](/docs/quickstart)
+- [CLI 参考](/docs/cli)
+- [AI 查询（MCP）](/docs/mcp)
+- [持续集成](/docs/ci)
