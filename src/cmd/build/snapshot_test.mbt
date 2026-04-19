@@ -112,7 +112,7 @@ fn write_config_for(
       #|    - 
       #|checks:
       #|  format: sarif
-      #|  policy: default-compat
+      #|  policy: ./.cogna/policies
       #|
     )
     .replace(old="profile: ", new="profile: \{profile}")

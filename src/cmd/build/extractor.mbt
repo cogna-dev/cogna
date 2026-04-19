@@ -167,7 +167,6 @@ fn profile_mode(profile : String) -> (String, String) {
     "rust-crate" => ("parser-first", "rust-analyzer")
     "terraform-module" => ("parser-first", "hcl-parser")
     "openapi-spec" => ("parser-only", "none")
-    "policy-bundle" => ("policy-bundle", "opa")
     _ => ("parser-only", "none")
   }
 }
@@ -271,7 +270,6 @@ fn profile_language(profile : String) -> String {
     "rust-crate" => "rust"
     "terraform-module" => "terraform"
     "openapi-spec" => "openapi"
-    "policy-bundle" => "rego"
     _ => "generic"
   }
 }
@@ -331,51 +329,6 @@ fn push_simple_record(
     declarations, symbols, profile, server, language, path, line_no, kind, name,
     signature, "",
   )
-}
-
-///|
-fn extract_policy_file(
-  declarations : Array[Json],
-  symbols : Array[Json],
-  profile : String,
-  server : String,
-  path : String,
-  lines : Array[String],
-) -> Unit {
-  for i in 0..<lines.length() {
-    let line_no = i + 1
-    let line = trim_spaces(line_before_comment(lines[i]))
-    if line == "" {
-      continue
-    }
-    if line.has_prefix("package ") {
-      let package_name = trim_spaces(line[8:].to_string())
-      push_simple_record(
-        declarations, symbols, profile, server, "rego", path, line_no, "package",
-        package_name, "package \\{package_name}",
-      )
-      continue
-    }
-    if line.contains(" if ") && line.contains("{") {
-      let rule_name = first_token(line)
-      if rule_name != "" {
-        push_simple_record(
-          declarations, symbols, profile, server, "rego", path, line_no, "policy_rule",
-          rule_name, line,
-        )
-      }
-      continue
-    }
-    if line.contains(":=") {
-      let rule_name = first_token(line)
-      if rule_name != "" {
-        push_simple_record(
-          declarations, symbols, profile, server, "rego", path, line_no, "policy_rule",
-          rule_name, line,
-        )
-      }
-    }
-  }
 }
 
 ///|
@@ -443,15 +396,6 @@ fn collect_records_from_view(
         )
       "openapi-spec" =>
         @extract_openapi.extract_file(
-          declarations,
-          symbols,
-          config.profile,
-          server,
-          relative_path,
-          lines,
-        )
-      "policy-bundle" =>
-        extract_policy_file(
           declarations,
           symbols,
           config.profile,

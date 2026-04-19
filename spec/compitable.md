@@ -25,7 +25,7 @@
 | CargoPackage | ✅ repo-proven | `src/cmd/build/source/cargo.mbt`, `src/cmd/build/source/main_test.mbt`（vendor 优先、registry fallback、missing guidance） | real-world e2e 依赖本机 `cargo fetch`/`cargo vendor` |
 | GoModule | ✅ repo-proven | `src/cmd/build/source/gomod.mbt`, `src/cmd/build/source/main_test.mbt`（vendor 优先、cache fallback、escaped path） | real-world e2e 依赖本机 `go mod download`/`go mod vendor` |
 | TerraformPackage | ✅ repo-proven | `src/cmd/build/source/terraform.mbt`, `src/cmd/build/source/main_test.mbt`（module/provider initialized guidance） | provider 以 lockfile identity 为准，binary 不做源码解析 |
-| GitRepo | 🟡 repo-proven | `src/cmd/build/source/git.mbt`, `src/cmd/build/source/main_test.mbt`（clone local repository） | `src/e2e/extractors/runtime.mbt` 默认将 git case 标记为 skipped，待后续开启 |
+| GitRepo | 🟡 repo-proven | `src/cmd/build/source/git.mbt`, `src/cmd/build/source/main_test.mbt`（clone local repository） | `src/e2e/extractors/runtime.mbt` 已支持 git source，默认由 `COGNA_ENABLE_GIT_REMOTE_E2E` 控制是否执行远端 case |
 
 ### 1.2 Surface 支持情况
 
@@ -35,7 +35,7 @@
 | native diff | ✅ repo-proven | `src/cmd/diff/pipeline.mbt`, `src/cmd/diff/main_test.mbt` | dependency compare 走 SPDX transient derive |
 | readonly SDK query/fetch | ✅ repo-proven | `src/sdk/js.mbt`, `src/sdk/moon.pkg`, `src/sdk/query.mbt`, `src/sdk/sdk_test.mbt` | 仅保留 query/fetch/parse helpers |
 | Desktop build/diff path | ✅ repo-proven | `integrations/desktop/src/main/sdk.ts`（通过 CLI `build` / `diff`） | IPC channel 名称仍为 `sdk:*`，语义上已不走 SDK runtime |
-| acceptance coverage | 🟡 in-progress | `src/e2e/extractors/main_test.mbt`, `src/e2e/extractors/main.mbt`, `e2e/extractors/rust.json` | Rust case manifest 已接入；需持续补真实 pass/skip 台账 |
+| acceptance coverage | ✅ e2e-proven | `src/e2e/extractors/main_test.mbt`, `src/e2e/extractors/main.mbt`, `e2e/extractors/{rust,go,openapi,terraform}.json`, `e2e/extractors/*/*/snapshots/cogna/*` | 本地 examples 驱动的多语言 e2e snapshots 已落地；远端 package/repo case 保留为环境依赖 case |
 
 ---
 
@@ -153,12 +153,12 @@ COGNA_UPDATE_SNAPSHOTS=true moon test --target native src/cmd/build/snapshot_tes
 - Diff richer metadata tests：`src/cmd/diff/main_test.mbt`
 - Bundle reader richer declaration tests：`src/core/bundle/reader_test.mbt`
 - Extract subpackage enrichment tests：`src/core/extract/subpackages_test.mbt`
-- 现有 e2e manifest：`e2e/extractors/rust.json`
+- 现有 e2e manifest：`e2e/extractors/{rust,go,openapi,terraform,go-remote,terraform-remote}.json`
 
 说明：
 
-- 当前仓库里还没有完整提交的 `src/e2e/extractors/*` harness 实现；
-- 因此本文件中的 `🟡 repo-proven` 主要来自 extractor 实现、snapshot tests、diff tests、reader tests；
+- `src/e2e/extractors/*` harness 已落地并支持 local/package/git 多 source；
+- 当前仍保留部分 `🟡 repo-proven` 行用于记录“需真实远端样本或更复杂语法样本”的能力；
 - 只有当真实 case 进入 `e2e/extractors` 并留下 case/snapshot 证据后，才允许升级成 `✅ e2e-proven`。
 
 ---
@@ -175,21 +175,21 @@ COGNA_UPDATE_SNAPSHOTS=true moon test --target native src/cmd/build/snapshot_tes
 
 | Feature | Status | 当前证据 | 备注 / 后续更新点 |
 |---|---:|---|---|
-| free functions | 🟡 repo-proven | `src/extractors/rust/main.mbt:732+` | baseline 已覆盖；等待 real-world e2e |
-| public/private visibility | 🟡 repo-proven | `src/extractors/rust/main.mbt:707`, `893+` | signature 已编码可见性 |
-| structs / enums / traits | 🟡 repo-proven | `decl_name`, `strip_decl_modifiers`, `extract_file` | 需 real-world case 验证更复杂 trait body |
-| impl blocks | 🟡 repo-proven | `impl_targets`, `extract_file`, `subpackages_test.mbt` | 已有 impl metadata enrichment 证据 |
-| associated functions | 🟡 repo-proven | `extract_file` 中 `associated_fn` | 需 e2e 验证 trait impl 组合 |
-| associated consts | 🟡 repo-proven | `extract_file` 中 `associated_const` | 需 real-world case |
-| associated types | 🟡 repo-proven | `extract_file` 中 `associated_type` | 需 real-world case |
-| generics / type params | 🟡 repo-proven | `signature_type_params`, `decl_name`, `normalize_owner_key` | 已见 type param parsing 逻辑 |
-| where clauses | 🟡 repo-proven | `where_clause`, `multiline_clause` | 需 e2e 验证 multiline where |
-| async functions | 🟡 repo-proven | `strip_decl_modifiers` | 当前从 signature 归一化；等待 e2e |
-| unsafe functions | 🟡 repo-proven | `is_unsafe`, `diff marks rust declarations changed...` | diff 已有 breaking rule 证据 |
-| extern ABI functions | 🟡 repo-proven | `extern_abi`, `bundle reader accepts richer rust declaration ndjson` | `extern "C"` 已有 reader 证据 |
-| macro exports / `macro_rules!` | 🟡 repo-proven | `#[macro_export]`, `macro_rules!` branch in `extract_file` | 需 real-world macro-heavy crate |
-| doc comments (`///`) | 🟡 repo-proven | `extract_file` pending_doc logic | 仍需 e2e 样本 |
-| deprecated attributes | 🟡 repo-proven | `#[deprecated]` handling in `extract_file` | 需 e2e 样本 |
+| free functions | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | local rust example 已实测通过 |
+| public/private visibility | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `pub` / `pub(crate)` use 项已进入 e2e |
+| structs / enums / traits | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `ApiItem` / `Status` / `Service` 已进入 e2e |
+| impl blocks | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | inherent impl + trait impl 已进入 e2e |
+| associated functions | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `Service::call` 已进入 e2e |
+| associated consts | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `Service::VERSION` 已进入 e2e |
+| associated types | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `Service::Output` 已进入 e2e |
+| generics / type params | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `ApiItem<T>` / const generics 样例已进入 e2e |
+| where clauses | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `ApiItem<T>` 与 impl 的 `where T: Clone` 已进入 e2e |
+| async functions | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `load_value` async fn 已进入 e2e |
+| unsafe functions | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `dangerous` 样例已进入 e2e |
+| extern ABI functions | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `c_add` 样例已进入 e2e |
+| macro exports / `macro_rules!` | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `make_status` 样例已进入 e2e |
+| doc comments (`///`) | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `ApiItem<T>` 文档注释路径已进入 e2e |
+| deprecated attributes | ✅ e2e-proven | `e2e/extractors/rust/rust-local-example/snapshots/cogna/declarations.ndjson` | `ApiItem<T>` 的 deprecated 元信息已进入 e2e |
 | test-only items / cfg-gated items | ⏭ skipped | 未见明确 extractor 规则 | 如 real-world case 暴露再拆分 |
 | proc macros / derive macro expansion semantics | ❌ unsupported | 未见 parser / semantic expansion 逻辑 | 当前只做文本级 declaration extraction |
 
@@ -206,21 +206,21 @@ COGNA_UPDATE_SNAPSHOTS=true moon test --target native src/cmd/build/snapshot_tes
 
 | Feature | Status | 当前证据 | 备注 / 后续更新点 |
 |---|---:|---|---|
-| package declarations | 🟡 repo-proven | `extract_file` declaration prefixes | 需 e2e 多 package 样本 |
-| imports | 🟡 repo-proven | `extract_record`, `enrich_record` 中 `importPath` / `importAlias` | alias import 已有字段 |
-| const / var declarations | 🟡 repo-proven | `extract_file` group handling + `extract_record` | 包括 grouped declarations |
-| grouped declarations (`const (...)`, `var (...)`, `type (...)`, `import (...)`) | 🟡 repo-proven | `group_kind` / `group_scope_depth` | 需要 e2e 验证复杂 group formatting |
-| type declarations | 🟡 repo-proven | `type_name`, `extract_record` | 包括 type alias / named types |
-| structs | 🟡 repo-proven | `active_struct`, `struct_name`, `extract_struct_field` | baseline 已覆盖；等待 e2e |
-| struct fields | 🟡 repo-proven | `extract_struct_field` | 需 real-world anonymous field 样本 |
-| embedded fields | 🟡 repo-proven | `embedded_field`, `collect_embedding_index` | 已有 embedding enrichment 逻辑 |
-| interfaces | 🟡 repo-proven | `enrich_record` for `interface` | 需 e2e 验证 embedded interfaces |
-| free functions | 🟡 repo-proven | `extract_record` + `function_return_types` | baseline 已覆盖 |
-| methods | 🟡 repo-proven | `receiver_parts`, `method_param_types`, `subpackages_test.mbt` | receiver metadata 已有 test |
-| pointer receivers | 🟡 repo-proven | `receiver_parts` + `pointerReceiver` flag | 需 e2e 样本 |
-| generics / type params | 🟡 repo-proven | `type_name` + `signature_type_params` in enrich path | 需真实泛型 Go case |
-| named / tuple-like returns | 🟡 repo-proven | `return_types_after_params`, `function_return_types` | 已有 return extraction 逻辑 |
-| comments as docs | 🟡 repo-proven | `//` pending_doc handling | 需 e2e 样本 |
+| package declarations | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | go local example 已实测通过 |
+| imports | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | normal/alias/blank/dot import 已进入 e2e |
+| const / var declarations | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | grouped const/var 样例已进入 e2e |
+| grouped declarations (`const (...)`, `var (...)`, `type (...)`, `import (...)`) | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | grouped declarations 样例已进入 e2e |
+| type declarations | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | type alias + named struct/interface 已进入 e2e |
+| structs | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `Greeter` / `Box[T]` 已进入 e2e |
+| struct fields | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `Greeter.Prefix` / `Box.Value` 已进入 e2e |
+| embedded fields | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `Box.Greeter` 已进入 e2e |
+| interfaces | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `PayloadReader` / `Composite` 已进入 e2e |
+| free functions | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `Hello` / `MapValue` / `NewGreeter` 已进入 e2e |
+| methods | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | pointer/value receiver 样例已进入 e2e |
+| pointer receivers | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `(*Greeter).Greet` 样例已进入 e2e |
+| generics / type params | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `Box[T]` / `MapValue[T,U]` 样例已进入 e2e |
+| named / tuple-like returns | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | `Read() (Message, error)` 与函数返回类型已进入 e2e |
+| comments as docs | ✅ e2e-proven | `e2e/extractors/go/go-local-example/snapshots/cogna/declarations.ndjson` | interface/function 上方注释路径已进入 e2e |
 | build tags / file-level constraints | ⏭ skipped | 未见显式 extractor 规则 | 若 real-world case 暴露再补 |
 | cgo constructs | ⏭ skipped | 未见专门规则 | 当前先不单列支持 |
 
@@ -237,23 +237,23 @@ COGNA_UPDATE_SNAPSHOTS=true moon test --target native src/cmd/build/snapshot_tes
 
 | Feature | Status | 当前证据 | 备注 / 后续更新点 |
 |---|---:|---|---|
-| `terraform` block | 🟡 repo-proven | `hcl_block_name`, `parse_hcl_file` | 需 real-world module e2e |
-| `provider` blocks | 🟡 repo-proven | `hcl_block_name`, `collect_required_providers`, `uses_provider` relation | provider alias 已有逻辑 |
-| `resource` blocks | 🟡 repo-proven | `hcl_block_name`, `extract_file` | baseline 已覆盖 |
-| `data` blocks | 🟡 repo-proven | `hcl_block_name` | 需 e2e 样本 |
-| `variable` blocks | 🟡 repo-proven | `hcl_block_name`, `diff marks terraform variables becoming required...` | required flag 已有 diff 规则 |
-| `output` blocks | 🟡 repo-proven | `hcl_block_name`, `terraform-output-removed` diff test | output removal 已有 diff 证据 |
-| `module` blocks | 🟡 repo-proven | `hcl_block_name` includes `module` | 需 real-world nested module cases |
-| `locals` blocks | 🟡 repo-proven | `hcl_block_name` | 需 e2e 样本 |
-| `check` blocks | 🟡 repo-proven | `hcl_block_name` includes `check` | 当前仅结构识别 |
-| `dynamic` blocks | 🟡 repo-proven | `hcl_block_name` includes `dynamic` | 需 e2e 验证 deeper attrs |
-| provider requirements / versions | 🟡 repo-proven | `collect_required_providers`, `providers.terraform` reader test | `source` / `version` / `alias` 均有 evidence |
-| provider aliases | 🟡 repo-proven | `TerraformProviderInfo.provider_alias`, `providerRef` | diff / reader 已验证 |
-| `depends_on` | 🟡 repo-proven | terraform reader test includes `dependsOn` | 需 e2e |
-| lifecycle: `prevent_destroy` | 🟡 repo-proven | `terraform-prevent-destroy-added` diff test | richer metadata 已覆盖 |
-| lifecycle: `create_before_destroy` | 🟡 repo-proven | `terraform-create-before-destroy-added` diff test | richer metadata 已覆盖 |
-| lifecycle: `ignore_changes` | 🟡 repo-proven | `terraform-ignore-changes-expanded` diff test | richer metadata 已覆盖 |
-| attribute / expression parsing via HCL AST | 🟡 repo-proven | `@hcl.parse`, `expression_to_text` | 真实复杂表达式仍待 e2e |
+| `terraform` block | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | `required_providers` 结构已进入 e2e |
+| `provider` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | provider requirements / alias 相关记录已进入 e2e |
+| `resource` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | terraform local example 已实测通过 |
+| `data` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | `depends_on = [data.aws_caller_identity.current]` 关联已进入 e2e |
+| `variable` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | required/sensitive/validation 样例已进入 e2e |
+| `output` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | output+depends_on 样例已进入 e2e |
+| `module` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | local module + providers 样例已进入 e2e |
+| `locals` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | `local.base_tags` 表达式样例已进入 e2e |
+| `check` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | check/assert 语义相关记录已进入 e2e |
+| `dynamic` blocks | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | `dynamic ingress` 样例已进入 e2e |
+| provider requirements / versions | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | required_providers 版本约束样例已进入 e2e |
+| provider aliases | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | aliased provider 场景已进入 e2e |
+| `depends_on` | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | module/resource/output depends_on 已进入 e2e |
+| lifecycle: `prevent_destroy` | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | lifecycle block 已进入 e2e |
+| lifecycle: `create_before_destroy` | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | lifecycle block 已进入 e2e |
+| lifecycle: `ignore_changes` | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | lifecycle block 已进入 e2e |
+| attribute / expression parsing via HCL AST | ✅ e2e-proven | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/declarations.ndjson` | type/object/expression 解析结果已进入 e2e |
 | `for_each` / `count` semantics | ⏭ skipped | 未见明确特性级 rule | 如 e2e 暴露再拆分 |
 | deep module graph / cross-file resolution | ⏭ skipped | 当前文档只记录 declaration extraction，不承诺 full semantic graph | 后续按 case 增补 |
 
@@ -270,36 +270,36 @@ COGNA_UPDATE_SNAPSHOTS=true moon test --target native src/cmd/build/snapshot_tes
 
 | Feature | Status | 当前证据 | 备注 / 后续更新点 |
 |---|---:|---|---|
-| `paths` | 🟡 repo-proven | `extract_file` handles `paths:` and path records | baseline 已覆盖 |
-| operations / HTTP methods | 🟡 repo-proven | `operation(line)`, `httpMethod` metadata | reader / diff 均有证据 |
-| `components.schemas` | 🟡 repo-proven | `component_kind("schemas")` | 需 e2e 样本 |
-| `components.parameters` | 🟡 repo-proven | `component_kind("parameters")`, `parameterIn`, `required` | richer metadata path 已有 |
-| `components.responses` | 🟡 repo-proven | `component_response_media_types` | 需 e2e 更复杂 media types |
-| `components.requestBodies` | 🟡 repo-proven | `component_kind("requestBodies")` | 需 e2e |
-| `components.headers` | 🟡 repo-proven | `component_kind("headers")` | 需 e2e |
-| `components.securitySchemes` | 🟡 repo-proven | `security_scheme` kind, `securitySchemeName` | 需 e2e |
-| `callbacks` | 🟡 repo-proven | `active_callback_expression`, reader test `callbackExpression` | 已有 explicit metadata |
-| `webhooks` | 🟡 repo-proven | `in_webhooks`, `component_kind("webhooks")` | 需 e2e |
-| `$ref` references | 🟡 repo-proven | `normalize_reference_target`, `ref` metadata | ref extraction 已有代码 |
-| discriminator mapping | 🟡 repo-proven | reader test includes `discriminatorMapping` | 需 e2e |
-| status codes | 🟡 repo-proven | `diff marks openapi deeper status...` | diff 已覆盖 narrowing / status changes |
-| media types | 🟡 repo-proven | reader test `mediaTypes`, component response collection | richer metadata 已覆盖 |
-| parameter requiredness | 🟡 repo-proven | `required` metadata setting | 需 e2e |
+| `paths` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | openapi local example 已实测通过 |
+| operations / HTTP methods | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | GET/POST operations 样例已进入 e2e |
+| `components.schemas` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | oneOf/anyOf/discriminator schemas 样例已进入 e2e |
+| `components.parameters` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | RequestId / paymentId 参数样例已进入 e2e |
+| `components.responses` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | NotFound response 样例已进入 e2e |
+| `components.requestBodies` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | PaymentRequest / callback requestBody 已进入 e2e |
+| `components.headers` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | `CorrelationId` header component 已进入 e2e |
+| `components.securitySchemes` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | ApiKeyAuth / OAuth2 已进入 e2e |
+| `callbacks` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | callback expression 样例已进入 e2e |
+| `webhooks` | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | webhook path 样例已进入 e2e |
+| `$ref` references | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | components/internal/external `$ref` 已进入 e2e |
+| discriminator mapping | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | discriminator declaration 已进入 e2e |
+| status codes | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | `200/201/404` response status 路径已进入 e2e |
+| media types | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | `application/json` content 样例已进入 e2e |
+| parameter requiredness | ✅ e2e-proven | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/declarations.ndjson` | required path/body 参数样例已进入 e2e |
 | YAML anchors / advanced schema composition | ⏭ skipped | 未见明确 extractor 规则 | 如真实 case 出现再拆分 |
 
 ---
 
-## 9. Policy / Rego 兼容性记录
+## 9. Policy / Rego 使用边界
 
-当前仓库有 policy-bundle build tests，但还没有与 `src/extractors/*` 对齐的独立语法兼容性矩阵基础。
+policy 当前不属于 extractor 兼容性矩阵。
 
-因此本轮先记录为：
+本仓库当前约定是：
 
-| Feature Group | Status | 当前证据 | 备注 |
+| Capability | Status | 当前证据 | 备注 |
 |---|---:|---|---|
-| builtin policy bundle assembly | 🟡 repo-proven | `src/cmd/build/main_test.mbt` policy-bundle tests | 当前是 build 规则，不是 extractor 语法矩阵 |
-| custom rego file ordering / validation | 🟡 repo-proven | `build reads custom rego files...`, duplicate / missing metadata tests | 如后续增加独立 rego extractor，再拆出细化表 |
-| rego syntax declarations matrix | ⏭ skipped | 尚无 `src/extractors/policy` | 等真正 extractor 出现后再立表 |
+| `init` materializes built-in policy into workspace | 🟡 repo-proven | `src/cmd/init/*` | 当前阶段的正确入口是 `./.cogna/policies` |
+| `check` evaluates policy directory via OPA bundle input | ✅ repo-proven | `src/cmd/check/main.mbt`, `src/cmd/check/main_test.mbt` | policy 目录直接作为 `opa eval --bundle ...` 输入 |
+| policy in extractor/build/diff mainline | ⛔ not-supported | 本阶段显式禁止 | 不再维护任何策略 profile，也不再规划 `src/extractors/policy` |
 
 ---
 
@@ -311,9 +311,15 @@ COGNA_UPDATE_SNAPSHOTS=true moon test --target native src/cmd/build/snapshot_tes
 
 | Case ID | Language | Source | Status | 触发到的 feature rows | Snapshot / 证据 | Notes |
 |---|---|---|---:|---|---|---|
-| `rust:aws-sdk-dynamodb@1.110.0` | rust | cargo | _pending_ | _待补_ | `e2e/extractors/rust.json` | 首批 real-world cargo case |
-| `rust:aws-config@1.8.15` | rust | cargo | _pending_ | _待补_ | `e2e/extractors/rust.json` | 首批 real-world cargo case |
-| `rust:https://github.com/awslabs/aws-sdk-rust` | rust | git | _pending_ | _待补_ | `e2e/extractors/rust.json` | 首批 real-world git case |
+| `rust-local-example` | rust | local workspace | ✅ e2e-proven | free functions / generics / unsafe / extern ABI / macro_rules | `e2e/extractors/rust/rust-local-example/snapshots/cogna/*` | 基于 `e2e/examples/rust-crate/full/repo` |
+| `go-local-example` | go | local workspace | ✅ e2e-proven | package decl / grouped decl / methods / pointer receiver / generics | `e2e/extractors/go/go-local-example/snapshots/cogna/*` | 基于 `e2e/examples/go-module/full/repo` |
+| `openapi-local-example` | openapi | local workspace | ✅ e2e-proven | paths / operations / schemas / callbacks / webhooks | `e2e/extractors/openapi/openapi-local-example/snapshots/cogna/*` | 基于 `e2e/examples/openapi-spec/full/repo` |
+| `terraform-local-example` | terraform | local workspace | ✅ e2e-proven | resource / variable / module / dynamic block | `e2e/extractors/terraform/terraform-local-example/snapshots/cogna/*` | 基于 `e2e/examples/terraform-module/full/repo` |
+| `go-module-remote-example` | go | module cache | ⏭ skipped | imports / interfaces / functions / generics / comments as docs | `e2e/extractors/go/go-module-remote-example/snapshots/cogna/*` | 当前阶段 deferred；仅在 `COGNA_ENABLE_REMOTE_E2E=true` 时执行 |
+| `terraform-module-remote-example` | terraform | terraform modules cache | ⏭ skipped | required_providers / for_each / count / depends_on / type constraints | `e2e/extractors/terraform/terraform-module-remote-example/snapshots/cogna/*` | 当前阶段 deferred；仅在 `COGNA_ENABLE_REMOTE_E2E=true` 时执行 |
+| `rust:aws-sdk-dynamodb@1.110.0` | rust | cargo | ⏭ skipped | _待补_ | `e2e/extractors/rust.json` | 当前阶段 deferred；仅在 `COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E=true` 时执行 |
+| `rust:aws-config@1.8.15` | rust | cargo | ⏭ skipped | _待补_ | `e2e/extractors/rust.json` | 当前阶段 deferred；仅在 `COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E=true` 时执行 |
+| `rust:https://github.com/awslabs/aws-sdk-rust@main` | rust | git | ⏭ skipped | _待补_ | `e2e/extractors/rust.json` | 当前阶段 deferred；仅在 `COGNA_ENABLE_GIT_REMOTE_E2E=true` 时执行 |
 
 后续每新增一个 case，必须至少补：
 

@@ -61,7 +61,7 @@ function writeRuntimeProjectFiles(): void {
       '    - "**/*.go"',
       'checks:',
       '  format: sarif',
-      '  policy: default-compat',
+      '  policy: ./.cogna/policies',
       '',
     ].join('\n'),
     'utf-8',

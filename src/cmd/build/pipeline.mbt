@@ -51,96 +51,24 @@ fn artifact_with_sha(
 }
 
 ///|
-fn runtime_signature_from_env() -> Json {
-  let status = match @sys.get_env_var("COGNA_SIGNATURE_STATUS") {
-    Some("verified") => "verified"
-    Some("untrusted") => "untrusted"
-    _ => "unsigned"
-  }
-  let signature_value = match @sys.get_env_var("COGNA_SIGNATURE_VALUE") {
-    Some(raw) => {
-      let trimmed = raw.trim().to_string()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
-    None => None
-  }
-  let signature : Map[String, Json] = {
-    "status": Json::string(status),
-    "algorithm": Json::string("sha256"),
-  }
-  match @sys.get_env_var("COGNA_SIGNATURE_KEY_ID") {
-    Some(value) if value.trim().to_string() != "" =>
-      signature["keyId"] = Json::string(value.trim().to_string())
-    _ => ()
-  }
-  match signature_value {
-    Some(value) => signature["value"] = Json::string(value)
-    None => ()
-  }
-  Json::object(signature)
-}
-
-///|
 fn pipeline_manifest_json(
   config : @config.Config,
   declarations_sha : String,
   commit : String,
-  opa_bundle_sha : String?,
-  policy_rules_sha : String?,
 ) -> Json {
-  let base_artifacts : Array[Json] = [
+  let artifacts : Array[Json] = [
     artifact_with_sha("declarations.ndjson", "none", declarations_sha),
   ]
-  if config.profile == "policy-bundle" {
-    match opa_bundle_sha {
-      Some(sha) =>
-        base_artifacts.push(
-          artifact_with_sha("opa-bundle.tar.gz", "gzip", sha),
-        )
-      None => ()
-    }
-    match policy_rules_sha {
-      Some(sha) =>
-        base_artifacts.push(
-          artifact_with_sha("policy.rules.json", "none", sha),
-        )
-      None => ()
-    }
-    {
-      "schemaVersion": "ciq-opa-bundle/v1",
-      "purl": config.purl,
-      "profile": config.profile,
-      "source": {
-        "repo": config.source.repo,
-        "ref": config.source.source_ref,
-        "commit": commit,
-      },
-      "opa": {
-        "entrypoint": "cogna/compat/deny",
-        "format": "opa-bundle.tar.gz",
-      },
-      "provenance": {
-        "checksums": "checksums.txt",
-        "signature": runtime_signature_from_env(),
-      },
-      "artifacts": base_artifacts,
-    }
-  } else {
-    {
-      "schemaVersion": "ciq-bundle/v1",
-      "purl": config.purl,
-      "profile": config.profile,
-      "source": {
-        "repo": config.source.repo,
-        "ref": config.source.source_ref,
-        "commit": commit,
-      },
-      "artifacts": base_artifacts,
-    }
+  {
+    "schemaVersion": "ciq-bundle/v1",
+    "purl": config.purl,
+    "profile": config.profile,
+    "source": {
+      "repo": config.source.repo,
+      "ref": config.source.source_ref,
+      "commit": commit,
+    },
+    "artifacts": artifacts,
   }
 }
 
@@ -178,20 +106,10 @@ fn pipeline_checksums_text(
   manifest_sha : String,
   declarations_sha : String,
   metadata_sha : String,
-  opa_bundle_sha : String?,
-  policy_rules_sha : String?,
 ) -> String {
-  let base = "manifest.json  \{manifest_sha}\n" +
+  "manifest.json  \{manifest_sha}\n" +
     "declarations.ndjson  \{declarations_sha}\n" +
     "metadata.json  \{metadata_sha}\n"
-  let with_opa = match opa_bundle_sha {
-    Some(sha) => base + "opa-bundle.tar.gz  \{sha}\n"
-    None => base
-  }
-  match policy_rules_sha {
-    Some(sha) => with_opa + "policy.rules.json  \{sha}\n"
-    None => with_opa
-  }
 }
 
 ///|
@@ -335,8 +253,6 @@ fn pipeline_build_tar_payload(
   declarations_artifact : Bytes,
   metadata_text : String,
   checksums : String,
-  opa_bundle : Bytes?,
-  policy_rules : String?,
 ) -> Bytes {
   let entries : Array[(String, Bytes)] = [
     ("manifest.json", pipeline_utf8_bytes(manifest_text)),
@@ -344,14 +260,6 @@ fn pipeline_build_tar_payload(
     ("metadata.json", pipeline_utf8_bytes(metadata_text)),
     ("checksums.txt", pipeline_utf8_bytes(checksums)),
   ]
-  match opa_bundle {
-    Some(content) => entries.push(("opa-bundle.tar.gz", content))
-    None => ()
-  }
-  match policy_rules {
-    Some(content) => entries.push(("policy.rules.json", pipeline_utf8_bytes(content)))
-    None => ()
-  }
   pipeline_tar_archive(entries)
 }
 
@@ -604,82 +512,6 @@ fn write_dependency_bundles(
 }
 
 ///|
-fn read_rego_from_dir(policies_dir : String) -> Result[String, String] {
-  let entries = @fs.read_dir(policies_dir) catch {
-    _ => return Err("cannot read policies directory: \{policies_dir}")
-  }
-  let rego_files : Array[String] = []
-  for entry in entries {
-    if entry.has_suffix(".rego") {
-      rego_files.push(entry)
-    }
-  }
-  rego_files.sort()
-  let mut text = ""
-  for filename in rego_files {
-    let content = @fs.read_file_to_string("\{policies_dir}/\{filename}") catch {
-      _ =>
-        return Err("cannot read policy file \{policies_dir}/\{filename}")
-    }
-    text = text + content + "\n"
-  }
-  Ok(text)
-}
-
-///|
-fn build_opa_bundle_tar_gz(
-  config : @config.Config,
-  repo : String,
-) -> Result[(Bytes, String), String] {
-  let rules = @fs.read_dir(repo) catch { _ => [] }
-  let rego_files : Array[String] = []
-  for i in 0..<rules.length() {
-    if rules[i].has_suffix(".rego") {
-      rego_files.push(rules[i])
-    }
-  }
-  rego_files.sort()
-  let policy_text = if rego_files.is_empty() {
-    let fallback = read_rego_from_dir("./policies")
-    guard fallback is Ok(text) else { return Err(fallback.unwrap_err()) }
-    text
-  } else {
-    let mut text = ""
-    for i in 0..<rego_files.length() {
-      let content = @fs.read_file_to_string("\{repo}/\{rego_files[i]}") catch {
-        _ =>
-          return Err("cannot read policy file \{repo}/\{rego_files[i]}")
-      }
-      text = text + content + "\n"
-    }
-    text
-  }
-  let catalog_rules_out = @policy_rules.from_rego_text(policy_text)
-  guard catalog_rules_out is Ok(catalog_rules) else {
-    return Err(catalog_rules_out.unwrap_err().to_string())
-  }
-  let policy_rules_text = @policy_rules.catalog_json(catalog_rules)
-  let manifest : Json = { "revision": config.purl, "roots": ["cogna"] }
-  let tar_payload = pipeline_tar_archive([
-    ("policy.rego", pipeline_utf8_bytes(policy_text)),
-    ("data.json", pipeline_utf8_bytes("{}\n")),
-    (".manifest", pipeline_utf8_bytes(manifest.stringify(indent=2))),
-    ("policy.rules.json", pipeline_utf8_bytes(policy_rules_text)),
-  ])
-  let gz = @gio.Buffer::new()
-  let writer = @gzip.Writer::new(gz)
-  let (_, write_out) = writer.write(@gio.Slice::new(tar_payload.to_array()))
-  guard write_out is None else {
-    return Err("cannot write opa bundle gzip payload")
-  }
-  let close_out = writer.close()
-  guard close_out is None else {
-    return Err("cannot close opa bundle gzip writer")
-  }
-  Ok((gz.to_bytes(), policy_rules_text))
-}
-
-///|
 fn write_bundle_skeleton(
   config : @config.Config,
   repo : String,
@@ -697,33 +529,10 @@ fn write_bundle_skeleton(
   }
   let sbom_artifacts = build_sbom_artifacts(sbom_scan)
   let spdx_json_text = sbom_artifacts.spdx_json
-  let mut policy_rules_out : String? = None
-  let opa_bundle_out = if config.profile == "policy-bundle" {
-    let built = build_opa_bundle_tar_gz(config, repo)
-    match built {
-      Ok((bytes, rules)) => {
-        policy_rules_out = Some(rules)
-        Some(bytes)
-      }
-      Err(error) => return Err(error)
-    }
-  } else {
-    None
-  }
-  let opa_bundle_sha = match opa_bundle_out {
-    Some(bytes) => Some(pipeline_sha256_hex(bytes))
-    None => None
-  }
-  let policy_rules_sha = match policy_rules_out {
-    Some(text) => Some(pipeline_sha256_hex(pipeline_utf8_bytes(text)))
-    None => None
-  }
   let manifest_object = pipeline_manifest_json(
     config,
     declarations_sha,
     extract.commit,
-    opa_bundle_sha,
-    policy_rules_sha,
   )
   let manifest = manifest_object.stringify(indent=2)
   let metadata = pipeline_metadata_json(config, extract).stringify(indent=2)
@@ -733,8 +542,6 @@ fn write_bundle_skeleton(
     manifest_sha,
     declarations_sha,
     metadata_sha,
-    opa_bundle_sha,
-    policy_rules_sha,
   )
   let dir_out = ensure_dir(dist_dir)
   guard dir_out is Ok(_) else { return Err(dir_out.unwrap_err()) }
@@ -754,21 +561,11 @@ fn write_bundle_skeleton(
   guard metadata_out is Ok(_) else { return Err(metadata_out.unwrap_err()) }
   let checksums_out = write_text("\{dist_dir}/checksums.txt", checksums)
   guard checksums_out is Ok(_) else { return Err(checksums_out.unwrap_err()) }
-  if opa_bundle_out is Some(bundle_bytes) {
-    let opa_out = write_bytes("\{dist_dir}/opa-bundle.tar.gz", bundle_bytes)
-    guard opa_out is Ok(_) else { return Err(opa_out.unwrap_err()) }
-  }
-  if policy_rules_out is Some(rules_text) {
-    let rules_out = write_text("\{dist_dir}/policy.rules.json", rules_text)
-    guard rules_out is Ok(_) else { return Err(rules_out.unwrap_err()) }
-  }
   let tar_payload = pipeline_build_tar_payload(
     manifest,
     declarations_artifact,
     metadata,
     checksums,
-    opa_bundle_out,
-    policy_rules_out,
   )
   let gz = @gio.Buffer::new()
   let writer = @gzip.Writer::new(gz)

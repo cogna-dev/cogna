@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ciq-bundle/v1",
+  "purl": "pkg:golang/e2e/go-local-example@0.0.0",
+  "profile": "go-module",
+  "source": {
+    "repo": ".",
+    "ref": "main",
+    "commit": "unknown"
+  },
+  "artifacts": [
+    {
+      "path": "declarations.ndjson",
+      "sha256": "071008941573137c7c8572403df84058ff2c5a8350dc89ba1e9ebac7acc19047",
+      "compression": "none"
+    }
+  ]
+}

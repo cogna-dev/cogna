@@ -31,7 +31,7 @@ fn setup_sdk_runtime_context() -> Unit {
     #|    - "**/*.go"
     #|checks:
     #|  format: sarif
-    #|  policy: default-compat
+    #|  policy: ./.cogna/policies
     #|
   write_test_file("./cogna.yaml", config_text)
   ensure_test_dir("./dist")

@@ -42,7 +42,7 @@ cache:
     storeDir: .cogna/cache
 ```
 
-`profile` 决定 Cogna 如何理解你的代码。支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`、`policy-bundle`。
+`profile` 决定 Cogna 如何理解你的代码。当前支持的值：`go-module`、`rust-crate`、`terraform-module`、`openapi-spec`。
 
 ---
 
@@ -108,36 +108,15 @@ cogna diff
 
 ---
 
-## 第 4 步：准备 policy bundle（可选，用于 check）
+## 第 4 步：准备 policy 目录（可选，用于 check）
 
-`check` 命令需要一个 policy bundle 来判断哪些变化是可接受的。最简单的方式是用内置规则：
+`check` 命令需要一个 policy 目录来判断哪些变化是可接受的。默认情况下，`cogna init` 已经把内置规则复制到：
 
-**新建一个 policy 仓库**，配置 `cogna.yml`：
-
-```yaml
-schemaVersion: ciq-config/v2
-profile: policy-bundle
-purl: pkg:generic/your-org/compat-policy@1.0.0
-source:
-  repo: https://github.com/your-org/compat-policy
-  ref: main
-inputs:
-  include:
-    - "**/*.rego"
-cache:
-  type: local
-  local:
-    storeDir: .cogna/cache
+```text
+./.cogna/policies/
 ```
 
-然后构建它：
-
-```bash
-cd ./compat-policy
-cogna build
-```
-
-你会得到 `./compat-policy/dist/bundle.ciq.tgz`，这就是传给 `check` 的 policy bundle。
+如果你要自定义规则，直接编辑这个目录下的 `.rego` 文件即可。
 
 ---
 

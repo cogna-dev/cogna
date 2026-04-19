@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ciq-bundle/v1",
+  "purl": "pkg:terraform/e2e/terraform-module-remote-example@0.0.0",
+  "profile": "terraform-module",
+  "source": {
+    "repo": ".",
+    "ref": "main",
+    "commit": "unknown"
+  },
+  "artifacts": [
+    {
+      "path": "declarations.ndjson",
+      "sha256": "32a3ef5562b02904fa3c77c9b043e5ba5c9607d700ec446e555fb7834092f54d",
+      "compression": "none"
+    }
+  ]
+}

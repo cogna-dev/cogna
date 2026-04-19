@@ -6881,9 +6881,6 @@ function _M0FP411cogna_2ddev5cogna4core6config22is__supported__profile(profile) 
     case "terraform-module": {
       return true;
     }
-    case "policy-bundle": {
-      return true;
-    }
     default: {
       return false;
     }
@@ -7065,7 +7062,7 @@ function _M0FP411cogna_2ddev5cogna4core6config18find__config__path(root_dir) {
   return _M0FP311moonbitlang1x2fs12path__exists(fallback) ? fallback : undefined;
 }
 function _M0FP411cogna_2ddev5cogna4core6config15default__config() {
-  return new _M0TP411cogna_2ddev5cogna4core6config6Config("ciq-config/v2", "openapi-spec", "none", "pkg:openapi/acme/payment-api@2026.03.01", new _M0TP411cogna_2ddev5cogna4core6config6Source("https://github.com/acme/payment-api", "main"), new _M0TP411cogna_2ddev5cogna4core6config6Inputs(["openapi/**/*.yaml"]), new _M0TP411cogna_2ddev5cogna4core6config6Checks("sarif", "./policies"), new _M0TP411cogna_2ddev5cogna4core6config12DiffSettings(undefined, false), new _M0TP411cogna_2ddev5cogna4core6config12SbomSettings("spdx", true, true), new _M0TP411cogna_2ddev5cogna4core6config13CacheSettings("local", new _M0TP411cogna_2ddev5cogna4core6config18LocalCacheSettings(".cogna/cache"), new _M0TP411cogna_2ddev5cogna4core6config17HttpCacheSettings("", 10000)), new _M0TP411cogna_2ddev5cogna4core6config11McpSettings(3000));
+  return new _M0TP411cogna_2ddev5cogna4core6config6Config("ciq-config/v2", "openapi-spec", "none", "pkg:openapi/acme/payment-api@2026.03.01", new _M0TP411cogna_2ddev5cogna4core6config6Source("https://github.com/acme/payment-api", "main"), new _M0TP411cogna_2ddev5cogna4core6config6Inputs(["openapi/**/*.yaml"]), new _M0TP411cogna_2ddev5cogna4core6config6Checks("sarif", "./.cogna/policies"), new _M0TP411cogna_2ddev5cogna4core6config12DiffSettings(undefined, false), new _M0TP411cogna_2ddev5cogna4core6config12SbomSettings("spdx", true, true), new _M0TP411cogna_2ddev5cogna4core6config13CacheSettings("local", new _M0TP411cogna_2ddev5cogna4core6config18LocalCacheSettings(".cogna/cache"), new _M0TP411cogna_2ddev5cogna4core6config17HttpCacheSettings("", 10000)), new _M0TP411cogna_2ddev5cogna4core6config11McpSettings(3000));
 }
 function _M0FP411cogna_2ddev5cogna4core6config13parse__config(content, path) {
   const defaults = _M0FP411cogna_2ddev5cogna4core6config15default__config();

@@ -3,7 +3,6 @@ import {
   "gmlewis/io" @gio,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,
-  "moonbitlang/x/sys" @sys,
   "shu-kitamura/sha256" @sha256,
   "moonbitlang/x/fs" @fs,
   "cogna-dev/cogna/core/extract" @extract,
@@ -14,7 +13,6 @@ import {
   "cogna-dev/cogna/core/bundle" @bundle,
   "cogna-dev/cogna/core/snapshot" @sbom_snapshot,
   "cogna-dev/cogna/core/virtual_package" @vp,
-  "cogna-dev/cogna/core/policy" @policy_rules,
   "cogna-dev/cogna/cache/local" @local_cache,
   "cogna-dev/cogna/cache/http" @http_cache,
   "cogna-dev/sbom/src/lib" @ext_sbom,
@@ -27,5 +25,6 @@ import {
 import {
   "moonbitlang/core/env" @env,
   "moonbitlang/core/json" @json,
+  "moonbitlang/x/sys" @sys,
   "cogna-dev/cogna/cache/local" @local_cache,
 } for "test"

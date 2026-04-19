@@ -1,6 +1,11 @@
 {
     "cases": [
         {
+            "id": "rust-local-example",
+            "extractor": "rust",
+            "path": "./e2e/examples/rust-crate/full/repo"
+        },
+        {
             "extractor": "rust",
             "package": "aws-sdk-dynamodb",
             "version": "1.110.0"
@@ -12,7 +17,8 @@
         },
         {
             "extractor": "rust",
-            "repo": "https://github.com/awslabs/aws-sdk-rust"
+            "repo": "https://github.com/awslabs/aws-sdk-rust",
+            "ref": "main"
         }
     ]
 }

@@ -53,67 +53,6 @@ test "bundle reader parses valid manifest" {
   }
 }
 
-///|
-test "bundle reader parses valid opa manifest" {
-  let repo = "/tmp/cogna-bundle-reader-opa"
-  @fs.remove_file("\{repo}/dist/manifest.json") catch {
-    _ => ()
-  }
-  @fs.remove_dir("\{repo}/dist") catch {
-    _ => ()
-  }
-  @fs.remove_dir(repo) catch {
-    _ => ()
-  }
-  @fs.create_dir(repo) catch {
-    _ => fail("failed to create repo")
-  }
-  @fs.create_dir("\{repo}/dist") catch {
-    _ => fail("failed to create dist")
-  }
-
-  let manifest : Json = {
-    "schemaVersion": "ciq-opa-bundle/v1",
-    "purl": "pkg:generic/acme/compat-policy@2026.03.01",
-    "profile": "policy-bundle",
-    "source": {
-      "repo": "https://github.com/acme/compat-policy",
-      "ref": "main",
-      "commit": "abc",
-    },
-    "opa": { "entrypoint": "cogna/compat/deny", "format": "opa-bundle.tar.gz" },
-    "provenance": {
-      "checksums": "checksums.txt",
-      "signature": { "status": "unsigned", "algorithm": "sha256" },
-    },
-    "artifacts": [
-      { "path": "declarations.ndjson", "sha256": "x", "compression": "none" },
-      { "path": "opa-bundle.tar.gz", "sha256": "y", "compression": "gzip" },
-    ],
-  }
-  @fs.write_string_to_file(
-    "\{repo}/dist/manifest.json",
-    manifest.stringify(indent=2),
-  ) catch {
-    _ => fail("failed to write manifest")
-  }
-
-  let out = read_manifest("\{repo}/dist/manifest.json")
-  guard out is Ok(parsed) else { fail("expected opa manifest to parse") }
-  inspect(parsed.schema_version, content="ciq-opa-bundle/v1")
-  inspect(parsed.profile, content="policy-bundle")
-  inspect(parsed.artifacts.length(), content="2")
-
-  @fs.remove_file("\{repo}/dist/manifest.json") catch {
-    _ => ()
-  }
-  @fs.remove_dir("\{repo}/dist") catch {
-    _ => ()
-  }
-  @fs.remove_dir(repo) catch {
-    _ => ()
-  }
-}
 
 ///|
 test "bundle reader parses ndjson" {

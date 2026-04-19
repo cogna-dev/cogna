@@ -121,7 +121,6 @@ fn profile_mode_native(profile : String) -> (String, String) {
     "rust-crate" => ("native-assisted", "rust-analyzer")
     "terraform-module" => ("parser-first", "hcl-parser")
     "openapi-spec" => ("parser-only", "none")
-    "policy-bundle" => ("policy-bundle", "opa")
     _ => ("parser-only", "none")
   }
 }

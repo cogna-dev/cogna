@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#f8fafc"/>
+
+  <!-- Central Shield/Check Icon -->
+  <circle cx="200" cy="120" r="50" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <path d="M200 90 L200 75 L185 75 L200 60 L215 75 L200 75" fill="#10b981"/>
+  <path d="M185 110 L195 120 L215 100" stroke="#10b981" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bottom: Check Results/Report -->
+  <rect x="100" y="190" width="200" height="70" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+  <rect x="100" y="190" width="200" height="24" rx="8" fill="#f8fafc"/>
+  <text x="200" y="206" font-size="11" fill="#64748b" text-anchor="middle" font-family="system-ui">检查结果</text>
+
+  <!-- Check Items -->
+  <!-- Item 1: Passed -->
+  <circle cx="120" cy="232" r="6" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <path d="M117 232 L119 234 L123 230" stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="135" y="229" width="70" height="6" rx="2" fill="#64748b"/>
+
+  <!-- Item 2: Passed -->
+  <circle cx="120" cy="248" r="6" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <path d="M117 248 L119 250 L123 246" stroke="#22c55e" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="135" y="245" width="60" height="6" rx="2" fill="#64748b"/>
+
+  <!-- Top Labels -->
+  <text x="200" y="35" font-size="12" fill="#64748b" text-anchor="middle" font-family="system-ui">兼容性检查</text>
+
+  <!-- Decorative Elements -->
+  <circle cx="50" cy="150" r="4" fill="#e2e8f0"/>
+  <circle cx="350" cy="150" r="4" fill="#e2e8f0"/>
+  <circle cx="80" cy="80" r="3" fill="#e2e8f0"/>
+  <circle cx="320" cy="220" r="3" fill="#e2e8f0"/>
+</svg>

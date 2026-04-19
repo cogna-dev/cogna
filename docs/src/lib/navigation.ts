@@ -70,7 +70,7 @@ export const contributorSidebar: NavGroup[] = [
     title: "开始",
     items: [
       { title: "贡献指南", href: "/contrib/introduction" },
-      { title: "开发进度", href: "/docs/progress" },
+      { title: "架构边界", href: "/contrib/architecture" },
     ],
   },
   {
@@ -97,7 +97,7 @@ export const footerMenus: FooterGroup[] = [
       { title: "快速开始", href: "/docs/quickstart" },
       { title: "用户文档", href: "/docs" },
       { title: "CLI", href: "/docs/cli" },
-      { title: "产品状态", href: "/docs/progress" },
+      { title: "支持范围", href: "/docs/providers" },
     ],
   },
   {

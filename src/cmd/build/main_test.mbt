@@ -47,8 +47,6 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   ensure_file_removed("\{repo}/dist/declarations.ndjson")
   ensure_file_removed("\{repo}/dist/metadata.json")
   ensure_file_removed("\{repo}/dist/checksums.txt")
-  ensure_file_removed("\{repo}/dist/opa-bundle.tar.gz")
-  ensure_file_removed("\{repo}/dist/policy.rules.json")
   ensure_file_removed("\{repo}/dist/bundle.ciq.tgz")
   ensure_file_removed(
     "\{repo}/dist/dependencies/pkg_npm_react_18.2.0/manifest.json",
@@ -121,7 +119,7 @@ fn write_valid_config(path : String) -> Unit {
     #|    - openapi/**/*.yaml
     #|checks:
     #|  format: sarif
-    #|  policy: default-compat
+    #|  policy: ./.cogna/policies
     #|
   @fs.write_string_to_file(path, content) catch {
     _ => abort("failed to write test config")
@@ -142,7 +140,7 @@ fn write_valid_v2_config(path : String) -> Unit {
     #|    - openapi/**/*.yaml
     #|checks:
     #|  format: sarif
-    #|  policy: ./dist/policy.ciq.tgz
+    #|  policy: ./.cogna/policies
     #|diff:
     #|  includeTestChanges: false
     #|sbom:
@@ -165,27 +163,6 @@ fn write_valid_v2_config(path : String) -> Unit {
 }
 
 ///|
-fn write_policy_config(path : String) -> Unit {
-  let content =
-    #|schemaVersion: ciq-config/v1
-    #|profile: policy-bundle
-    #|purl: pkg:generic/acme/compat-policy@2026.03.01
-    #|source:
-    #|  repo: https://github.com/acme/compat-policy
-    #|  ref: main
-    #|inputs:
-    #|  include:
-    #|    - "**/*.rego"
-    #|checks:
-    #|  format: sarif
-    #|  policy: default-compat
-    #|
-  @fs.write_string_to_file(path, content) catch {
-    _ => abort("failed to write test policy config")
-  }
-}
-
-///|
 fn read_text_main(path : String, fail_message : String) -> String {
   @fs.read_file_to_string(path) catch {
     _ => abort(fail_message)
@@ -195,13 +172,6 @@ fn read_text_main(path : String, fail_message : String) -> String {
 ///|
 fn tmp_build_repo(name : String) -> String {
   "/tmp/cogna-build-\{name}"
-}
-
-///|
-fn write_policy_rego(repo : String, content : String) -> Unit {
-  @fs.write_string_to_file("\{repo}/policy.rego", content) catch {
-    _ => abort("failed to write policy file")
-  }
 }
 
 ///|
@@ -444,370 +414,6 @@ test "build returns config error when config file is missing" {
   let text = error.to_string()
   assert_true(text.contains("config error:"))
   assert_true(text.contains("cogna.yml"))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build creates policy-bundle artifacts and opa manifest" {
-  let repo = tmp_build_repo("policy-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  let policy =
-    #|package cogna.compat
-    #|
-    #|deny contains out if {
-    #|  out := {
-    #|    "rule_id": "compat.core.removed-declaration",
-    #|    "level": "error",
-    #|    "message": "Removed public API requires compatibility review",
-    #|    "docs": "https://example.dev/policy/compat.core.removed-declaration"
-    #|  }
-    #|}
-    #|
-  write_policy_rego(repo, policy)
-
-  let out = run({ repo, })
-  guard out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("policy bundle build should succeed")
-  }
-
-  let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("manifest should exist")
-      ""
-    }
-  }
-  assert_true(manifest.contains("\"schemaVersion\": \"ciq-opa-bundle/v1\""))
-  assert_true(manifest.contains("\"profile\": \"policy-bundle\""))
-  assert_true(manifest.contains("\"entrypoint\": \"cogna/compat/deny\""))
-  assert_true(manifest.contains("\"provenance\""))
-  assert_true(manifest.contains("\"checksums\": \"checksums.txt\""))
-  assert_true(manifest.contains("\"status\": \"unsigned\""))
-  assert_true(manifest.contains("\"path\": \"opa-bundle.tar.gz\""))
-  assert_true(manifest.contains("\"path\": \"policy.rules.json\""))
-  assert_true(!manifest.contains("\"path\": \"software-components.ndjson\""))
-  assert_true(!manifest.contains("\"path\": \"sbom.spdx.json\""))
-  assert_true(!manifest.contains("\"path\": \"sbom.cdx.json\""))
-  assert_true(!manifest.contains("\"declarationSchema\""))
-
-  let opa_bundle = @fs.read_file_to_bytes("\{repo}/dist/opa-bundle.tar.gz") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("opa bundle should exist")
-      b""
-    }
-  }
-  assert_true(opa_bundle.length() > 0)
-
-  let policy_rules = @fs.read_file_to_string("\{repo}/dist/policy.rules.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("policy rules should exist")
-      ""
-    }
-  }
-  assert_true(
-    policy_rules.contains("\"schemaVersion\": \"cogna-policy-rules/v1\""),
-  )
-  assert_true(policy_rules.contains("compat.core.removed-declaration"))
-  assert_true(policy_rules.contains("\"family\": \"core\""))
-  assert_true(policy_rules.contains("\"defaultLevel\": \"error\""))
-  assert_true(
-    policy_rules.contains("\"entrypoint\": \"data.cogna.compat.deny\""),
-  )
-
-  let checksums = @fs.read_file_to_string("\{repo}/dist/checksums.txt") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("checksums should exist")
-      ""
-    }
-  }
-  assert_true(has_64_hex(checksum_for(checksums, "opa-bundle.tar.gz")))
-  assert_true(has_64_hex(checksum_for(checksums, "policy.rules.json")))
-  assert_true(has_64_hex(checksum_for(checksums, "declarations.ndjson")))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build policy-bundle uses builtin rego and generated catalog when repo has no rego files" {
-  let repo = tmp_build_repo("builtin-policy-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  let out = run({ repo, })
-  guard out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("builtin policy bundle build should succeed")
-  }
-
-  let policy_rules = @fs.read_file_to_string("\{repo}/dist/policy.rules.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("policy rules should exist")
-      ""
-    }
-  }
-  assert_true(
-    policy_rules.contains("\"schemaVersion\": \"cogna-policy-rules/v1\"") ||
-    policy_rules.contains("\"schemaVersion\":\"cogna-policy-rules/v1\""),
-  )
-  assert_true(policy_rules.contains("compat.core.removed-declaration"))
-  assert_true(policy_rules.contains("compat.go.signature-changed"))
-  assert_true(policy_rules.contains("compat.rust.became-unsafe"))
-  assert_true(policy_rules.contains("compat.terraform.input-became-required"))
-  assert_true(policy_rules.contains("compat.terraform.output-removed"))
-  assert_true(policy_rules.contains("compat.openapi.response-status-removed"))
-  assert_true(policy_rules.contains("compat.openapi.response-schema-narrowed"))
-  assert_true(policy_rules.contains("compat.component.version-upgrade"))
-  assert_true(
-    policy_rules.contains("\"entrypoint\": \"data.cogna.compat.deny\""),
-  )
-
-  let opa_bundle = @fs.read_file_to_bytes("\{repo}/dist/opa-bundle.tar.gz") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("opa bundle should exist")
-      b""
-    }
-  }
-  assert_true(opa_bundle.length() > 0)
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build rejects duplicate custom policy rule ids" {
-  let repo = tmp_build_repo("duplicate-policy-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  let policy =
-    #|package cogna.compat
-    #|
-    #|deny contains out if {
-    #|  out := {
-    #|    "rule_id": "compat.core.removed-declaration",
-    #|    "level": "error",
-    #|    "message": "first",
-    #|    "docs": "https://example.dev/policy/first"
-    #|  }
-    #|}
-    #|
-    #|deny contains out if {
-    #|  out := {
-    #|    "rule_id": "compat.core.removed-declaration",
-    #|    "level": "error",
-    #|    "message": "second",
-    #|    "docs": "https://example.dev/policy/second"
-    #|  }
-    #|}
-    #|
-  write_policy_rego(repo, policy)
-
-  let out = run({ repo, })
-  guard out is Err(error) else {
-    cleanup_tmp_repo(repo)
-    fail("duplicate custom rule ids should fail build")
-  }
-  assert_true(error.message.contains("duplicate rule_id"))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build reads custom rego files in deterministic lexicographic order" {
-  let repo = tmp_build_repo("sorted-policy-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  let z_policy =
-    #|package cogna.compat
-    #|
-    #|deny contains out if {
-    #|  out := {
-    #|    "rule_id": "compat.custom.zeta-rule",
-    #|    "level": "warning",
-    #|    "message": "zeta",
-    #|    "docs": "https://example.dev/policy/zeta"
-    #|  }
-    #|}
-    #|
-  let a_policy =
-    #|package cogna.compat
-    #|
-    #|deny contains out if {
-    #|  out := {
-    #|    "rule_id": "compat.custom.alpha-rule",
-    #|    "level": "error",
-    #|    "message": "alpha",
-    #|    "docs": "https://example.dev/policy/alpha"
-    #|  }
-    #|}
-    #|
-  @fs.write_string_to_file("\{repo}/z.rego", z_policy) catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("failed to write z.rego")
-    }
-  }
-  @fs.write_string_to_file("\{repo}/a.rego", a_policy) catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("failed to write a.rego")
-    }
-  }
-
-  let out = run({ repo, })
-  guard out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("sorted custom policy bundle build should succeed")
-  }
-
-  let policy_rules = @fs.read_file_to_string("\{repo}/dist/policy.rules.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("policy rules should exist")
-      ""
-    }
-  }
-  let alpha_index = policy_rules.find("compat.custom.alpha-rule")
-  let zeta_index = policy_rules.find("compat.custom.zeta-rule")
-  guard alpha_index is Some(alpha_pos) else {
-    cleanup_tmp_repo(repo)
-    fail("alpha rule should exist in policy rules catalog")
-  }
-  guard zeta_index is Some(zeta_pos) else {
-    cleanup_tmp_repo(repo)
-    fail("zeta rule should exist in policy rules catalog")
-  }
-  assert_true(alpha_pos < zeta_pos)
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build rejects custom policy rules missing literal metadata" {
-  let repo = tmp_build_repo("missing-metadata-policy-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  let policy =
-    #|package cogna.compat
-    #|
-    #|deny contains out if {
-    #|  out := {
-    #|    "rule_id": "compat.core.removed-declaration",
-    #|    "level": "error",
-    #|    "message": "Removed public API requires compatibility review"
-    #|  }
-    #|}
-    #|
-  write_policy_rego(repo, policy)
-
-  let out = run({ repo, })
-  guard out is Err(error) else {
-    cleanup_tmp_repo(repo)
-    fail("missing docs metadata should fail build")
-  }
-  assert_true(error.message.contains("missing literal docs metadata"))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build rejects custom policy bundles with no extracted rules" {
-  let repo = tmp_build_repo("empty-catalog-policy-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  let policy =
-    #|package cogna.compat
-    #|
-    #|default deny = []
-    #|
-  write_policy_rego(repo, policy)
-
-  let out = run({ repo, })
-  guard out is Err(error) else {
-    cleanup_tmp_repo(repo)
-    fail("empty extracted policy catalog should fail build")
-  }
-  assert_true(error.message.contains("no rules extracted"))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build policy-bundle supports signature status and key id env" {
-  let repo = tmp_build_repo("policy-signature-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
-  let out = run({ repo, })
-  @sys.unset_env_var("COGNA_SIGNATURE_STATUS")
-  @sys.unset_env_var("COGNA_SIGNATURE_KEY_ID")
-  guard out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("policy bundle build should succeed")
-  }
-
-  let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("manifest should exist")
-      ""
-    }
-  }
-  assert_true(manifest.contains("\"status\": \"verified\""))
-  assert_true(manifest.contains("\"keyId\": \"acme-main\""))
-
-  cleanup_tmp_repo(repo)
-}
-
-///|
-test "build policy-bundle includes signature value when provided" {
-  let repo = tmp_build_repo("policy-signature-value-repo")
-  cleanup_tmp_repo(repo)
-  @fs.create_dir(repo)
-
-  write_policy_config("\{repo}/cogna.yaml")
-  @sys.set_env_var("COGNA_SIGNATURE_STATUS", "verified")
-  @sys.set_env_var("COGNA_SIGNATURE_KEY_ID", "acme-main")
-  @sys.set_env_var("COGNA_SIGNATURE_VALUE", "ZmFrZS1zaWduYXR1cmU=")
-  let out = run({ repo, })
-  @sys.unset_env_var("COGNA_SIGNATURE_STATUS")
-  @sys.unset_env_var("COGNA_SIGNATURE_KEY_ID")
-  @sys.unset_env_var("COGNA_SIGNATURE_VALUE")
-  guard out is Ok(_) else {
-    cleanup_tmp_repo(repo)
-    fail("policy bundle build should succeed")
-  }
-
-  let manifest = @fs.read_file_to_string("\{repo}/dist/manifest.json") catch {
-    _ => {
-      cleanup_tmp_repo(repo)
-      fail("manifest should exist")
-      ""
-    }
-  }
-  assert_true(manifest.contains("\"status\": \"verified\""))
-  assert_true(manifest.contains("\"keyId\": \"acme-main\""))
-  assert_true(manifest.contains("\"value\": \"ZmFrZS1zaWduYXR1cmU=\""))
 
   cleanup_tmp_repo(repo)
 }

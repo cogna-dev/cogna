@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ciq-metadata/v1",
+  "profile": "rust-crate",
+  "extractor": {
+    "role": "canonical",
+    "backend": "canonical",
+    "mode": "parser-first",
+    "server": "canonical",
+    "version": "canonical-v1",
+    "fallback": false,
+    "stats": {
+      "declarations": 22,
+      "diagnosticFiles": 0
+    }
+  },
+  "case": {
+    "id": "rust-local-example",
+    "extractor": "rust"
+  }
+}

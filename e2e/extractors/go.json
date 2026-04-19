@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "id": "go-local-example",
+      "extractor": "go",
+      "path": "./e2e/examples/go-module/full/repo"
+    }
+  ]
+}

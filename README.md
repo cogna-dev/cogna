@@ -40,7 +40,6 @@ init -> build -> diff -> check
 - User docs: https://cogna.xaclabs.dev/docs/introduction
 - Quickstart: https://cogna.xaclabs.dev/docs/quickstart
 - Contributor docs: https://cogna.xaclabs.dev/contrib/introduction
-- Progress: https://cogna.xaclabs.dev/docs/progress
 - Repo contributing guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 
 For the full docs site, visit:

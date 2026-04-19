@@ -117,14 +117,7 @@ fn read_rego_from_dir(policies_dir : String) -> Result[String, @cli.CliError] {
 fn read_catalog_rego_text(
   policies_dir : String,
 ) -> Result[String, @cli.CliError] {
-  let primary_out = read_rego_from_dir(policies_dir)
-  guard primary_out is Ok(primary_text) else {
-    return Err(primary_out.unwrap_err())
-  }
-  if primary_text != "" || policies_dir == "./policies" {
-    return Ok(primary_text)
-  }
-  read_rego_from_dir("./policies")
+  read_rego_from_dir(policies_dir)
 }
 
 ///|

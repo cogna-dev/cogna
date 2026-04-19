@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ciq-metadata/v1",
+  "profile": "go-module",
+  "extractor": {
+    "role": "canonical",
+    "backend": "canonical",
+    "mode": "parser-first",
+    "server": "canonical",
+    "version": "canonical-v1",
+    "fallback": false,
+    "stats": {
+      "declarations": 30,
+      "diagnosticFiles": 0
+    }
+  },
+  "case": {
+    "id": "go-local-example",
+    "extractor": "go"
+  }
+}

@@ -1,6 +1,6 @@
 # Cogna Desktop 整体设计
 
-本文定义 `cogna.xaclabs.dev`、Cogna CLI、Cogna Desktop 与 cache-first runtime 的整体关系。
+本文定义 `cogna.xaclabs.dev`、Cogna CLI、Cogna Desktop 与当前 local-first runtime 的整体关系。
 
 目标不是把桌面端做成另一个独立产品，而是让它成为 **当前项目上下文** 的图形化入口，并与 `spec/api.md`、`spec/cache.md` 的 public contract 保持一致。
 
@@ -19,7 +19,7 @@ Cogna 下一阶段应收口为三个用户可感知入口：
 - 当前项目上下文来自本地工作目录
 - 当前项目元数据来自 `cogna.yml`
 - 当前项目依赖发现来自 `.cogna/sbom.spdx.json`
-- 远程复用来自 cache-first bundle store，而不是 registry / publish workflow
+- 远程复用是可选增强，不是当前主验收前提
 
 ---
 
@@ -35,7 +35,7 @@ Docs site 是 **唯一公开文档入口**。
 - 命令参考
 - cache / desktop / policy / MCP 说明
 - 下载桌面端与 CLI 的引导
-- 发布说明与开发进度
+- 发布说明与使用说明
 
 它不负责：
 
@@ -47,7 +47,6 @@ Docs site 是 **唯一公开文档入口**。
 
 - `/docs/*`：用户文档
 - `/contrib/*`：贡献者文档
-- `/docs/progress`：当前真实进度
 - `/docs/desktop`：桌面端使用说明
 - `/docs/cache`：cache-first 说明
 - `/download` 或首页 CTA：下载桌面端 / CLI

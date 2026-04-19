@@ -13,7 +13,7 @@ pub fn default_config_yaml() -> String {
     #|    - openapi/**/*.yaml
     #|checks:
     #|  format: sarif
-    #|  policy: ./dist/policy.ciq.tgz
+    #|  policy: ./.cogna/policies
     #|diff:
     #|  includeTestChanges: false
     #|sbom:

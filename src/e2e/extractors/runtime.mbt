@@ -58,16 +58,44 @@ fn remove_tree(path : String) -> Unit {
 
 ///|
 fn read_source_view(case_ : E2eCase) -> Result[@vp.ReadonlyPackageView, String] {
+  let workspace_root = match case_.source {
+    LocalWorkspace(_) => "."
+    _ =>
+      match @sys.get_env_var("COGNA_REMOTE_WORKSPACE_ROOT") {
+        Some(value) => {
+          let path = value.trim().to_string()
+          if path == "" {
+            "."
+          } else {
+            path
+          }
+        }
+        None => "."
+      }
+  }
   let spec = match case_.source {
+    LocalWorkspace(path) => @vp.SourceSpec::LocalWorkspace({ root_dir: path })
     CargoPackage(name, version) =>
       @vp.SourceSpec::CargoPackage({
         name,
         version,
         registry: None,
       })
-    GitRepo(url) => @vp.SourceSpec::GitRepo({ url, ref_: None })
+    GoModule(module_path, version) =>
+      @vp.SourceSpec::GoModule({
+        module_path,
+        version,
+        proxy: None,
+      })
+    TerraformPackage(kind, source, version) =>
+      @vp.SourceSpec::TerraformPackage({
+        kind,
+        source,
+        version,
+      })
+    GitRepo(url, ref_) => @vp.SourceSpec::GitRepo({ url, ref_ })
   }
-  let package_out = @source.resolve_source_in_workspace(".", spec)
+  let package_out = @source.resolve_source_in_workspace(workspace_root, spec)
   guard package_out is Ok(package_) else {
     return Err(package_out.unwrap_err())
   }
@@ -75,8 +103,63 @@ fn read_source_view(case_ : E2eCase) -> Result[@vp.ReadonlyPackageView, String] 
 }
 
 ///|
-fn should_include_path(path : String) -> Bool {
-  path.has_suffix(".rs")
+fn include_path_for(extractor : String, path : String) -> Bool {
+  match extractor {
+    "rust" => path.has_suffix(".rs")
+    "go" => path.has_suffix(".go")
+    "terraform" => path.has_suffix(".tf")
+    "openapi" => path.has_suffix(".yaml") || path.has_suffix(".yml")
+    _ => false
+  }
+}
+
+///|
+fn profile_for_extractor(extractor : String) -> String {
+  match extractor {
+    "rust" => "rust-crate"
+    "go" => "go-module"
+    "terraform" => "terraform-module"
+    "openapi" => "openapi-spec"
+    _ => "openapi-spec"
+  }
+}
+
+///|
+fn purl_for_case(case_ : E2eCase) -> String {
+  match profile_for_extractor(case_.extractor) {
+    "rust-crate" => "pkg:cargo/e2e/\{case_.id}@0.0.0"
+    "go-module" => "pkg:golang/e2e/\{case_.id}@0.0.0"
+    "terraform-module" => "pkg:terraform/e2e/\{case_.id}@0.0.0"
+    _ => "pkg:openapi/e2e/\{case_.id}@0.0.0"
+  }
+}
+
+///|
+fn remote_e2e_enabled() -> Bool {
+  match @sys.get_env_var("COGNA_ENABLE_REMOTE_E2E") {
+    Some("true") => true
+    _ => false
+  }
+}
+
+///|
+fn git_remote_e2e_enabled() -> Bool {
+  match @sys.get_env_var("COGNA_ENABLE_GIT_REMOTE_E2E") {
+    Some("true") => true
+    _ =>
+      match @sys.get_env_var("COGNA_ENABLE_GIT_E2E") {
+        Some("true") => true
+        _ => false
+      }
+  }
+}
+
+///|
+pub fn rust_package_remote_e2e_enabled() -> Bool {
+  match @sys.get_env_var("COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E") {
+    Some("true") => true
+    _ => false
+  }
 }
 
 ///|
@@ -89,7 +172,7 @@ fn extract_rust_case(
   let paths = package_view.list_paths()
   for i in 0..<paths.length() {
     let relative_path = paths[i]
-    if !should_include_path(relative_path) {
+    if !include_path_for("rust", relative_path) {
       continue
     }
     let text_out = package_view.read_text(relative_path)
@@ -115,11 +198,114 @@ fn extract_rust_case(
 }
 
 ///|
+fn extract_go_case(
+  case_ : E2eCase,
+  package_view : @vp.ReadonlyPackageView,
+) -> Result[Array[Json], String] {
+  let declarations : Array[Json] = []
+  let symbols : Array[Json] = []
+  let paths = package_view.list_paths()
+  for i in 0..<paths.length() {
+    let relative_path = paths[i]
+    if !include_path_for("go", relative_path) {
+      continue
+    }
+    let text_out = package_view.read_text(relative_path)
+    guard text_out is Ok(content) else {
+      return Err("cannot read source file \{relative_path}: \{text_out.unwrap_err()}")
+    }
+    let lines = content.split("\n").to_array().map(line => line.to_string())
+    @extract_go.extract_file(
+      declarations,
+      symbols,
+      "go-module",
+      "canonical",
+      relative_path,
+      lines,
+    )
+  }
+  @extract_go.postprocess_declarations(declarations, "go-module")
+  let final_declarations = @extract.sort_and_dedup(declarations, "id")
+  if final_declarations.is_empty() {
+    return Err("extractor produced no declarations for case \{case_.id}")
+  }
+  Ok(final_declarations)
+}
+
+///|
+fn extract_terraform_case(
+  case_ : E2eCase,
+  package_view : @vp.ReadonlyPackageView,
+) -> Result[Array[Json], String] {
+  let declarations : Array[Json] = []
+  let symbols : Array[Json] = []
+  let paths = package_view.list_paths()
+  for i in 0..<paths.length() {
+    let relative_path = paths[i]
+    if !include_path_for("terraform", relative_path) {
+      continue
+    }
+    let text_out = package_view.read_text(relative_path)
+    guard text_out is Ok(content) else {
+      return Err("cannot read source file \{relative_path}: \{text_out.unwrap_err()}")
+    }
+    let lines = content.split("\n").to_array().map(line => line.to_string())
+    @extract_terraform.extract_file(
+      declarations,
+      symbols,
+      "terraform-module",
+      "canonical",
+      relative_path,
+      lines,
+    )
+  }
+  let final_declarations = @extract.sort_and_dedup(declarations, "id")
+  if final_declarations.is_empty() {
+    return Err("extractor produced no declarations for case \{case_.id}")
+  }
+  Ok(final_declarations)
+}
+
+///|
+fn extract_openapi_case(
+  case_ : E2eCase,
+  package_view : @vp.ReadonlyPackageView,
+) -> Result[Array[Json], String] {
+  let declarations : Array[Json] = []
+  let symbols : Array[Json] = []
+  let paths = package_view.list_paths()
+  for i in 0..<paths.length() {
+    let relative_path = paths[i]
+    if !include_path_for("openapi", relative_path) {
+      continue
+    }
+    let text_out = package_view.read_text(relative_path)
+    guard text_out is Ok(content) else {
+      return Err("cannot read source file \{relative_path}: \{text_out.unwrap_err()}")
+    }
+    let lines = content.split("\n").to_array().map(line => line.to_string())
+    @extract_openapi.extract_file(
+      declarations,
+      symbols,
+      "openapi-spec",
+      "canonical",
+      relative_path,
+      lines,
+    )
+  }
+  let final_declarations = @extract.sort_and_dedup(declarations, "id")
+  if final_declarations.is_empty() {
+    return Err("extractor produced no declarations for case \{case_.id}")
+  }
+  Ok(final_declarations)
+}
+
+///|
 fn manifest_json(case_ : E2eCase) -> Json {
   {
     "schemaVersion": "ciq-bundle/v1",
-    "purl": "pkg:cargo/e2e/\{case_.id}@0.0.0",
-    "profile": "rust-crate",
+    "purl": purl_for_case(case_),
+    "profile": profile_for_extractor(case_.extractor),
     "source": {
       "repo": ".",
       "ref": "main",
@@ -139,7 +325,7 @@ fn manifest_json(case_ : E2eCase) -> Json {
 fn metadata_json(case_ : E2eCase, declarations : Array[Json]) -> Json {
   {
     "schemaVersion": "ciq-metadata/v1",
-    "profile": "rust-crate",
+    "profile": profile_for_extractor(case_.extractor),
     "extractor": {
       "role": "canonical",
       "backend": "canonical",
@@ -234,7 +420,10 @@ fn write_case_outputs(
 
 ///|
 pub fn run_case(case_ : E2eCase) -> CaseRunResult {
-  if case_.extractor != "rust" {
+  if case_.extractor != "rust" &&
+    case_.extractor != "go" &&
+    case_.extractor != "terraform" &&
+    case_.extractor != "openapi" {
     return {
       case_id: case_.id,
       status: "skipped",
@@ -243,13 +432,64 @@ pub fn run_case(case_ : E2eCase) -> CaseRunResult {
     }
   }
   match case_.source {
-    GitRepo(_) =>
-      return {
-        case_id: case_.id,
-        status: "skipped",
-        reason: Some("git e2e cases are disabled by default"),
-        snapshot_dir: None,
+    CargoPackage(_, _) => {
+      if !remote_e2e_enabled() {
+        return {
+          case_id: case_.id,
+          status: "skipped",
+          reason: Some(
+            "remote e2e cases are disabled by default (set COGNA_ENABLE_REMOTE_E2E=true)",
+          ),
+          snapshot_dir: None,
+        }
       }
+      if case_.extractor == "rust" && !rust_package_remote_e2e_enabled() {
+        return {
+          case_id: case_.id,
+          status: "skipped",
+          reason: Some(
+            "rust remote package cases are disabled by default (set COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E=true)",
+          ),
+          snapshot_dir: None,
+        }
+      }
+    }
+    GitRepo(_, _) => {
+      if !git_remote_e2e_enabled() {
+        return {
+          case_id: case_.id,
+          status: "skipped",
+          reason: Some(
+            "git remote e2e cases are disabled by default (set COGNA_ENABLE_GIT_REMOTE_E2E=true)",
+          ),
+          snapshot_dir: None,
+        }
+      }
+    }
+    GoModule(_, _) => {
+      if !remote_e2e_enabled() {
+        return {
+          case_id: case_.id,
+          status: "skipped",
+          reason: Some(
+            "remote e2e cases are disabled by default (set COGNA_ENABLE_REMOTE_E2E=true)",
+          ),
+          snapshot_dir: None,
+        }
+      }
+    }
+    TerraformPackage(_, source, _) => {
+      if !source.has_prefix("./") && !source.has_prefix("../") && !remote_e2e_enabled() {
+        return {
+          case_id: case_.id,
+          status: "skipped",
+          reason: Some(
+            "remote e2e cases are disabled by default (set COGNA_ENABLE_REMOTE_E2E=true)",
+          ),
+          snapshot_dir: None,
+        }
+      }
+    }
     _ => ()
   }
   let view_out = read_source_view(case_)
@@ -261,7 +501,13 @@ pub fn run_case(case_ : E2eCase) -> CaseRunResult {
       snapshot_dir: None,
     }
   }
-  let declarations_out = extract_rust_case(case_, package_view)
+  let declarations_out = match case_.extractor {
+    "rust" => extract_rust_case(case_, package_view)
+    "go" => extract_go_case(case_, package_view)
+    "terraform" => extract_terraform_case(case_, package_view)
+    "openapi" => extract_openapi_case(case_, package_view)
+    _ => Err("unsupported extractor in phase-1 harness: \{case_.extractor}")
+  }
   guard declarations_out is Ok(declarations) else {
     return {
       case_id: case_.id,

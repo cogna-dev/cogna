@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "id": "openapi-local-example",
+      "extractor": "openapi",
+      "path": "./e2e/examples/openapi-spec/full/repo"
+    }
+  ]
+}

@@ -1,7 +1,10 @@
 ///|
 pub(all) enum E2eSource {
+  LocalWorkspace(String)
   CargoPackage(String, String)
-  GitRepo(String)
+  GoModule(String, String)
+  TerraformPackage(String, String, String?)
+  GitRepo(String, String?)
 } derive(Eq)
 
 ///|
@@ -25,6 +28,21 @@ fn normalize_case_id(value : String) -> String {
     id = id.replace_all(old="--", new="-")
   }
   id
+}
+
+///|
+fn explicit_case_id(case_obj : Map[String, Json]) -> String? {
+  match case_obj.get("id") {
+    Some(String(value)) => {
+      let id = value.trim().to_string()
+      if id == "" {
+        None
+      } else {
+        Some(normalize_case_id(id))
+      }
+    }
+    _ => None
+  }
 }
 
 ///|
@@ -59,38 +77,123 @@ fn extract_cases_from_manifest(path : String) -> Result[Array[E2eCase], String] 
     if extractor == "" {
       continue
     }
-    match case_obj.get("package") {
-      Some(String(name_raw)) => {
-        let name = name_raw.trim().to_string()
-        let version = match case_obj.get("version") {
-          Some(String(value)) => value.trim().to_string()
-          _ => ""
-        }
-        if name == "" || version == "" {
+    match case_obj.get("path") {
+      Some(String(path_raw)) => {
+        let path = path_raw.trim().to_string()
+        if path == "" {
           continue
         }
-        let raw_id = "\{extractor}:\{name}@\{version}"
+        let raw_id = "\{extractor}:\{path}"
         cases.push({
-          id: normalize_case_id(raw_id),
+          id: explicit_case_id(case_obj).unwrap_or(normalize_case_id(raw_id)),
           extractor,
-          source: E2eSource::CargoPackage(name, version),
+          source: E2eSource::LocalWorkspace(path),
         })
       }
       _ =>
-        match case_obj.get("repo") {
-          Some(String(url_raw)) => {
-            let url = url_raw.trim().to_string()
-            if url == "" {
+        match case_obj.get("package") {
+          Some(String(name_raw)) => {
+            let name = name_raw.trim().to_string()
+            let version = match case_obj.get("version") {
+              Some(String(value)) => value.trim().to_string()
+              _ => ""
+            }
+            if name == "" || version == "" {
               continue
             }
-            let raw_id = "\{extractor}:\{url}"
+            let raw_id = "\{extractor}:\{name}@\{version}"
             cases.push({
-              id: normalize_case_id(raw_id),
+              id: explicit_case_id(case_obj).unwrap_or(normalize_case_id(raw_id)),
               extractor,
-              source: E2eSource::GitRepo(url),
+              source: E2eSource::CargoPackage(name, version),
             })
           }
-          _ => ()
+          _ =>
+            match case_obj.get("module") {
+              Some(String(module_raw)) => {
+                let module_path = module_raw.trim().to_string()
+                let version = match case_obj.get("version") {
+                  Some(String(value)) => value.trim().to_string()
+                  _ => ""
+                }
+                if module_path == "" || version == "" {
+                  continue
+                }
+                let raw_id = "\{extractor}:\{module_path}@\{version}"
+                cases.push({
+                  id: explicit_case_id(case_obj).unwrap_or(normalize_case_id(raw_id)),
+                  extractor,
+                  source: E2eSource::GoModule(module_path, version),
+                })
+              }
+              _ => {
+                let terraform_kind = match case_obj.get("terraform_kind") {
+                  Some(String(value)) => value.trim().to_string()
+                  _ => ""
+                }
+                let terraform_source = match case_obj.get("source") {
+                  Some(String(value)) => value.trim().to_string()
+                  _ => ""
+                }
+                if terraform_kind != "" && terraform_source != "" {
+                  let version = match case_obj.get("version") {
+                    Some(String(value)) => {
+                      let trimmed = value.trim().to_string()
+                      if trimmed == "" {
+                        None
+                      } else {
+                        Some(trimmed)
+                      }
+                    }
+                    _ => None
+                  }
+                  let raw_id = match version {
+                    Some(value) =>
+                      "\{extractor}:\{terraform_kind}:\{terraform_source}@\{value}"
+                    None => "\{extractor}:\{terraform_kind}:\{terraform_source}"
+                  }
+                  cases.push({
+                    id: explicit_case_id(case_obj).unwrap_or(normalize_case_id(raw_id)),
+                    extractor,
+                    source: E2eSource::TerraformPackage(
+                      terraform_kind,
+                      terraform_source,
+                      version,
+                    ),
+                  })
+                  continue
+                }
+                match case_obj.get("repo") {
+                  Some(String(url_raw)) => {
+                    let url = url_raw.trim().to_string()
+                    if url == "" {
+                      continue
+                    }
+                    let ref_ = match case_obj.get("ref") {
+                      Some(String(value)) => {
+                        let trimmed = value.trim().to_string()
+                        if trimmed == "" {
+                          None
+                        } else {
+                          Some(trimmed)
+                        }
+                      }
+                      _ => None
+                    }
+                    let raw_id = match ref_ {
+                      Some(value) => "\{extractor}:\{url}@\{value}"
+                      None => "\{extractor}:\{url}"
+                    }
+                    cases.push({
+                      id: explicit_case_id(case_obj).unwrap_or(normalize_case_id(raw_id)),
+                      extractor,
+                      source: E2eSource::GitRepo(url, ref_),
+                    })
+                  }
+                  _ => ()
+                }
+              }
+            }
         }
     }
   }

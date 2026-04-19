@@ -5,9 +5,9 @@ import { HomeFeature } from "@/components/home/home-feature"
 import { HomeHero } from "@/components/home/home-hero"
 
 const homeHero = {
-  title: "CodeIQ",
+  title: "Cogna",
   description:
-    "从代码与规格文件提取公开声明，生成 Bundle，比较版本，执行本地 policy check，并把结果交给 CLI、cache proxy 和 MCP 复用。",
+    "以源码为单一事实来源，为 AI 和开发者提供精准的代码上下文，替代传统的文档和代码理解工具",
   actions: [
     {
       title: "快速开始",
@@ -15,8 +15,8 @@ const homeHero = {
       variant: "default" as const,
     },
     {
-      title: "用户文档",
-      href: "/docs",
+      title: "了解详情",
+      href: "/docs/introduction",
       variant: "outline" as const,
     },
   ],
@@ -25,72 +25,60 @@ const homeHero = {
 const homeFeature = {
   variant: "default" as const,
   layout: "bento" as const,
-  title: "Feature 列表",
-  description:
-    "当前主页同时给出核心能力和文档入口：既能快速理解产品能做什么，也能直接进入 Tutorials / How-to / Reference / Explanation。",
+  title: "核心能力",
+  description: "Cogna 以源码为中心，重建代码理解的基础设施",
   items: [
     {
-      title: "构建 CIQ Bundle",
+      title: "AI 代码理解",
       description:
-        "对 Go、Rust、Terraform、OpenAPI 仓库生成声明、符号、software components 与 SBOM 产物，并打包成 `bundle.ciq.tgz`。",
-      cover: "/images/feature-accessible.svg",
-      action: { title: "查看快速开始", href: "/docs/quickstart" },
+        "替代 Context7 MCP 等传统工具，直接从源码提取精准的代码上下文，让 AI 理解真实的代码结构而非依赖过时的文档",
+      cover: "/images/feature-extraction.svg",
+      action: {
+        title: "了解详情",
+        href: "/docs/mcp",
+      },
       span: 1 as const,
     },
     {
-      title: "比较与检查",
+      title: "源码即文档",
       description:
-        "`diff` 当前会输出 `semanticDiff`、`beforeRecord` / `afterRecord`、`componentDiff`；`check` 会在本机执行 OPA 并生成最小 SARIF。",
-      cover: "/images/feature-themeable.svg",
-      action: { title: "查看持续集成", href: "/docs/ci" },
-      span: 1 as const,
-    },
-    {
-      title: "本地策略 Bundle",
-      description:
-        "`policy-bundle` profile 已能产出 `ciq-opa-bundle/v1`、`opa-bundle.tar.gz` 与 `policy.rules.json`，供 `check --policy` 使用。",
-      cover: "/images/feature-composable.svg",
-      action: { title: "查看构建索引", href: "/docs/build-indexes" },
-      span: 1 as const,
-    },
-    {
-      title: "Cache Proxy",
-      description:
-        "`serve` 与 `cache list/add/remove` 让 CLI、脚本和 MCP 在同一台机器上复用同一份 local/http cache。",
-      cover: "/images/feature-accessible.svg",
-      action: { title: "查看远程索引", href: "/docs/remote-indexing" },
-      span: 1 as const,
-    },
-    {
-      title: "AI / MCP 查询",
-      description:
-        "本地 MCP runtime 当前暴露 `codeiq.query.outlines`、`codeiq.query.symbol` 和 `codeiq.runtime.context`，面向本机 bundle 查询，而不是远端 hosted service。",
-      cover: "/images/feature-themeable.svg",
-      action: { title: "查看 AI 查询", href: "/docs/mcp" },
-      span: 1 as const,
-    },
-    {
-      title: "支持范围与文档四象限",
-      description:
-        "当前支持 Go / Rust / Terraform / OpenAPI / policy-bundle；用户文档按 Tutorials、How-to、Reference、Explanation 组织，贡献者文档承接架构边界和开发进度。",
-      cover: "/images/feature-composable.svg",
-      action: { title: "查看用户文档", href: "/docs" },
+        "替代 Dash、DevDocs 等文档工具，以源码作为唯一的事实来源，自动生成准确的 API 参考，消除文档与代码不同步的问题",
+      cover: "/images/feature-governance.svg",
+      action: {
+        title: "了解详情",
+        href: "/docs/query-signatures",
+      },
       span: 2 as const,
+    },
+    {
+      title: "发版前检查",
+      description:
+        "在发布前自动检查接口变更，识别破坏性更新，确保版本兼容性。支持 Go、Rust、Terraform、OpenAPI 等多种类型仓库，轻松集成到 CI/CD 流程",
+      cover: "/images/feature-cache.svg",
+      action: {
+        title: "了解详情",
+        href: "/docs/build-indexes",
+      },
+      span: 3 as const,
     },
   ],
 }
 
 const homeCta = {
-  title: "继续深入",
+  title: "开始使用 Cogna，让 AI 和开发者都能准确理解你的代码",
   description:
-    "如果你要参与仓库维护、继续推进 A002 内置 OPA 兼容性策略库，或核对 proposal 与实现的差异，请继续阅读贡献者文档和开发进度。",
+    "支持 Go、Rust、Terraform、OpenAPI 等多种类型仓库，轻松集成到现有开发流程",
   variant: "primary" as const,
-  action: { title: "贡献者文档", href: "/contrib/introduction" },
+  action: {
+    title: "快速开始",
+    href: "/docs/quickstart",
+    variant: "default" as const,
+  },
 }
 ---
 
-<Layout title="CodeIQ" description="面向声明与变更治理的本地工作流">
-	<HomeHero client:load hero={homeHero} />
-	<HomeFeature client:load feature={homeFeature} />
-	<HomeCta client:load cta={homeCta} />
+<Layout title="Cogna" description="以源码为单一事实来源，重建 AI 和开发者的代码理解">
+  <HomeHero client:load hero={homeHero} />
+  <HomeFeature client:load feature={homeFeature} />
+  <HomeCta client:load cta={homeCta} />
 </Layout>

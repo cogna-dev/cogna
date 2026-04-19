@@ -15,8 +15,7 @@ fn has_disallowed_input_path(paths : Array[String]) -> Bool {
 ///|
 fn is_supported_profile(profile : String) -> Bool {
   match profile {
-    "openapi-spec" | "go-module" | "rust-crate" | "terraform-module" |
-    "policy-bundle" => true
+    "openapi-spec" | "go-module" | "rust-crate" | "terraform-module" => true
     _ => false
   }
 }

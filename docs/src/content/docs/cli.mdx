@@ -48,14 +48,6 @@ dist/
 .cogna/sbom.spdx.json
 ```
 
-如果 `profile: policy-bundle`，还会额外生成：
-
-```text
-dist/
-├── opa-bundle.tar.gz
-└── policy.rules.json
-```
-
 ---
 
 ## `cogna diff`
@@ -76,7 +68,7 @@ dist/diff.json
 
 ## `cogna check`
 
-读取 `cogna.yml` 里的 `checks.policy` 并对 `dist/diff.json` 执行 policy 检查：
+读取 `cogna.yml` 里的 `checks.policy` 目录并对 `dist/diff.json` 执行 policy 检查：
 
 ```bash
 cogna check
@@ -89,6 +81,8 @@ dist/check.sarif.json
 ```
 
 > `check` 依赖本机可用的 `opa eval`。
+>
+> 默认 `cogna init` 会把内置 policy materialize 到 `./.cogna/policies`。
 
 ---
 

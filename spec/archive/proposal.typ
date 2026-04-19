@@ -24,8 +24,9 @@
 
 - `docs/src/content/docs/*`（用户文档）
 - `docs/src/content/contrib/*`（贡献者文档）
-- `docs/src/content/docs/progress.mdx`（唯一进度真相源）
 - `spec/cache.md`、`spec/plan.md`、`spec/review.md`（当前迁移与验收基线）
+
+若下文出现 `CIQ OPA Bundle`、策略 bundle、`publish` 到 `Local Registry` 等术语，均表示 2026-03 申报阶段的历史设想；当前实现已经收口为 local-first `init -> build -> diff -> check`，policy 仅在 `init` 物化到 `./.cogna/policies`，并由 `check` 直接传给 OPA。
 
 = 项目目标与应用场景
 
@@ -120,7 +121,7 @@ inputs:
     - openapi/**/*.yaml
 checks:
   format: sarif
-  policy: default-compat
+  policy: ./.cogna/policies
 ```
 
 `CIQ Config` 的关键字段为：
@@ -243,6 +244,8 @@ pkg:cargo/tokio@1.43.0.ciq.tgz
 
 === CIQ OPA Bundle
 
+下节仅用于保留当时的历史设想，不代表当前实现。
+
 `CIQ OPA Bundle` 是一种特殊的 `CIQ Bundle`，专门用于存储和管理与 Open Policy Agent (OPA) 相关的策略和规则。它不是面向代码声明查询的索引，而是面向 `check` 阶段的策略载荷：其中包含 OPA 的策略文件、数据文件以及相关元数据，可以像普通 `CIQ Bundle` 一样被 `Cogna Registry` 管理、缓存、下载和版本化。
 
 它的作用是把“检查规则”也纳入 Cogna 的版本治理体系：库团队可以把兼容性规则、发布门禁规则、组织约束规则单独构建成策略产物，再由 `cogna check` 在本地装载执行。这种设计特别适合需要频繁更新和维护策略的项目。
@@ -264,7 +267,7 @@ compat-policy@2026.03.01.ciq.tgz
 - #strong[`metadata.json`]：描述策略说明、适用场景、默认入口点、兼容的 `check` 模式。
 - #strong[`checksums.txt`]：记录各文件摘要，便于 Registry 做去重和缓存一致性校验。
 
-一个典型的使用方式是：SDK 团队先构建并发布 `CIQ OPA Bundle`，随后在业务代码仓库中执行 `cogna check ./dist/sdk.diff.json --policy ./compat-policy@2026.03.01.ciq.tgz`，把差异结果转成 SARIF。这样，策略本身也和代码一样具备清晰版本、可追溯来源和统一分发路径。
+一个典型的使用方式是：在当前实现里，业务代码仓库会在 `init` 时先得到本地 policy 目录，随后执行 `cogna check ./dist/sdk.diff.json --policy ./.cogna/policies`，把差异结果转成 SARIF。这样，策略本身仍然可以保持清晰来源，但不会再被纳入当前主流程的独立 build 制品。
 
 === CIQ Diff
 
@@ -516,7 +519,7 @@ MCP Agent 的工具接口设计如下：
 - #strong[用户故事 1：SDK 开发者]
   1. SDK 开发者先在本地代码仓库执行 `build`，得到当前版本的 `CIQ Bundle`，从而把对外公开接口固定为一个可追溯、可复用的声明快照。
   2. 接着他执行 `diff`，将当前快照与上一稳定版本进行对比，产出 `CIQ Diff`，快速识别新增、删除、变更和弃用的公开接口。
-  3. 为了把工程规则纳入门禁流程，他会再准备一个本地可用的 `CIQ OPA Bundle`，然后执行 `check <diff-file> --policy <local-policy-bundle>`，验证这次代码变更是否符合 policy 要求，并把结果转成 SARIF，用于 CI 展示与拦截。
+  3. 在当前实现里，为了把工程规则纳入门禁流程，他会直接使用 `init` 生成的本地 policy 目录，并执行 `check <diff-file> --policy ./.cogna/policies`，验证这次代码变更是否符合 policy 要求，并把结果转成 SARIF，用于 CI 展示与拦截。
   4. 如果团队还维护测试平台或测试追踪系统，他可以进一步把 `CIQ Diff.testChanges` 中的测试用例变化与外部测试 ID 关联，用于测试可观测性分析、回归计划编排和发布证据留存。
   5. 当 `check` 通过后，他再执行 `publish`，把新的 `CIQ Bundle` 发布到单机 `Local Registry`，让同一台机器上的 MCP 与自动化流程复用这份稳定快照。
   6. 最终效果是：SDK 开发者既能在发版前获得确定性的兼容性证据，也能在发版后把可查询的上下文资产沉淀到共享本地 bundle store，同时为测试变化提供可追踪的分析证据。
@@ -569,7 +572,7 @@ MCP Agent 的工具接口设计如下：
   1. 后台开发工程师在接入第三方库或第三方 API 前，先从 `Local Registry` 物化所需的 `CIQ Bundle` 到本地缓存。
   2. 如果只是一次性查询，他直接执行 `query ./query.json`，根据查询文件中的 PURL 和 selector 获取指定声明、签名或契约说明；如果是高频交互式查询，他会执行 `mcp start`，让 AI Agent 根据当前包管理器依赖自动发现并装载需要的 bundle，再通过 MCP 反复查询这些本地产物。
   3. 当他在本地开发自己的 OpenAPI 时，会先执行 `build` 生成当前版本快照，再执行 `diff --since <stable-commit> --test-changes` 与稳定版本比较，确认公开契约发生了哪些变化，以及验证这些变化是否伴随测试用例调整。
-  4. 最后，他会执行 `check <diff-file> --policy <local-policy-bundle>`，把这些变化转成 SARIF，用于确认自己交付的 OpenAPI 没有破坏性变更。
+  4. 最后，他会执行 `check <diff-file> --policy ./.cogna/policies`，把这些变化转成 SARIF，用于确认自己交付的 OpenAPI 没有破坏性变更。
   5. 最终效果是：无论是消费外部依赖，还是维护自己的对外 API，他都能在统一的本地工具链中完成“下载 / 查询 / 对比 / 检查”的闭环。
 
 #figure(

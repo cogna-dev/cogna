@@ -9,4 +9,4 @@ inputs:
     - "**/*.go"
 checks:
   format: sarif
-  policy: default-compat
+  policy: ./.cogna/policies

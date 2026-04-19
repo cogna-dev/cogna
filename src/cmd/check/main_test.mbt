@@ -5,10 +5,23 @@ fn remove_file_if_exists(path : String) -> Unit {
   }
 }
 
-///|
-fn remove_dir_if_exists(path : String) -> Unit {
-  @fs.remove_dir(path) catch {
-    _ => ()
+fn ensure_tree_removed(path : String) -> Unit {
+  if !@fs.path_exists(path) {
+    return
+  }
+  let is_dir = try? @fs.is_dir(path)
+  if is_dir is Ok(true) {
+    let entries = @fs.read_dir(path) catch { _ => [] }
+    for i in 0..<entries.length() {
+      ensure_tree_removed("\{path}/\{entries[i]}")
+    }
+    @fs.remove_dir(path) catch {
+      _ => ()
+    }
+  } else {
+    @fs.remove_file(path) catch {
+      _ => ()
+    }
   }
 }
 
@@ -22,14 +35,21 @@ fn cleanup_tmp_repo(repo : String) -> Unit {
   remove_file_if_exists("\{repo}/dist/metadata.json")
   remove_file_if_exists("\{repo}/dist/checksums.txt")
   @sys.unset_env_var("COGNA_OPA_EVAL_JSON")
-  remove_dir_if_exists("\{repo}/dist/policies")
-  remove_dir_if_exists("\{repo}/dist")
-  remove_dir_if_exists(repo)
+  ensure_tree_removed("\{repo}/dist/policies")
+  ensure_tree_removed("\{repo}/dist")
+  ensure_tree_removed(repo)
 }
 
 ///|
 fn tmp_check_repo(name : String) -> String {
   "/tmp/cogna-check-\{name}"
+}
+
+///|
+fn write_builtin_policy_dir(path : String) -> Unit {
+  @fs.write_string_to_file("\{path}/compat.rego", @policy_rules.builtin_rego_text()) catch {
+    _ => abort("failed to write builtin policy fixture")
+  }
 }
 
 ///|
@@ -659,6 +679,7 @@ test "check merges policy catalog rules into sarif driver metadata" {
   @fs.create_dir(policy_path) catch {
     _ => abort("failed to create policies dir")
   }
+  write_builtin_policy_dir(policy_path)
   let content : Json = {
     "schemaVersion": "ciq-diff/v1",
     "basePurl": "pkg:cargo/tokio@1.42.0",

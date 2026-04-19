@@ -1,10 +1,35 @@
 ///|
+fn skip_remote_rust_package_case(case_ : E2eCase) -> Bool {
+  if case_.extractor != "rust" {
+    return false
+  }
+  if !remote_e2e_enabled() || rust_package_remote_e2e_enabled() {
+    return false
+  }
+  match case_.source {
+    CargoPackage(_, _) => true
+    _ => false
+  }
+}
+
+///|
 pub fn run_acceptance() -> Result[Array[CaseRunResult], String] {
   let cases_out = load_cases()
   guard cases_out is Ok(cases) else { return Err(cases_out.unwrap_err()) }
   let results : Array[CaseRunResult] = []
   for i in 0..<cases.length() {
     let case_ = cases[i]
+    if skip_remote_rust_package_case(case_) {
+      results.push({
+        case_id: case_.id,
+        status: "skipped",
+        reason: Some(
+          "rust remote package cases are disabled by default (set COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E=true)",
+        ),
+        snapshot_dir: None,
+      })
+      continue
+    }
     let result = run_case(case_)
     match result.status {
       "passed" => {

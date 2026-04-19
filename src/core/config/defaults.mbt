@@ -7,7 +7,7 @@ pub fn default_config() -> Config {
     purl: "pkg:openapi/acme/payment-api@2026.03.01",
     source: { repo: "https://github.com/acme/payment-api", source_ref: "main" },
     inputs: { include_paths: ["openapi/**/*.yaml"] },
-    checks: { format: "sarif", policy: "./policies" },
+    checks: { format: "sarif", policy: "./.cogna/policies" },
     diff: { since: None, include_test_changes: false },
     sbom: {
       format: "spdx",

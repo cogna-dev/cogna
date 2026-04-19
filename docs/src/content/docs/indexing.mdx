@@ -1,0 +1,157 @@
+---
+title: Bundle 与结果文件参考
+description: 精确查阅 Cogna 各类产物（Bundle、Diff、SARIF、Query Result）的文件结构和字段含义。
+order: 8
+---
+
+# Bundle 与结果文件参考
+
+这里列出 Cogna 每个命令生成的具体文件，以及每个文件中包含的内容。当你不确定某个产物是什么、在哪里、有什么字段时，查这里。
+
+---
+
+## 普通仓库 Bundle（CIQ Bundle）
+
+在目标仓库目录执行 `cogna build` 后，`dist/` 下会生成：
+
+```text
+dist/
+├── manifest.json           ← bundle 元数据：purl、profile、生成时间
+├── declarations.ndjson     ← 公开声明列表（函数、类型、接口等）
+├── metadata.json           ← 补充元数据
+├── checksums.txt           ← 文件校验和
+└── bundle.ciq.tgz          ← 完整归档（cache / 分发用）
+```
+
+另外，SPDX SBOM 会写入项目根目录的：
+
+```text
+.cogna/sbom.spdx.json
+```
+
+其中 `bundle.ciq.tgz` 是 cache 复用与分发的主要文件。
+
+对 Go / Rust 仓库，`metadata.json` 中记录的是 canonical author path 的结果；当配置 `validation: lsp` 时，LSP 只做 parity validation，不会再写出第二份 backend-specific bundle 或第二套 snapshot truth。
+
+---
+
+## Policy 目录
+
+当前 `cogna check` 从 `cogna.yml -> checks.policy` 读取 policy 目录，而不是读取一个单独构建出的 bundle。
+
+默认路径是：
+
+```text
+.cogna/policies/
+```
+
+该目录中的 `.rego` 文件会在检查时直接交给 OPA。
+
+---
+
+## Diff 文件（CIQ Diff）
+
+执行 `cogna diff` 后，`dist/diff.json` 的结构：
+
+```json
+{
+  "schemaVersion": "ciq-diff/v1",
+  "summary": {
+    "added": 2,
+    "changed": 1,
+    "removed": 0
+  },
+  "changes": [
+    {
+      "kind": "changed",
+      "level": "error",
+      "path": "Client.Do",
+      "semanticDiff": {
+        "findings": [
+          {
+            "ruleId": "compat.go.signature-changed",
+            "level": "error",
+            "message": "parameter 'ctx context.Context' was added"
+          }
+        ]
+      },
+      "beforeRecord": { "uri": "client/client.go", "startLine": 87 },
+      "afterRecord": { "uri": "client/client.go", "startLine": 89 }
+    }
+  ],
+  "componentChanges": [
+    {
+      "kind": "changed",
+      "beforePurl": "pkg:cargo/serde@1.0.195",
+      "afterPurl": "pkg:cargo/serde@1.0.197",
+      "beforeVersion": "1.0.195",
+      "afterVersion": "1.0.197"
+    }
+  ]
+}
+```
+
+---
+
+## SARIF 文件（check.sarif.json）
+
+执行 `cogna check` 后，`dist/check.sarif.json` 符合 SARIF 2.1.0 标准：
+
+```json
+{
+  "version": "2.1.0",
+  "runs": [{
+    "tool": {
+      "driver": {
+        "name": "Cogna",
+        "rules": [
+          {
+            "id": "compat.go.signature-changed",
+            "helpUri": "https://cogna.xaclabs.dev/docs/policies#rule-compat-go-signature-changed"
+          }
+        ]
+      }
+    },
+    "results": [
+      {
+        "ruleId": "compat.go.signature-changed",
+        "level": "error",
+        "message": { "text": "function 'Client.Do' added parameter 'ctx'" },
+        "locations": [{
+          "physicalLocation": {
+            "artifactLocation": { "uri": "client/client.go" },
+            "region": { "startLine": 87 }
+          }
+        }]
+      }
+    ]
+  }]
+}
+```
+
+---
+
+## Query 文件（CIQ Query / CIQ Result）
+
+**查询文件格式（输入）：**
+
+```json
+{
+  "schemaVersion": "ciq-query/v1",
+  "purl": "pkg:cargo/tokio@1.43.0",
+  "selector": {
+    "path": "tokio::sync::Mutex::lock",
+    "kind": "function"
+  },
+  "intent": "upgrade"
+}
+```
+
+可通过 `cogna mcp serve --port 3000` 暴露查询能力给 AI / Agent；查询请求和结果 shape 仍遵循 `ciq-query/v1` 与 `ciq-result/v1`。
+
+---
+
+## 下一步
+
+- 配置 purl 和 profile：[配置参考](/docs/config)
+- CLI 命令完整参考：[CLI 参考](/docs/cli)

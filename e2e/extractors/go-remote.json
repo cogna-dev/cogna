@@ -1,0 +1,10 @@
+{
+  "cases": [
+    {
+      "id": "go-module-remote-example",
+      "extractor": "go",
+      "module": "github.com/samber/lo",
+      "version": "v1.39.0"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#f8fafc"/>
+
+  <!-- Left Panel: Old Version -->
+  <rect x="30" y="60" width="140" height="180" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+  <rect x="30" y="60" width="140" height="28" rx="8" fill="#f1f5f9"/>
+  <text x="100" y="78" font-size="12" fill="#64748b" text-anchor="middle" font-family="system-ui">v1.0.0</text>
+
+  <!-- Old Code Lines -->
+  <rect x="46" y="106" width="60" height="6" rx="2" fill="#64748b"/>
+  <rect x="46" y="120" width="90" height="6" rx="2" fill="#64748b"/>
+  <rect x="46" y="134" width="70" height="6" rx="2" fill="#64748b"/>
+  <rect x="46" y="148" width="80" height="6" rx="2" fill="#64748b"/>
+  <rect x="46" y="162" width="50" height="6" rx="2" fill="#64748b"/>
+
+  <!-- Right Panel: New Version -->
+  <rect x="230" y="60" width="140" height="180" rx="8" fill="#ffffff" stroke="#3b82f6" stroke-width="2"/>
+  <rect x="230" y="60" width="140" height="28" rx="8" fill="#3b82f6"/>
+  <text x="300" y="78" font-size="12" fill="#ffffff" text-anchor="middle" font-family="system-ui">v2.0.0</text>
+
+  <!-- New Code Lines (with changes highlighted) -->
+  <rect x="246" y="106" width="60" height="6" rx="2" fill="#64748b"/>
+  <rect x="246" y="120" width="90" height="6" rx="2" fill="#64748b"/>
+  <!-- Changed line - highlighted -->
+  <rect x="246" y="134" width="70" height="6" rx="2" fill="#22c55e"/>
+  <rect x="246" y="148" width="80" height="6" rx="2" fill="#64748b"/>
+  <!-- Added line - highlighted -->
+  <rect x="246" y="162" width="100" height="6" rx="2" fill="#22c55e"/>
+
+  <!-- Middle: Diff/Compare Icon -->
+  <circle cx="200" cy="150" r="28" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+  <!-- Arrows indicating comparison -->
+  <path d="M190 150 L180 150" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>
+  <path d="M185 145 L180 150 L185 155" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M210 150 L220 150" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+  <path d="M215 145 L220 150 L215 155" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Labels -->
+  <text x="100" y="45" font-size="11" fill="#64748b" text-anchor="middle" font-family="system-ui">旧版本</text>
+  <text x="300" y="45" font-size="11" fill="#64748b" text-anchor="middle" font-family="system-ui">新版本</text>
+</svg>
