@@ -60,9 +60,7 @@ export const userSidebar: NavGroup[] = [
     items: [
       { title: "软件成分分析", href: "/docs/sca-spdx" },
       { title: "内置策略规则", href: "/docs/policies" },
-      { title: "自定义变更策略", href: "/docs/policy" },
       { title: "SARIF", href: "/docs/sarif" },
-      { title: "平台工程", href: "/docs/platform-engineering" },
     ],
   },
 ]

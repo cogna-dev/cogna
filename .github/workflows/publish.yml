@@ -1,0 +1,124 @@
+name: Publish SDKs
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  dry-run:
+    name: Dry-run publish (MoonBit + npm)
+    if: ${{ github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify version alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          moon_version=$(python3 -c 'import json; print(json.load(open("moon.mod.json", encoding="utf-8"))["version"])')
+          npm_version=$(python3 -c 'import json; print(json.load(open("integrations/sdk/node/package.json", encoding="utf-8"))["version"])')
+          if [ "$moon_version" != "$npm_version" ]; then
+            echo "::error::Version mismatch: moon.mod.json=$moon_version, integrations/sdk/node/package.json=$npm_version"
+            exit 1
+          fi
+          echo "Version alignment OK: $moon_version"
+
+      - name: Setup MoonBit
+        uses: cogna-dev/moonbit-actions/setup@v0
+
+      - name: MoonBit publish dry-run
+        if: ${{ !env.ACT }}
+        run: moon publish --dry-run
+
+      - name: Setup Node.js for npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10 --activate
+
+      - name: Install SDK dependencies
+        run: pnpm --filter @cogna-dev/sdk install --frozen-lockfile
+
+      - name: Build npm SDK
+        run: pnpm --filter @cogna-dev/sdk run build
+
+      - name: npm publish dry-run
+        working-directory: integrations/sdk/node
+        run: npm publish --dry-run --access public
+
+  publish:
+    name: Publish MoonBit + npm
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify tag and versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          moon_version=$(python3 -c 'import json; print(json.load(open("moon.mod.json", encoding="utf-8"))["version"])')
+          npm_version=$(python3 -c 'import json; print(json.load(open("integrations/sdk/node/package.json", encoding="utf-8"))["version"])')
+          expected="v${moon_version}"
+          if [ "$tag" != "$expected" ]; then
+            echo "::error::Tag mismatch: tag=$tag expected=$expected"
+            exit 1
+          fi
+          if [ "$moon_version" != "$npm_version" ]; then
+            echo "::error::Version mismatch: moon.mod.json=$moon_version, integrations/sdk/node/package.json=$npm_version"
+            exit 1
+          fi
+          echo "Tag/version check passed: $tag"
+
+      - name: Setup MoonBit
+        uses: cogna-dev/moonbit-actions/setup@v0
+
+      - name: Publish MoonBit SDK
+        uses: cogna-dev/moonbit-actions/publish@v0
+        with:
+          token: ${{ secrets.MOONCAKES_TOKEN }}
+
+      - name: Setup Node.js for npm
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10 --activate
+
+      - name: Install SDK dependencies
+        run: pnpm --filter @cogna-dev/sdk install --frozen-lockfile
+
+      - name: Build npm SDK
+        run: pnpm --filter @cogna-dev/sdk run build
+
+      - name: Publish npm SDK (Trusted Publisher)
+        working-directory: integrations/sdk/node
+        run: npm publish --provenance --access public

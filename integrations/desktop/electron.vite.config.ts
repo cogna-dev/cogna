@@ -4,13 +4,18 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  main: {},
+  main: {
+    resolve: {
+      alias: {
+        '@cogna-dev/sdk': resolve(__dirname, '../sdk/node/src/index.ts')
+      }
+    }
+  },
   preload: {},
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src'),
-        '@cogna/ui': resolve(__dirname, '../ui/src')
+        '@renderer': resolve('src/renderer/src')
       }
     },
     plugins: [react(), tailwindcss()]

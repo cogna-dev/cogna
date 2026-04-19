@@ -1,0 +1,44 @@
+---
+title: 变更模型
+description: 解释 Cogna 中“变更”在 build / diff / check 流程里的数据形态，以及贡献时需要遵守的兼容性约束。
+order: 3
+---
+
+# 变更模型
+
+本页面向贡献者，说明仓库里“变更”是如何被表达、比较和消费的。
+
+## 变更在流程中的位置
+
+在当前实现中，核心链路是：
+
+1. `build` 产出声明与组件事实；
+2. `diff` 比较 base 与 target 的事实集合；
+3. `check` 基于 diff 结果执行策略规则并输出结论（包含 SARIF 分支）。
+
+因此，贡献者在改动抽取器、规范字段或 CLI 输出时，需要同时考虑这三步的连锁影响。
+
+## 贡献时的重点检查
+
+- 变更分类是否稳定：`added` / `removed` / `changed` / `deprecated`；
+- 变更标识是否稳定（ID、symbol、level、message 等字段）；
+- 向后兼容：旧 bundle 与新逻辑是否还能被正确解析；
+- 输出一致性：CLI、SDK、desktop 集成看到的语义应一致。
+
+## 回归建议
+
+当你修改变更相关逻辑时，建议至少执行：
+
+```bash
+moon check
+moon test
+```
+
+并补充或更新与变更语义直接相关的测试用例，避免出现“字段存在但语义漂移”的回归。
+
+## 相关文档
+
+- 贡献入口：[/contrib/introduction](/contrib/introduction)
+- 当前进展：[/docs/progress](/docs/progress)
+- 策略模型：[/contrib/policy](/contrib/policy)
+- 发布进度：[/docs/progress](/docs/progress)

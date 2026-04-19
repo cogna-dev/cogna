@@ -42,7 +42,7 @@ const homeFeature = {
       description:
         "`diff` 当前会输出 `semanticDiff`、`beforeRecord` / `afterRecord`、`componentDiff`；`check` 会在本机执行 OPA 并生成最小 SARIF。",
       cover: "/images/feature-themeable.svg",
-      action: { title: "查看发版检查", href: "/docs/release-check" },
+      action: { title: "查看持续集成", href: "/docs/ci" },
       span: 1 as const,
     },
     {
@@ -50,7 +50,7 @@ const homeFeature = {
       description:
         "`policy-bundle` profile 已能产出 `ciq-opa-bundle/v1`、`opa-bundle.tar.gz` 与 `policy.rules.json`，供 `check --policy` 使用。",
       cover: "/images/feature-composable.svg",
-      action: { title: "查看 Bundle 参考", href: "/docs/indexing" },
+      action: { title: "查看构建索引", href: "/docs/build-indexes" },
       span: 1 as const,
     },
     {
@@ -58,7 +58,7 @@ const homeFeature = {
       description:
         "`serve` 与 `cache list/add/remove` 让 CLI、脚本和 MCP 在同一台机器上复用同一份 local/http cache。",
       cover: "/images/feature-accessible.svg",
-      action: { title: "查看共享 Bundle", href: "/docs/bundle-sharing" },
+      action: { title: "查看远程索引", href: "/docs/remote-indexing" },
       span: 1 as const,
     },
     {

@@ -16,16 +16,7 @@ order: 19
 
 ## 工作流概览
 
-```mermaid
-flowchart LR
-    A["PR 提交\n或 push to main"] --> B["CI: cogna build\n构建 bundle"]
-    B --> C["CI: 准备 dist/base / dist/target\ncogna diff"]
-    C --> D["CI: cogna check\n读取 checks.policy"]
-    D --> E{"有 breaking change?"}
-    E -- "是（error）" --> F["CI 失败\n阻止合并"]
-    E -- "否" --> G["CI 通过\n允许合并"]
-    D --> H["上传 check.sarif.json\n到 Code Scanning"]
-```
+
 
 ---
 
@@ -177,6 +168,6 @@ just action-e2e
 
 ## 下一步
 
-- 了解发版检查的完整流程：[发版检查](/docs/release-check)
+- 了解变更检查流程：[分析变更](/docs/analyze-changes)
 - 了解 SARIF 结构和接入方式：[启用 SARIF 集成](/docs/sarif)
-- 自定义 policy 规则：[定制 OPA 自动审查策略](/docs/policy)
+- 自定义 policy 规则：[内置策略规则](/docs/policies)
