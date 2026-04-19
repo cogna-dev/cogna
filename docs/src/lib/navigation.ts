@@ -70,7 +70,6 @@ export const contributorSidebar: NavGroup[] = [
     title: "开始",
     items: [
       { title: "贡献指南", href: "/contrib/introduction" },
-      { title: "架构边界", href: "/contrib/architecture" },
     ],
   },
   {

@@ -8,6 +8,7 @@ trace.json
 .codeiq/
 .cogna/
 .claude/settings*
+.claude/worktrees/
 .sisyphus/
 src/cmd/**/tmp_*/
 src/cmd/registry/tmp_sig_consts/

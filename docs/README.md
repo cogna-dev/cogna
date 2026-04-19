@@ -22,6 +22,6 @@ pnpm build
 
 ## 当前信息架构
 
-- 顶部导航：快速开始 / 用户文档 / 贡献者文档 / 开发进度 / GitHub
+- 顶部导航：用户文档 / 贡献者文档 / GitHub
 - 用户文档采用 Divio 四象限：Tutorials / How-to / Reference / Explanation
 - 主页 feature 区用于展示四象限和当前核心能力

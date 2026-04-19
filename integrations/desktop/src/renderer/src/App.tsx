@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import type { Outline, PackageNode, QueryMatch, QueryMode, DiffResult } from './cogna-ui'
 import { queryModes, PackageTree, DiffView } from './cogna-ui'
 import {
@@ -20,6 +20,9 @@ import {
   Folder,
   Search,
   TerminalSquare,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
   Minus,
   Square,
   X
@@ -32,9 +35,23 @@ type WorkspaceState = {
   source: 'default' | 'deep-link' | 'renderer'
 }
 
+type WorkspaceHealth = {
+  hasConfig: boolean
+  hasCache: boolean
+}
+
+type ToastKind = 'success' | 'error' | 'info'
+
+type ToastMessage = {
+  id: number
+  kind: ToastKind
+  title: string
+  description?: string
+}
+
 type DetailItem = Outline | QueryMatch
 type ExplorerTab = 'outlines' | 'query'
-type AppView = 'explorer' | 'diff'
+type AppView = 'explorer' | 'changes' | 'policy'
 
 type Relation = 'root' | 'workspace' | 'direct' | 'transitive'
 
@@ -90,6 +107,27 @@ type SdkDiffResult = {
   }
   changes: SdkDiffChange[]
   testChanges: SdkDiffChange[]
+}
+
+type SdkSarifResult = {
+  ruleId?: string
+  level: 'error' | 'warning' | 'note'
+  message: string
+  uri: string
+  startLine: number
+  endLine: number
+  helpUri?: string
+}
+
+type SdkCheckResult = {
+  sarifPath: string
+  summary: {
+    error: number
+    warning: number
+    note: number
+    total: number
+  }
+  results: SdkSarifResult[]
 }
 
 type SdkResult<T> =
@@ -195,12 +233,67 @@ function App(): React.JSX.Element {
   const [queryText, setQueryText] = useState('effect cleanup')
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null)
   const [appView, setAppView] = useState<AppView>('explorer')
+  const [policyTab, setPolicyTab] = useState<'loaded-policy'>('loaded-policy')
   const [commandOpen, setCommandOpen] = useState(false)
-  const [buildStatus, setBuildStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [workspaceHealth, setWorkspaceHealth] = useState<WorkspaceHealth>({ hasConfig: false, hasCache: false })
+  const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const [isBuilding, setIsBuilding] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
   const [outlinesByPackage, setOutlinesByPackage] = useState<Record<string, Outline[]>>({})
   const [queryMatchesByPackage, setQueryMatchesByPackage] = useState<Record<string, QueryMatch[]>>({})
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null)
+  const [checkResult, setCheckResult] = useState<SdkCheckResult | null>(null)
+  const [isChecking, setIsChecking] = useState(false)
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
+
+  const pushToast = useCallback((kind: ToastKind, title: string, description?: string): number => {
+    const id = Date.now() + Math.floor(Math.random() * 1000)
+    setToasts((current) => [...current, { id, kind, title, description }])
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id))
+    }, 3600)
+    return id
+  }, [])
+
+  const removeToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((item) => item.id !== id))
+  }, [])
+
+  const refreshWorkspaceData = useCallback(async () => {
+    setIsBootstrapping(true)
+    try {
+      const ws = await window.api.workspace.getState()
+      setWorkspaceState(ws)
+
+      const health = await window.api.workspace.getHealth()
+      setWorkspaceHealth(health)
+
+      if (!health.hasCache) {
+        setPackagesRoot({
+          name: ws.displayName || 'workspace-app',
+          relation: 'root',
+          children: [],
+        })
+        setOutlinesByPackage({})
+        setQueryMatchesByPackage({})
+        setDiffResult(null)
+        setCheckResult(null)
+        setErrorMessage('')
+        return
+      }
+
+      const packagesOut: SdkResult<{ root: SdkPackageNode }> = await window.api.sdk.fetchPackages()
+      if (packagesOut.success) {
+        setPackagesRoot(mapPackageNode(packagesOut.data.root))
+        setErrorMessage('')
+      } else {
+        setErrorMessage(packagesOut.error)
+      }
+    } finally {
+      setIsBootstrapping(false)
+    }
+  }, [])
 
   const selectedPackage = useMemo(
     () => packageList.find((item) => item.name === selectedPackageName) ?? packageList[0] ?? packagesRoot,
@@ -245,53 +338,21 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     let active = true
-
-    const bootstrap = async (): Promise<void> => {
-      const ws = await window.api.workspace.getState()
+    void refreshWorkspaceData()
+    const dispose = window.api.workspace.onDidChange(() => {
       if (!active) return
-      setWorkspaceState(ws)
-
-      const packagesOut: SdkResult<{ root: SdkPackageNode }> = await window.api.sdk.fetchPackages()
-      if (!active) return
-      if (packagesOut.success) {
-        setPackagesRoot(mapPackageNode(packagesOut.data.root))
-      } else {
-        setErrorMessage(packagesOut.error)
-      }
-
-      const diffOut: SdkResult<SdkDiffResult> = await window.api.sdk.diff({
-        base: 'v1.1.0',
-        target: 'working-tree',
-        includeTestChanges: true,
-      })
-      if (!active) return
-      if (diffOut.success) {
-        setDiffResult(mapDiffResult(diffOut.data))
-      }
-    }
-
-    void bootstrap()
-
-    const dispose = window.api.workspace.onDidChange((state) => {
-      setWorkspaceState(state)
-      void window.api.sdk.fetchPackages().then((result) => {
-        if (!active) return
-        if (result.success) {
-          setPackagesRoot(mapPackageNode(result.data.root))
-          setErrorMessage('')
-        } else {
-          setErrorMessage(result.error)
-        }
-      })
+      void refreshWorkspaceData()
     })
-
     return () => {
       active = false
       dispose()
     }
-  }, [])
+  }, [refreshWorkspaceData])
 
   useEffect(() => {
+    if (!workspaceHealth.hasCache) {
+      return
+    }
     if (!selectedPackage.name) {
       return
     }
@@ -306,9 +367,12 @@ function App(): React.JSX.Element {
         setErrorMessage(result.error)
       }
     })
-  }, [selectedPackage.name])
+  }, [selectedPackage.name, workspaceHealth.hasCache])
 
   useEffect(() => {
+    if (!workspaceHealth.hasCache) {
+      return
+    }
     if (queryText.trim().length === 0) {
       setQueryMatchesByPackage((current) => ({
         ...current,
@@ -334,7 +398,7 @@ function App(): React.JSX.Element {
           setErrorMessage(result.error)
         }
       })
-  }, [selectedPackage.name, queryMode, queryText])
+  }, [selectedPackage.name, queryMode, queryText, workspaceHealth.hasCache])
 
   useEffect(() => {
     setSelectedPackageName(packageList[0]?.name ?? 'workspace-app')
@@ -343,14 +407,122 @@ function App(): React.JSX.Element {
 
   const isMac = useMemo(() => window.navigator.platform.toUpperCase().indexOf('MAC') >= 0, [])
 
+  const resolveCliApi = useCallback(() => {
+    const api = window.api as typeof window.api & {
+      cli?: {
+        build?: () => Promise<SdkResult<{ success: boolean }>>
+        init?: () => Promise<SdkResult<{ success: boolean }>>
+        check?: () => Promise<SdkResult<SdkCheckResult>>
+        diff?: (params: {
+          base: string
+          target: string
+          includeTestChanges: boolean
+        }) => Promise<SdkResult<SdkDiffResult>>
+      }
+      sdk?: {
+        build?: () => Promise<SdkResult<{ success: boolean }>>
+        init?: () => Promise<SdkResult<{ success: boolean }>>
+        check?: () => Promise<SdkResult<SdkCheckResult>>
+        diff?: (params: {
+          base: string
+          target: string
+          includeTestChanges: boolean
+        }) => Promise<SdkResult<SdkDiffResult>>
+      }
+    }
+
+    const build = api.cli?.build ?? api.sdk?.build
+    const init = api.cli?.init ?? api.sdk?.init
+    const check = api.cli?.check ?? api.sdk?.check
+    const diff = api.cli?.diff ?? api.sdk?.diff
+
+    return { build, init, check, diff }
+  }, [])
+
   const handleBuild = async (): Promise<void> => {
-    const out = await window.api.sdk.build()
-    if (out.success) {
-      setBuildStatus(out.data.success ? 'Build succeeded' : 'Build failed')
-      setErrorMessage('')
-    } else {
-      setBuildStatus('')
+    if (isBuilding) {
+      return
+    }
+    setIsBuilding(true)
+    const loadingToastId = pushToast('info', 'Build started', 'Running cogna build in current workspace.')
+    try {
+      const { build } = resolveCliApi()
+      if (!build) {
+        const message = 'Desktop command API is not available. Please restart `pnpm dev` to refresh preload/main process.'
+        setErrorMessage(message)
+        pushToast('error', 'Build failed', message)
+        return
+      }
+      const out = await build()
+      if (out.success) {
+        pushToast('success', 'Build finished', 'Workspace cache artifacts are ready.')
+        setErrorMessage('')
+        await refreshWorkspaceData()
+        return
+      }
       setErrorMessage(out.error)
+      pushToast('error', 'Build failed', out.error)
+    } finally {
+      removeToast(loadingToastId)
+      setIsBuilding(false)
+    }
+  }
+
+  const handleInit = async (): Promise<void> => {
+    if (isInitializing) {
+      return
+    }
+    setIsInitializing(true)
+    const loadingToastId = pushToast('info', 'Init started', 'Creating cogna.yaml in current workspace.')
+    try {
+      const { init } = resolveCliApi()
+      if (!init) {
+        const message = 'Desktop command API is not available. Please restart `pnpm dev` to refresh preload/main process.'
+        setErrorMessage(message)
+        pushToast('error', 'Init failed', message)
+        return
+      }
+      const out = await init()
+      if (!out.success) {
+        setErrorMessage(out.error)
+        pushToast('error', 'Init failed', out.error)
+        return
+      }
+      setErrorMessage('')
+      pushToast('success', 'Init finished', 'Configuration file created successfully.')
+      await refreshWorkspaceData()
+    } finally {
+      removeToast(loadingToastId)
+      setIsInitializing(false)
+    }
+  }
+
+  const handleCheck = async (): Promise<void> => {
+    if (isChecking) {
+      return
+    }
+    setIsChecking(true)
+    const loadingToastId = pushToast('info', 'Check started', 'Running cogna check and reading SARIF report.')
+    try {
+      const { check } = resolveCliApi()
+      if (!check) {
+        const message = 'Desktop command API is not available. Please restart `pnpm dev` to refresh preload/main process.'
+        setErrorMessage(message)
+        pushToast('error', 'Check failed', message)
+        return
+      }
+      const out = await check()
+      if (!out.success) {
+        setErrorMessage(out.error)
+        pushToast('error', 'Check failed', out.error)
+        return
+      }
+      setCheckResult(out.data)
+      setErrorMessage('')
+      pushToast('success', 'Check finished', `${out.data.summary.total} findings loaded from SARIF.`)
+    } finally {
+      removeToast(loadingToastId)
+      setIsChecking(false)
     }
   }
 
@@ -359,19 +531,33 @@ function App(): React.JSX.Element {
     target: string
     includeTestChanges: boolean
   }): Promise<DiffResult | null> => {
-    const out = await window.api.sdk.diff(params)
-    if (!out.success) {
-      setErrorMessage(out.error)
-      return null
+    const loadingToastId = pushToast('info', 'Changes started', 'Running cogna diff for selected base/target.')
+    try {
+      const { diff } = resolveCliApi()
+      if (!diff) {
+        const message = 'Desktop command API is not available. Please restart `pnpm dev` to refresh preload/main process.'
+        setErrorMessage(message)
+        pushToast('error', 'Changes failed', message)
+        return null
+      }
+      const out = await diff(params)
+      if (!out.success) {
+        setErrorMessage(out.error)
+        pushToast('error', 'Changes failed', out.error)
+        return null
+      }
+      const mapped = {
+        ...mapDiffResult(out.data),
+        base: params.base,
+        target: params.target,
+      }
+      setDiffResult(mapped)
+      setErrorMessage('')
+      pushToast('success', 'Changes finished', `${mapped.summary.changed + mapped.summary.added + mapped.summary.removed} changes computed.`)
+      return mapped
+    } finally {
+      removeToast(loadingToastId)
     }
-    const mapped = {
-      ...mapDiffResult(out.data),
-      base: params.base,
-      target: params.target,
-    }
-    setDiffResult(mapped)
-    setErrorMessage('')
-    return mapped
   }
 
   return (
@@ -402,12 +588,21 @@ function App(): React.JSX.Element {
             </button>
             <button
               className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                appView === 'diff' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                appView === 'changes' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
-              onClick={() => setAppView('diff')}
+              onClick={() => setAppView('changes')}
               type="button"
             >
-              Diff
+              Reviewer
+            </button>
+            <button
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                appView === 'policy' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setAppView('policy')}
+              type="button"
+            >
+              Gate
             </button>
           </div>
 
@@ -460,11 +655,42 @@ function App(): React.JSX.Element {
         {errorMessage.length > 0 && (
           <div className="px-4 py-2 text-xs text-red-500 border-b border-border bg-red-500/5">{errorMessage}</div>
         )}
-        {buildStatus.length > 0 && (
-          <div className="px-4 py-2 text-xs text-green-500 border-b border-border bg-green-500/5">{buildStatus}</div>
-        )}
 
-        {appView === 'explorer' ? (
+        {(!workspaceHealth.hasConfig || !workspaceHealth.hasCache || isBootstrapping) ? (
+          <div className="flex flex-1 items-center justify-center px-6">
+            <div className="w-full max-w-xl rounded-2xl border bg-card p-8 text-center shadow-sm flex flex-col items-center gap-4">
+              {isBootstrapping ? (
+                <>
+                  <Loader2 className="size-10 animate-spin text-primary" />
+                  <h2 className="text-xl font-semibold">Loading workspace</h2>
+                  <p className="text-sm text-muted-foreground">Resolving configuration and cache status…</p>
+                </>
+              ) : !workspaceHealth.hasConfig ? (
+                <>
+                  <h2 className="text-xl font-semibold">Initialize this workspace first</h2>
+                  <p className="text-sm text-muted-foreground">
+                    No cogna.yaml found in the current workspace. Create it before using Explorer, Reviewer, and Gate.
+                  </p>
+                  <Button size="lg" className="min-w-40" onClick={() => void handleInit()} disabled={isInitializing}>
+                    {isInitializing && <Loader2 className="mr-2 h-4 w-4 animate-spin" data-icon="inline-start" />}
+                    Init
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-semibold">Build cache artifacts</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Workspace has config, but no local cache artifacts were found. Run Build to prepare package/index data.
+                  </p>
+                  <Button size="lg" className="min-w-40" onClick={() => void handleBuild()} disabled={isBuilding}>
+                    {isBuilding && <Loader2 className="mr-2 h-4 w-4 animate-spin" data-icon="inline-start" />}
+                    Build
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : appView === 'explorer' ? (
           <div className="flex flex-1 overflow-hidden">
             <aside className="w-[240px] flex-shrink-0 border-r border-border flex flex-col bg-muted/20">
               <div className="h-10 flex items-center px-4 border-b border-border/50 bg-background/50">
@@ -493,27 +719,33 @@ function App(): React.JSX.Element {
                   </Badge>
                 </div>
 
-                <div className="flex bg-muted p-0.5 rounded-lg">
-                  <button
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${tab === 'outlines' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                    onClick={() => {
-                      setTab('outlines')
-                      setSelectedDetailId(null)
-                    }}
-                    type="button"
-                  >
-                    Outlines
-                  </button>
-                  <button
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${tab === 'query' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                    onClick={() => {
-                      setTab('query')
-                      setSelectedDetailId(null)
-                    }}
-                    type="button"
-                  >
-                    Query
-                  </button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" className="h-7 px-2" onClick={() => void handleBuild()} disabled={isBuilding}>
+                    {isBuilding && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" data-icon="inline-start" />}
+                    Build
+                  </Button>
+                  <div className="flex bg-muted p-0.5 rounded-lg">
+                    <button
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${tab === 'outlines' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => {
+                        setTab('outlines')
+                        setSelectedDetailId(null)
+                      }}
+                      type="button"
+                    >
+                      Outlines
+                    </button>
+                    <button
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${tab === 'query' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => {
+                        setTab('query')
+                        setSelectedDetailId(null)
+                      }}
+                      type="button"
+                    >
+                      Query
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -712,9 +944,122 @@ function App(): React.JSX.Element {
               </ScrollArea>
             </aside>
           </div>
-        ) : (
+        ) : appView === 'changes' ? (
           <DiffView initialResult={diffResult} onRunDiff={handleDiffRun} />
+        ) : (
+          <div className="flex flex-col flex-1 overflow-hidden bg-background">
+            <div className="h-10 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold">Policy</h2>
+                <Badge variant="outline" className="h-5 px-1.5 text-[10px] text-muted-foreground">
+                  {policyTab === 'loaded-policy' ? 'Loaded Policy' : 'Policy'}
+                </Badge>
+              </div>
+              <Button size="sm" className="h-7 px-2" onClick={() => void handleCheck()} disabled={isChecking}>
+                {isChecking && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" data-icon="inline-start" />}
+                {isChecking ? 'Checking…' : 'Check'}
+              </Button>
+            </div>
+            <div className="h-10 px-4 border-b border-border/50 flex items-center gap-2">
+              <button
+                type="button"
+                className="px-3 py-1 text-xs font-medium rounded-md bg-background border border-border"
+                onClick={() => setPolicyTab('loaded-policy')}
+              >
+                Loaded Policy
+              </button>
+              <span className="text-xs text-muted-foreground truncate">
+                {workspaceState.folderPath ? `${workspaceState.folderPath}/.cogna/policies` : '.cogna/policies'}
+              </span>
+            </div>
+            {checkResult ? (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex items-center gap-4 px-4 py-2 border-b border-border/50 bg-muted/5 shrink-0 text-xs">
+                  <span className="text-red-400 font-semibold">{checkResult.summary.error} error</span>
+                  <span className="text-yellow-400 font-semibold">{checkResult.summary.warning} warning</span>
+                  <span className="text-blue-400 font-semibold">{checkResult.summary.note} note</span>
+                  <span className="ml-auto text-muted-foreground">{checkResult.summary.total} total</span>
+                </div>
+                <div className="px-4 py-2 text-[11px] text-muted-foreground border-b border-border/30 font-mono truncate">
+                  SARIF: {checkResult.sarifPath}
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-3 flex flex-col gap-2">
+                    {checkResult.results.length === 0 ? (
+                      <div className="text-center py-10 text-sm text-muted-foreground">No SARIF findings.</div>
+                    ) : (
+                      checkResult.results.map((item, idx) => (
+                        <div key={`${item.ruleId ?? 'rule'}-${idx}`} className="p-3 rounded-lg border bg-card">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge
+                              variant={
+                                item.level === 'error'
+                                  ? 'destructive'
+                                  : item.level === 'warning'
+                                    ? 'secondary'
+                                    : 'outline'
+                              }
+                              className="text-[10px]"
+                            >
+                              {item.level}
+                            </Badge>
+                            <span className="font-mono text-xs text-primary break-all">{item.ruleId ?? 'policy.finding'}</span>
+                          </div>
+                          <p className="text-sm leading-relaxed">{item.message}</p>
+                          <div className="text-[11px] text-muted-foreground font-mono mt-2 break-all">
+                            {item.uri}:{item.startLine}-{item.endLine}
+                          </div>
+                          {item.helpUri && (
+                            <a
+                              href={item.helpUri}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block mt-2 text-xs text-primary hover:underline"
+                            >
+                              Rule help
+                            </a>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                Click Check to run cogna check and load SARIF findings.
+              </div>
+            )}
+          </div>
         )}
+
+        <div className="pointer-events-none fixed right-4 top-14 z-50 flex w-[360px] flex-col gap-2">
+          {toasts.map((item) => (
+            <div
+              key={item.id}
+              className="pointer-events-auto rounded-lg border bg-card p-3 shadow-md"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-start gap-2">
+                {item.kind === 'success' ? (
+                  <CheckCircle2 className="mt-0.5 size-4 text-green-500" />
+                ) : item.kind === 'error' ? (
+                  <AlertCircle className="mt-0.5 size-4 text-red-500" />
+                ) : (
+                  <Loader2 className="mt-0.5 size-4 animate-spin text-primary" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{item.title}</p>
+                  {item.description && <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => removeToast(item.id)}>
+                  ×
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
           <CommandInput placeholder="Search packages, symbols, commands..." />
@@ -752,12 +1097,22 @@ function App(): React.JSX.Element {
               <CommandItem
                 value="diff command"
                 onSelect={() => {
-                  setAppView('diff')
+                  setAppView('changes')
                   setCommandOpen(false)
                 }}
               >
                 <TerminalSquare className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Diff Project</span>
+                <span>Open Reviewer</span>
+              </CommandItem>
+              <CommandItem
+                value="policy command"
+                onSelect={() => {
+                  setAppView('policy')
+                  setCommandOpen(false)
+                }}
+              >
+                <TerminalSquare className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Open Gate</span>
               </CommandItem>
             </CommandGroup>
           </CommandList>

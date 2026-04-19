@@ -6,23 +6,29 @@
   "files": [
     "dist"
   ],
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/cjs/index.js"
     },
     "./generated": {
       "types": "./dist/generated/index.d.ts",
-      "import": "./dist/generated/index.js"
+      "import": "./dist/generated/index.js",
+      "require": "./dist/cjs/generated/index.js"
     },
     "./generated/*": {
       "types": "./dist/generated/*.d.ts",
-      "import": "./dist/generated/*.js"
+      "import": "./dist/generated/*.js",
+      "require": "./dist/cjs/generated/*.js"
     },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "node ./scripts/prepare-runtime.mjs && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --declarationMap --outDir dist && vite build",
+    "build": "node ./scripts/prepare-runtime.mjs && tsc -p tsconfig.json --noEmit false --emitDeclarationOnly --declaration --declarationMap --outDir dist && vite build && node ./scripts/prepare-cjs-package.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",

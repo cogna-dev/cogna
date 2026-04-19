@@ -3,7 +3,7 @@
     {
       "id": "openapi-local-example",
       "extractor": "openapi",
-      "path": "./e2e/examples/openapi-spec/full/repo"
+      "path": "./e2e/repos/openapi-spec"
     }
   ]
 }

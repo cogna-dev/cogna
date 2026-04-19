@@ -57,7 +57,7 @@ cogna --help
 | `release-dry` | Dry-run SDK publish to mooncakes.io | — |
 | `clean` | Remove all build artifacts (`moon clean`) | — |
 | `ci` | Full CI gate (mirrors GitHub Actions) | `check-lint`, `check-format`, `test-unit`, `build-cli`, `check-sdk` |
-| `act-e2e` | Run Actions E2E locally via act + Docker | — |
+| `act-e2e` | Run remote extractor e2e workflow via act + Docker | — |
 
 ## Dependency graph
 
@@ -148,9 +148,9 @@ pnpm build
 
 ## Current docs IA
 
-- Top navigation: 快速开始 / 用户文档 / 贡献者文档 / 开发进度 / GitHub
+- Top navigation: 用户文档 / 贡献者文档 / GitHub
 - User docs: organized by Tutorials / How-to / Reference / Explanation
-- Contributor docs: architecture, progress, maintenance guidance
+- Contributor docs: introduction, changes, policy, maintenance guidance
 
 ## Code conventions
 
@@ -159,7 +159,7 @@ pnpm build
 - Keep module cohesion: related functions in one file rather than one function per file
 - Avoid redundant package-name prefixes in exports (`@cli.Error` not `@cli.CliError`)
 
-## Running the Actions E2E locally
+## Running remote extractor E2E locally
 
 Requires [act](https://github.com/nektos/act) and Docker:
 

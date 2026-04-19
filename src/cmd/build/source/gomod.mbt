@@ -48,13 +48,19 @@ fn go_module_cache_dir(source : @vp.GoModuleSource) -> String? {
     Some(path) => {
       let root_out = try? @fs.is_dir(path)
       guard root_out is Ok(true) else { return None }
-      let candidate = "\{path}/\{go_escape_module_path(source.module_path)}@\{source.version}"
-      let candidate_out = try? @fs.is_dir(candidate)
-      if candidate_out is Ok(true) {
-        Some(candidate)
-      } else {
-        None
+      let module_key = go_escape_module_path(source.module_path)
+      let versions = [
+        source.version,
+        if source.version.has_prefix("v") { source.version } else { "v\{source.version}" },
+      ]
+      for i in 0..<versions.length() {
+        let candidate = "\{path}/\{module_key}@\{versions[i]}"
+        let candidate_out = try? @fs.is_dir(candidate)
+        if candidate_out is Ok(true) {
+          return Some(candidate)
+        }
       }
+      None
     }
     None => None
   }

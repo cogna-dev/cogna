@@ -8,6 +8,11 @@ type WorkspaceState = {
   source: 'default' | 'deep-link' | 'renderer'
 }
 
+type WorkspaceHealth = {
+  hasConfig: boolean
+  hasCache: boolean
+}
+
 type IpcSuccess<T> = {
   success: true
   data: T
@@ -77,6 +82,27 @@ type DiffResult = {
   testChanges: DiffChange[]
 }
 
+type SarifResult = {
+  ruleId?: string
+  level: 'error' | 'warning' | 'note'
+  message: string
+  uri: string
+  startLine: number
+  endLine: number
+  helpUri?: string
+}
+
+type CheckResult = {
+  sarifPath: string
+  summary: {
+    error: number
+    warning: number
+    note: number
+    total: number
+  }
+  results: SarifResult[]
+}
+
 const api = {
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
@@ -85,6 +111,7 @@ const api = {
   },
   workspace: {
     getState: (): Promise<WorkspaceState> => ipcRenderer.invoke('workspace:get-state'),
+    getHealth: (): Promise<WorkspaceHealth> => ipcRenderer.invoke('workspace:get-health'),
     openFolder: (folderPath: string): void => ipcRenderer.send('workspace:open-folder', folderPath),
     onDidChange: (callback: (state: WorkspaceState) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, state: WorkspaceState): void => {
@@ -96,8 +123,21 @@ const api = {
       }
     }
   },
+  cli: {
+    build: (): Promise<IpcResult<{ success: boolean }>> => ipcRenderer.invoke('cli:build'),
+    init: (): Promise<IpcResult<{ success: boolean }>> => ipcRenderer.invoke('cli:init'),
+    check: (): Promise<IpcResult<CheckResult>> => ipcRenderer.invoke('cli:check'),
+    diff: (params: {
+      base: string
+      target: string
+      includeTestChanges: boolean
+    }): Promise<IpcResult<DiffResult>> => ipcRenderer.invoke('cli:diff', params),
+  },
   sdk: {
+    // Read-only data/query APIs from @cogna-dev/sdk.
     build: (): Promise<IpcResult<{ success: boolean }>> => ipcRenderer.invoke('sdk:build'),
+    init: (): Promise<IpcResult<{ success: boolean }>> => ipcRenderer.invoke('sdk:init'),
+    check: (): Promise<IpcResult<CheckResult>> => ipcRenderer.invoke('sdk:check'),
     diff: (params: {
       base: string
       target: string

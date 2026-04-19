@@ -31,7 +31,7 @@
 #  test      | test-sdk            | Run JS SDK tests (vitest)
 #  release   | release-dry         | Dry-run SDK publish to validate package
 #  clean     | clean               | Remove all build artifacts (moon clean)
-#  ci        | ci                  | Full CI gate (check-lint + check-format + test-unit + build-cli + check-sdk)
+#  ci        | ci                  | Full CI gate (check-lint + check-format + test-unit + build-cli + check-sdk + check-cli-e2e-repos)
 #  act       | act-e2e             | Run Actions E2E locally via act
 #
 # Dependency graph:
@@ -130,6 +130,10 @@ check-sdk:
     pnpm --filter @cogna-dev/sdk run typecheck
     pnpm --filter @cogna-dev/sdk run lint
 
+# Run CLI e2e against all repos under e2e/repos
+check-cli-e2e-repos:
+    COGNA_E2E_TIMEOUT_SECONDS=30 bash scripts/ci/run-cli-e2e.sh
+
 # ------------------------------------------------------------------------------
 # fmt — Format source files in-place
 # ------------------------------------------------------------------------------
@@ -201,13 +205,13 @@ clean:
 # ci — Full CI gate (mirrors GitHub CI)
 # ------------------------------------------------------------------------------
 
-# Full CI pipeline: lint + format check + unit tests + CLI build + JS SDK check
-ci: check-lint check-format test-unit build-cli check-sdk
+# Full CI pipeline: lint + format check + unit tests + CLI build + JS SDK check + CLI e2e repos check
+ci: check-lint check-format test-unit build-cli check-sdk check-cli-e2e-repos
 
 # ------------------------------------------------------------------------------
 # act — Local GitHub Actions simulation
 # ------------------------------------------------------------------------------
 
-# Run Actions E2E workflow locally via act (requires act + Docker)
+# Run remote extractor e2e workflow locally via act (requires act + Docker)
 act-e2e:
-    act workflow_dispatch -W .github/workflows/actions-e2e.yml --container-architecture linux/amd64
+    ACT=true act workflow_dispatch -W .github/workflows/remote-e2e.yml --container-architecture linux/amd64

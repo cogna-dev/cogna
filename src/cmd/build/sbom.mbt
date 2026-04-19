@@ -597,25 +597,33 @@ fn build_go_cache_root() -> String? {
     Some(path) => Some(path)
     None =>
       match @sbom_snapshot.env_path("GOPATH") {
-        Some(go_path) =>
-          Some(
-            @sbom_snapshot.join_path(
-              @sbom_snapshot.join_path(go_path, "pkg"),
-              "mod",
-            ),
+        Some(go_path) => {
+          let first_go_path = match go_path.find(":") {
+            Some(idx) => go_path[:idx].to_string()
+            None => go_path
+          }
+          let candidate = @sbom_snapshot.join_path(
+            @sbom_snapshot.join_path(first_go_path, "pkg"),
+            "mod",
           )
+          Some(
+            candidate,
+          )
+        }
         None =>
           match @sbom_snapshot.home_dir() {
-            Some(home) =>
-              Some(
+            Some(home) => {
+              let candidate = @sbom_snapshot.join_path(
                 @sbom_snapshot.join_path(
-                  @sbom_snapshot.join_path(
-                    @sbom_snapshot.join_path(home, "go"),
-                    "pkg",
-                  ),
-                  "mod",
+                  @sbom_snapshot.join_path(home, "go"),
+                  "pkg",
                 ),
+                "mod",
               )
+              Some(
+                candidate,
+              )
+            }
             None => None
           }
       }
@@ -649,16 +657,24 @@ fn build_go_module_cache_dir(pkg : @sbom_types.Package) -> String? {
         Some(ns) => "\{ns}/\{pkg.name}"
         None => pkg.name
       }
-      let candidate = @sbom_snapshot.join_path(
-        path,
-        "\{build_go_escape_module_path(module_path)}@\{pkg.version()}",
-      )
-      if @sbom_snapshot.directory_exists(candidate) {
-        Some(candidate)
-      } else {
-        None
+      let module_key = build_go_escape_module_path(module_path)
+      let version = pkg.version()
+      let versions = [
+        version,
+        if version.has_prefix("v") { version } else { "v\{version}" },
+      ]
+      for i in 0..<versions.length() {
+        let candidate = @sbom_snapshot.join_path(
+          path,
+          "\{module_key}@\{versions[i]}",
+        )
+        if @sbom_snapshot.directory_exists(candidate) {
+          return Some(candidate)
+        }
       }
+      None
     }
+    Some(_) => None
     _ => None
   }
 }
@@ -807,7 +823,12 @@ fn build_collect_external_packages(
     guard cargo_lock is Ok(lock_content) else {
       return Err(cargo_lock.unwrap_err())
     }
-    let project = @ext_sbom.scan_cargo(repo, content, lock_content)
+    let project = @ext_sbom.scan_cargo_with_options(
+      repo,
+      content,
+      lock_content,
+      include_transitive_from_lock=false,
+    )
     for pkg in project.all_packages() {
       packages.push(pkg)
     }
@@ -818,7 +839,12 @@ fn build_collect_external_packages(
     guard go_mod is Ok(content) else { return Err(go_mod.unwrap_err()) }
     let go_sum = build_read_optional_file("\{repo}/go.sum")
     guard go_sum is Ok(sum_content) else { return Err(go_sum.unwrap_err()) }
-    let project = @ext_sbom.scan_go(repo, content, sum_content)
+    let project = @ext_sbom.scan_go_with_options(
+      repo,
+      content,
+      sum_content,
+      include_indirect=false,
+    )
     for pkg in project.all_packages() {
       packages.push(pkg)
     }
@@ -833,7 +859,12 @@ fn build_collect_external_packages(
     guard lock_content is Ok(lock_text) else {
       return Err(lock_content.unwrap_err())
     }
-    let project = @ext_sbom.scan_terraform(repo, terraform_files, lock_text)
+    let project = @ext_sbom.scan_terraform_with_options(
+      repo,
+      terraform_files,
+      lock_text,
+      include_lock_only_providers=false,
+    )
     for pkg in project.all_packages() {
       packages.push(pkg)
     }

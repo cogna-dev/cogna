@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'fs'
 import { basename, join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { sdkBuild, sdkDiff, sdkFetchPackages, sdkQuery, sdkQueryOutlines } from './sdk'
+import { sdkBuild, sdkCheck, sdkDiff, sdkFetchPackages, sdkInit, sdkQuery, sdkQueryOutlines } from './sdk'
 
 const APP_ID = 'dev.xaclabs.cogna'
 const PROTOCOL_NAME = 'cogna'
@@ -13,6 +13,11 @@ type WorkspaceState = {
   displayName: string
   contextSummary: string
   source: 'default' | 'deep-link' | 'renderer'
+}
+
+type WorkspaceHealth = {
+  hasConfig: boolean
+  hasCache: boolean
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -97,6 +102,16 @@ function updateWorkspaceFolder(
   workspaceState = next
   focusMainWindow()
   sendWorkspaceState()
+}
+
+function workspaceHealth(): WorkspaceHealth {
+  const root = workspaceState.folderPath
+  if (!root) {
+    return { hasConfig: false, hasCache: false }
+  }
+  const hasConfig = existsSync(resolve(root, 'cogna.yaml'))
+  const hasCache = existsSync(resolve(root, '.cogna', 'sbom.spdx.json'))
+  return { hasConfig, hasCache }
 }
 
 function parseDeepLink(url: string): string | null {
@@ -202,12 +217,22 @@ if (!gotTheLock) {
     updateWorkspaceFolder(folderPath, 'renderer')
   })
   ipcMain.handle('workspace:get-state', () => workspaceState)
+  ipcMain.handle('cli:build', () => sdkBuild(workspaceState.folderPath))
+  ipcMain.handle('cli:init', () => sdkInit(workspaceState.folderPath))
+  ipcMain.handle('cli:check', () => sdkCheck(workspaceState.folderPath))
+  ipcMain.handle('cli:diff', (_event, params: { base: string; target: string; includeTestChanges: boolean }) =>
+    sdkDiff({ ...params, workspacePath: workspaceState.folderPath })
+  )
+
+  // Backward-compatible aliases while renderer migrates to api.cli.*.
   ipcMain.handle('sdk:build', () => sdkBuild(workspaceState.folderPath))
+  ipcMain.handle('sdk:init', () => sdkInit(workspaceState.folderPath))
+  ipcMain.handle('sdk:check', () => sdkCheck(workspaceState.folderPath))
   ipcMain.handle('sdk:diff', (_event, params: { base: string; target: string; includeTestChanges: boolean }) =>
     sdkDiff({ ...params, workspacePath: workspaceState.folderPath })
   )
-  ipcMain.handle('sdk:fetch-packages', () => sdkFetchPackages())
-  ipcMain.handle('sdk:query-outlines', (_event, pkg: string) => sdkQueryOutlines(pkg))
+  ipcMain.handle('sdk:fetch-packages', () => sdkFetchPackages(workspaceState.folderPath))
+  ipcMain.handle('sdk:query-outlines', (_event, pkg: string) => sdkQueryOutlines(pkg, workspaceState.folderPath))
   ipcMain.handle(
     'sdk:query',
     (
@@ -218,8 +243,9 @@ if (!gotTheLock) {
         input: string
         limit?: number
       },
-    ) => sdkQuery(params),
+    ) => sdkQuery({ ...params, workspacePath: workspaceState.folderPath }),
   )
+  ipcMain.handle('workspace:get-health', () => workspaceHealth())
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId(APP_ID)

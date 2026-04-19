@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { DiffResult, DiffChange } from '../types'
 import { cn } from '../lib/utils'
-import { GitBranch, GitCompare, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react'
+import { GitBranch, GitCompare, ArrowRight, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { Button } from '@renderer/components/ui/button'
 
 type DiffChangeKind = DiffChange['kind']
 
@@ -173,21 +174,17 @@ export function DiffView({
           Include test changes
         </label>
         {!readonly && (
-          <button
-            type="button"
-            onClick={handleRunDiff}
-            disabled={isRunning}
-            className="ml-auto h-7 px-3 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isRunning ? 'Running…' : 'Run Diff'}
-          </button>
+          <Button type="button" size="sm" onClick={handleRunDiff} disabled={isRunning} className="ml-auto h-7 px-3 text-xs">
+            {isRunning && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" data-icon="inline-start" />}
+            {isRunning ? 'Running…' : 'Run Changes'}
+          </Button>
         )}
       </div>
 
       {!result ? (
         <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground">
           <GitCompare className="w-10 h-10 mb-3 opacity-20" />
-          <p className="text-sm">Enter base and target versions to run a diff.</p>
+          <p className="text-sm">Enter base and target versions to compute changes.</p>
         </div>
       ) : (
         <div className="flex flex-col flex-1 overflow-hidden">

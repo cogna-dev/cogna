@@ -1,3 +1,0 @@
-manifest.json  d92f295129ded58d9379e971502207e29285770d17aecd1cf82d89e6fc6e5af1
-declarations.ndjson  37e9cfc60ae0313a929e5599dfeaeb5fe7efafe12a5cf5b33444c2d22ecbd663
-metadata.json  <normalized>

@@ -129,21 +129,62 @@ pub fn directory_exists(path : String) -> Bool {
 }
 
 ///|
+fn is_visiting(visiting : Map[String, Bool], path : String) -> Bool {
+  match visiting.get(path) {
+    Some(true) => true
+    _ => false
+  }
+}
+
+///|
+fn normalize_dir_path(path : String) -> String {
+  let stripped = strip_relative_prefix(path)
+  if stripped.has_suffix("/") && stripped.length() > 1 {
+    stripped[:stripped.length() - 1].to_string()
+  } else {
+    stripped
+  }
+}
+
+///|
 fn collect_snapshot_paths(
   root_path : String,
   relative_dir : String,
   out : Array[String],
+  visiting : Map[String, Bool],
+  visited : Map[String, Bool],
+  depth : Int,
 ) -> Result[Unit, String] {
+  let relative_display = if relative_dir == "" { "." } else { relative_dir }
+  if depth > 256 {
+    return Err(
+      "snapshot traversal depth exceeded 256 at \{relative_display} (possible directory cycle)",
+    )
+  }
+
   let current_dir = if relative_dir == "" {
     root_path
   } else {
     join_path(root_path, relative_dir)
   }
+  let current_key = normalize_dir_path(current_dir)
+  if is_visiting(visiting, current_key) {
+    return Err(
+      "snapshot traversal cycle detected at directory: \{relative_display}",
+    )
+  }
+  if visited.contains(current_key) {
+    return Ok(())
+  }
+  visiting[current_key] = true
+
   let entries = @fs.read_dir(current_dir) catch {
-    err =>
+    err => {
+      visiting[current_key] = false
       return Err(
         "cannot read package directory \{current_dir}: \{err.to_string()}",
       )
+    }
   }
   entries.sort()
   for i in 0..<entries.length() {
@@ -156,8 +197,18 @@ fn collect_snapshot_paths(
     let absolute_path = join_path(root_path, relative_path)
     let is_dir = try? @fs.is_dir(absolute_path)
     if is_dir is Ok(true) {
-      let nested = collect_snapshot_paths(root_path, relative_path, out)
-      guard nested is Ok(_) else { return Err(nested.unwrap_err()) }
+      let nested = collect_snapshot_paths(
+        root_path,
+        relative_path,
+        out,
+        visiting,
+        visited,
+        depth + 1,
+      )
+      guard nested is Ok(_) else {
+        visiting[current_key] = false
+        return Err(nested.unwrap_err())
+      }
       continue
     }
     let is_file = try? @fs.is_file(absolute_path)
@@ -165,6 +216,8 @@ fn collect_snapshot_paths(
       out.push(relative_path)
     }
   }
+  visiting[current_key] = false
+  visited[current_key] = true
   Ok(())
 }
 
@@ -174,7 +227,16 @@ pub fn snapshot_files(root_path : String) -> Result[Array[PackageFile], String] 
     return Err("package root does not exist: \{root_path}")
   }
   let relative_paths : Array[String] = []
-  let collect_out = collect_snapshot_paths(root_path, "", relative_paths)
+  let visiting : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = {}
+  let collect_out = collect_snapshot_paths(
+    root_path,
+    "",
+    relative_paths,
+    visiting,
+    visited,
+    0,
+  )
   guard collect_out is Ok(_) else { return Err(collect_out.unwrap_err()) }
   if relative_paths.is_empty() {
     return Err("package root has no files: \{root_path}")

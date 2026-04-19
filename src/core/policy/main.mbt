@@ -307,9 +307,7 @@ pub fn sarif_rules_from_catalog(catalog : Json) -> Array[Json] {
 
 ///|
 pub fn builtin_rego_text() -> String {
-  #|package cogna.compat
-  #|
-  #|default deny = []
+  let text = #|package cogna.compat
   #|
   #|has_finding(change, code) if {
   #|  some finding in change.semanticDiff.findings
@@ -667,4 +665,6 @@ pub fn builtin_rego_text() -> String {
   #|    "docs": "https://cogna.xaclabs.dev/docs/policies#rule-compat-component-metadata-changed"
   #|  }
   #|}
+
+  text
 }

@@ -97,12 +97,13 @@
 
 ## 3. 更新工作流（必须执行）
 
-### 2.1 初始预研阶段
+### 2.1 当前基线阶段
 
-在还没有完整 `e2e/extractors` harness 之前：
+当前 `src/e2e/extractors/*` harness 已经落地，因此这份矩阵的维护基线改为：
 
-- 先根据 `src/extractors/*`、`src/cmd/build/snapshot_test.mbt`、`src/cmd/diff/main_test.mbt`、`src/core/bundle/reader_test.mbt` 填出 `🟡 repo-proven` 基线；
-- 如果某个语言特性只在代码里看得到意图，但没有测试/样例证据，宁可不写，或写成 `⏭ skipped` / `🟠 observed-gap`。
+- local examples + snapshot evidence 是当前主验收线；
+- repo tests / snapshot tests 继续作为 `🟡 repo-proven` 的补充证据；
+- 如果某个语言特性只有代码意图、没有 case/snapshot 证据，宁可不写，或写成 `⏭ skipped` / `🟠 observed-gap`。
 
 ### 2.2 e2e 运行阶段
 
@@ -114,13 +115,16 @@
 4. 在“Case 证据台账”中追加 case id、snapshot 路径、失败/skip 原因；
 5. 若新 case 暴露出此前表中没有的语法结构，必须新增对应 feature row。
 
-### 2.3 在正式 e2e harness 完成前的当前做法
+### 2.3 当前 harness 与证据入口
 
-当前仓库里还没有完整落地的 `src/e2e/extractors/*` harness，因此在过渡阶段：
+当前仓库里，`src/e2e/extractors/*` harness 已经作为真实入口存在，因此当前证据来源是：
 
-- `e2e/extractors/*.json` 是 machine-readable case manifest；
-- `src/cmd/build/snapshot_test.mbt` 是当前可复用的 snapshot 证据入口；
-- 在真正的 e2e harness 落地前，feature baseline 先以 repo tests + snapshot evidence 维持。
+- `e2e/extractors/*.json`：machine-readable case manifest；
+- `src/e2e/extractors/*`：local/package/git source harness 与 skip gating 实现；
+- `e2e/extractors/*/*/snapshots/cogna/*`：当前 local examples 与 deferred remote cases 的 snapshot 证据；
+- `src/cmd/build/snapshot_test.mbt`：补充性的 repo snapshot baseline。
+
+也就是说：feature baseline 不再停留在“等待 harness 落地”的过渡状态，而是以**已落地的 local harness + snapshot evidence**为当前基线。
 
 若需要刷新 snapshot，当前参考命令：
 
@@ -320,6 +324,24 @@ policy 当前不属于 extractor 兼容性矩阵。
 | `rust:aws-sdk-dynamodb@1.110.0` | rust | cargo | ⏭ skipped | _待补_ | `e2e/extractors/rust.json` | 当前阶段 deferred；仅在 `COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E=true` 时执行 |
 | `rust:aws-config@1.8.15` | rust | cargo | ⏭ skipped | _待补_ | `e2e/extractors/rust.json` | 当前阶段 deferred；仅在 `COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E=true` 时执行 |
 | `rust:https://github.com/awslabs/aws-sdk-rust@main` | rust | git | ⏭ skipped | _待补_ | `e2e/extractors/rust.json` | 当前阶段 deferred；仅在 `COGNA_ENABLE_GIT_REMOTE_E2E=true` 时执行 |
+
+remote case 的后续执行入口统一为：
+
+- `.github/workflows/remote-e2e.yml`
+- `scripts/ci/prepare-remote-e2e.sh`
+- `scripts/ci/run-remote-e2e.sh`
+
+执行证据优先记录：
+
+- workflow run URL
+- `remote-e2e-prepare-logs` artifact
+- `remote-e2e-artifacts` artifact
+
+aws-sdk-rust 相关 case 的主要观察指标：
+
+- Cargo prepare 阶段耗时
+- `cargo fetch` 是否命中缓存
+- run 阶段是否仍出现“not available locally”类错误
 
 后续每新增一个 case，必须至少补：
 

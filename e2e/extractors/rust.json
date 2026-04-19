@@ -3,7 +3,7 @@
         {
             "id": "rust-local-example",
             "extractor": "rust",
-            "path": "./e2e/examples/rust-crate/full/repo"
+            "path": "./e2e/repos/rust-crate"
         },
         {
             "extractor": "rust",

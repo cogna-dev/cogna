@@ -1,0 +1,141 @@
+name: Remote Extractor E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'release/*'
+
+jobs:
+  remote-e2e:
+    name: Prepare and run remote extractor e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: cogna-dev/moonbit-actions/setup@v0
+
+      - name: Setup Cogna
+        uses: ./integrations/actions/setup-cogna
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Resolve cache paths
+        id: cache-paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "gomodcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gocache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "cargo_home=${CARGO_HOME:-$HOME/.cargo}" >> "$GITHUB_OUTPUT"
+          echo "tf_plugin_cache=${RUNNER_TEMP}/terraform-plugin-cache" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Go cache
+        id: restore-go
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ steps.cache-paths.outputs.gomodcache }}
+            ${{ steps.cache-paths.outputs.gocache }}
+          key: remote-e2e-go-${{ runner.os }}-go1.23-${{ hashFiles('**/go.mod', '**/go.sum', 'e2e/extractors/go-remote.json') }}
+          restore-keys: |
+            remote-e2e-go-${{ runner.os }}-go1.23-
+
+      - name: Restore Cargo cache
+        id: restore-cargo
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ steps.cache-paths.outputs.cargo_home }}/registry/index
+            ${{ steps.cache-paths.outputs.cargo_home }}/registry/cache
+            ${{ steps.cache-paths.outputs.cargo_home }}/git/db
+          key: remote-e2e-cargo-${{ runner.os }}-stable-${{ hashFiles('e2e/extractors/rust.json') }}
+          restore-keys: |
+            remote-e2e-cargo-${{ runner.os }}-stable-
+
+      - name: Restore Terraform cache
+        id: restore-terraform
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.cache-paths.outputs.tf_plugin_cache }}
+          key: remote-e2e-terraform-${{ runner.os }}-${{ hashFiles('e2e/extractors/terraform-remote.json') }}
+          restore-keys: |
+            remote-e2e-terraform-${{ runner.os }}-
+
+      - name: Phase 1 - prepare remote dependencies
+        shell: bash
+        env:
+          COGNA_REMOTE_WORKSPACE_ROOT: ${{ github.workspace }}/.tmp/remote-e2e-workspace
+          TF_PLUGIN_CACHE_DIR: ${{ steps.cache-paths.outputs.tf_plugin_cache }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/ci/prepare-remote-e2e.sh
+
+      - name: Save Go cache
+        if: ${{ env.ACT != 'true' && github.repository == 'cogna-dev/cogna' && steps.restore-go.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.cache-paths.outputs.gomodcache }}
+            ${{ steps.cache-paths.outputs.gocache }}
+          key: remote-e2e-go-${{ runner.os }}-go1.23-${{ hashFiles('**/go.mod', '**/go.sum', 'e2e/extractors/go-remote.json') }}
+
+      - name: Save Cargo cache
+        if: ${{ env.ACT != 'true' && github.repository == 'cogna-dev/cogna' && steps.restore-cargo.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.cache-paths.outputs.cargo_home }}/registry/index
+            ${{ steps.cache-paths.outputs.cargo_home }}/registry/cache
+            ${{ steps.cache-paths.outputs.cargo_home }}/git/db
+          key: remote-e2e-cargo-${{ runner.os }}-stable-${{ hashFiles('e2e/extractors/rust.json') }}
+
+      - name: Save Terraform cache
+        if: ${{ env.ACT != 'true' && github.repository == 'cogna-dev/cogna' && steps.restore-terraform.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.cache-paths.outputs.tf_plugin_cache }}
+          key: remote-e2e-terraform-${{ runner.os }}-${{ hashFiles('e2e/extractors/terraform-remote.json') }}
+
+      - name: Phase 2 - run remote extractor e2e
+        shell: bash
+        env:
+          COGNA_ENABLE_REMOTE_E2E: 'true'
+          COGNA_ENABLE_GIT_REMOTE_E2E: 'true'
+          COGNA_ENABLE_RUST_PACKAGE_REMOTE_E2E: 'true'
+          COGNA_REMOTE_WORKSPACE_ROOT: ${{ github.workspace }}/.tmp/remote-e2e-workspace
+          TF_PLUGIN_CACHE_DIR: ${{ steps.cache-paths.outputs.tf_plugin_cache }}
+        run: |
+          set -euo pipefail
+          bash ./scripts/ci/run-remote-e2e.sh
+
+      - name: Upload remote e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-e2e-artifacts
+          path: |
+            e2e/extractors/*/*/snapshots/cogna/*
+            .tmp/remote-e2e-workspace/**
+          if-no-files-found: warn

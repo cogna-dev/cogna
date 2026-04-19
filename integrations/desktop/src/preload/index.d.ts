@@ -7,6 +7,11 @@ interface WorkspaceState {
   source: 'default' | 'deep-link' | 'renderer'
 }
 
+interface WorkspaceHealth {
+  hasConfig: boolean
+  hasCache: boolean
+}
+
 interface IpcSuccess<T> {
   success: true
   data: T
@@ -76,6 +81,27 @@ interface DiffResult {
   testChanges: DiffChange[]
 }
 
+interface SarifResult {
+  ruleId?: string
+  level: 'error' | 'warning' | 'note'
+  message: string
+  uri: string
+  startLine: number
+  endLine: number
+  helpUri?: string
+}
+
+interface CheckResult {
+  sarifPath: string
+  summary: {
+    error: number
+    warning: number
+    note: number
+    total: number
+  }
+  results: SarifResult[]
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI
@@ -87,16 +113,21 @@ declare global {
       }
       workspace: {
         getState: () => Promise<WorkspaceState>
+        getHealth: () => Promise<WorkspaceHealth>
         openFolder: (folderPath: string) => void
         onDidChange: (callback: (state: WorkspaceState) => void) => () => void
       }
-      sdk: {
+      cli: {
         build: () => Promise<IpcResult<{ success: boolean }>>
+        init: () => Promise<IpcResult<{ success: boolean }>>
+        check: () => Promise<IpcResult<CheckResult>>
         diff: (params: {
           base: string
           target: string
           includeTestChanges: boolean
         }) => Promise<IpcResult<DiffResult>>
+      }
+      sdk: {
         fetchPackages: () => Promise<IpcResult<{ root: PackageNode }>>
         queryOutlines: (pkg: string) => Promise<IpcResult<{ package: string; outlines: Outline[] }>>
         query: (params: {

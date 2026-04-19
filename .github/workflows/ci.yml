@@ -93,3 +93,56 @@ jobs:
 
       - name: Test
         run: pnpm --filter @cogna-dev/sdk run test
+
+  cli-e2e-repos:
+    name: CLI e2e repos checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: cogna-dev/moonbit-actions/setup@v0
+
+      - name: Setup Cogna
+        uses: ./integrations/actions/setup-cogna
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            source "$HOME/.cargo/env"
+          fi
+          if [ -f "$HOME/.cargo/env" ]; then
+            source "$HOME/.cargo/env"
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+
+      - name: Setup OPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v opa >/dev/null 2>&1; then
+            curl -L -o /usr/local/bin/opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+            chmod +x /usr/local/bin/opa
+          fi
+          opa version
+
+      - name: Run CLI e2e across repos
+        shell: bash
+        env:
+          COGNA_E2E_TIMEOUT_SECONDS: '30'
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run-cli-e2e.sh

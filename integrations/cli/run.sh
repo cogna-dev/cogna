@@ -4,6 +4,15 @@ set -euo pipefail
 
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 manifest_path="$source_root/moon.mod.json"
+timeout_seconds="${COGNA_CLI_TIMEOUT_SECONDS:-}"
+
+run_moon() {
+  if [[ -n "$timeout_seconds" ]]; then
+    perl -e 'alarm shift; exec @ARGV' "$timeout_seconds" "$@"
+  else
+    "$@"
+  fi
+}
 
 moon_args=()
 cli_args=()
@@ -41,14 +50,14 @@ fi
 cd "$source_root"
 if [[ ${#moon_args[@]} -eq 0 ]]; then
   if [[ ${#cli_args[@]} -eq 0 ]]; then
-    moon run --manifest-path "$manifest_path" src/cmd/main
+    run_moon moon run --manifest-path "$manifest_path" src/cmd/main
   else
-    moon run --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
+    run_moon moon run --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
   fi
 else
   if [[ ${#cli_args[@]} -eq 0 ]]; then
-    moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main
+    run_moon moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main
   else
-    moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
+    run_moon moon run "${moon_args[@]}" --manifest-path "$manifest_path" src/cmd/main -- "${cli_args[@]}"
   fi
 fi

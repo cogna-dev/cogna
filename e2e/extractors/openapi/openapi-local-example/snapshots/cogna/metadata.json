@@ -9,7 +9,7 @@
     "version": "canonical-v1",
     "fallback": false,
     "stats": {
-      "declarations": 42,
+      "declarations": 40,
       "diagnosticFiles": 0
     }
   },

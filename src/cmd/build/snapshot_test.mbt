@@ -334,31 +334,31 @@ fn run_snapshot_case(
 ///|
 test "snapshot terraform baseline extractor output" {
   run_snapshot_case(
-    "terraform", "terraform-module", "main.tf", "examples/terraform-module/full/repo/main.tf",
-    "**/*.tf", "examples/terraform-module/full/snapshots/cogna",
+    "terraform", "terraform-module", "main.tf", "e2e/repos/terraform-module/main.tf",
+    "**/*.tf", "e2e/repos/terraform-module/snapshots/cogna",
   )
 }
 
 ///|
 test "snapshot openapi baseline extractor output" {
   run_snapshot_case(
-    "openapi", "openapi-spec", "openapi/payment.yaml", "examples/openapi-spec/full/repo/openapi/payment.yaml",
-    "openapi/**/*.yaml", "examples/openapi-spec/full/snapshots/cogna",
+    "openapi", "openapi-spec", "openapi/payment.yaml", "e2e/repos/openapi-spec/openapi/payment.yaml",
+    "openapi/**/*.yaml", "e2e/repos/openapi-spec/snapshots/cogna",
   )
 }
 
 ///|
 test "snapshot go canonical extractor output" {
   run_snapshot_case(
-    "go", "go-module", "main.go", "examples/go-module/full/repo/main.go", "**/*.go",
-    "examples/go-module/full/snapshots/cogna",
+    "go", "go-module", "main.go", "e2e/repos/go-module/main.go", "**/*.go",
+    "e2e/repos/go-module/snapshots/cogna",
   )
 }
 
 ///|
 test "snapshot rust canonical extractor output" {
   run_snapshot_case(
-    "rust", "rust-crate", "lib.rs", "examples/rust-crate/full/repo/lib.rs", "**/*.rs",
-    "examples/rust-crate/full/snapshots/cogna",
+    "rust", "rust-crate", "lib.rs", "e2e/repos/rust-crate/lib.rs", "**/*.rs",
+    "e2e/repos/rust-crate/snapshots/cogna",
   )
 }

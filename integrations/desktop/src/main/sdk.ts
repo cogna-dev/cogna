@@ -67,6 +67,32 @@ export type DesktopDiffResult = {
   testChanges: DesktopDiffChange[]
 }
 
+export type DesktopSarifRule = {
+  id: string
+  helpUri?: string
+}
+
+export type DesktopSarifResult = {
+  ruleId?: string
+  level: 'error' | 'warning' | 'note'
+  message: string
+  uri: string
+  startLine: number
+  endLine: number
+  helpUri?: string
+}
+
+export type DesktopCheckResult = {
+  sarifPath: string
+  summary: {
+    error: number
+    warning: number
+    note: number
+    total: number
+  }
+  results: DesktopSarifResult[]
+}
+
 function emptySummary(): DesktopDiffResult['summary'] {
   return {
     added: 0,
@@ -166,30 +192,74 @@ type CliInvocationResult = {
   stderr: string
 }
 
-function workspaceRoot(): string {
-  return resolve(__dirname, '../../../../..')
+type SarifRule = {
+  id: string
+  helpUri?: string
 }
 
-function cliRunnerPath(): string {
-  return resolve(workspaceRoot(), 'integrations/cli/run.sh')
+type SarifResultEntry = {
+  ruleId?: string
+  level?: string
+  message?: {
+    text?: string
+  }
+  locations?: Array<{
+    physicalLocation?: {
+      artifactLocation?: {
+        uri?: string
+      }
+      region?: {
+        startLine?: number
+        endLine?: number
+      }
+    }
+  }>
+}
+
+type SarifRun = {
+  tool?: {
+    driver?: {
+      rules?: SarifRule[]
+    }
+  }
+  results?: SarifResultEntry[]
+}
+
+type SarifLog = {
+  version?: string
+  runs?: SarifRun[]
 }
 
 function workspaceArg(workspacePath?: string): string {
   return workspacePath && workspacePath.trim().length > 0 ? workspacePath : '.'
 }
 
-async function runCli(args: string[], cwd: string): Promise<CliInvocationResult> {
-  const scriptPath = cliRunnerPath()
-  if (!existsSync(scriptPath)) {
-    throw new Error(`Cogna CLI runner not found at ${scriptPath}`)
+function withWorkspaceCwd<T>(workspacePath: string | undefined, action: () => T): T {
+  const cwd = workspaceArg(workspacePath)
+  const previous = process.cwd()
+  try {
+    process.chdir(cwd)
+    return action()
+  } finally {
+    process.chdir(previous)
   }
-  const result = await execFileAsync(scriptPath, ['--', ...args], {
-    cwd,
-    env: process.env,
-  })
-  return {
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
+}
+
+async function runCli(args: string[], cwd: string): Promise<CliInvocationResult> {
+  try {
+    const result = await execFileAsync('cogna', args, {
+      cwd,
+      env: process.env,
+    })
+    return {
+      stdout: result.stdout ?? '',
+      stderr: result.stderr ?? '',
+    }
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'ENOENT') {
+      throw new Error('Cogna CLI not found in PATH. Please install cogna and ensure it is available in your shell environment.')
+    }
+    throw error
   }
 }
 
@@ -197,19 +267,54 @@ function readJsonFile<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf-8')) as T
 }
 
+function mapSarifLevel(level?: string): 'error' | 'warning' | 'note' {
+  if (level === 'error' || level === 'warning') {
+    return level
+  }
+  return 'note'
+}
+
+function mapSarifResult(item: SarifResultEntry, rulesById: Map<string, DesktopSarifRule>): DesktopSarifResult {
+  const location = item.locations?.[0]?.physicalLocation
+  const uri = location?.artifactLocation?.uri ?? 'unknown'
+  const startLine = location?.region?.startLine ?? 1
+  const endLine = location?.region?.endLine ?? startLine
+  const level = mapSarifLevel(item.level)
+  const rule = item.ruleId ? rulesById.get(item.ruleId) : undefined
+  return {
+    ruleId: item.ruleId,
+    level,
+    message: item.message?.text ?? 'Policy finding',
+    uri,
+    startLine,
+    endLine,
+    helpUri: rule?.helpUri,
+  }
+}
+
 export async function sdkBuild(workspacePath?: string): Promise<IpcResult<{ success: boolean }>> {
   try {
     const cwd = workspaceArg(workspacePath)
-    await runCli(['build', '--repo', cwd], cwd)
+    await runCli(['build'], cwd)
     return ok({ success: true })
   } catch (error) {
     return err(error)
   }
 }
 
-export async function sdkFetchPackages(): Promise<IpcResult<{ root: DesktopPackageNode }>> {
+export async function sdkInit(workspacePath?: string): Promise<IpcResult<{ success: boolean }>> {
   try {
-    const result = fetchPackages()
+    const cwd = workspaceArg(workspacePath)
+    await runCli(['init', '--output', './cogna.yaml'], cwd)
+    return ok({ success: true })
+  } catch (error) {
+    return err(error)
+  }
+}
+
+export async function sdkFetchPackages(workspacePath?: string): Promise<IpcResult<{ root: DesktopPackageNode }>> {
+  try {
+    const result = withWorkspaceCwd(workspacePath, () => fetchPackages())
     if (!result?.root) {
       return err('fetchPackages returned empty root')
     }
@@ -219,9 +324,9 @@ export async function sdkFetchPackages(): Promise<IpcResult<{ root: DesktopPacka
   }
 }
 
-export async function sdkQueryOutlines(pkg: string): Promise<IpcResult<{ package: string; outlines: DesktopOutline[] }>> {
+export async function sdkQueryOutlines(pkg: string, workspacePath?: string): Promise<IpcResult<{ package: string; outlines: DesktopOutline[] }>> {
   try {
-    const result = queryOutlines({ package: pkg })
+    const result = withWorkspaceCwd(workspacePath, () => queryOutlines({ package: pkg }))
     if (!result) {
       return err('queryOutlines returned empty result')
     }
@@ -239,6 +344,7 @@ export async function sdkQuery(params: {
   mode: 'exact-id' | 'exact-symbol' | 'fuzzy-text'
   input: string
   limit?: number
+  workspacePath?: string
 }): Promise<IpcResult<{ package: string; mode: string; matches: DesktopQueryMatch[] }>> {
   try {
     const req = {
@@ -248,7 +354,7 @@ export async function sdkQuery(params: {
       text: params.mode === 'fuzzy-text' ? params.input : undefined,
       limit: params.mode === 'fuzzy-text' ? params.limit : undefined,
     }
-    const result = query(req)
+    const result = withWorkspaceCwd(params.workspacePath, () => query(req))
     if (!result) {
       return err('query returned empty result')
     }
@@ -270,9 +376,20 @@ export async function sdkDiff(params: {
 }): Promise<IpcResult<DesktopDiffResult>> {
   try {
     const cwd = workspaceArg(params.workspacePath)
-    const args = ['diff', '--repo', cwd, '--since', params.base, '--include-test-changes', params.includeTestChanges ? 'true' : 'false']
-    await runCli(args, cwd)
-    const diffPath = resolve(cwd, 'dist', 'diff.json')
+    const args = ['diff', '--since', params.base, '--include-test-changes', params.includeTestChanges ? 'true' : 'false']
+    const invocation = await runCli(args, cwd)
+    const defaultDiffPath = resolve(cwd, 'dist', 'diff.json')
+    let diffPath = defaultDiffPath
+    if (!existsSync(diffPath)) {
+      const match = invocation.stdout.match(/Generated CIQ declaration diff at (.+)$/m)
+      const candidate = match?.[1]?.trim()
+      if (candidate && existsSync(candidate)) {
+        diffPath = candidate
+      }
+    }
+    if (!existsSync(diffPath)) {
+      throw new Error(`Diff output missing after command completion: ${defaultDiffPath}`)
+    }
     const result = readJsonFile<DiffFileResult>(diffPath)
     const summary = result.summary
       ? {
@@ -299,6 +416,57 @@ export async function sdkDiff(params: {
         level: change.level,
         message: change.message,
       })),
+    })
+  } catch (error) {
+    return err(error)
+  }
+}
+
+export async function sdkCheck(workspacePath?: string): Promise<IpcResult<DesktopCheckResult>> {
+  try {
+    const cwd = workspaceArg(workspacePath)
+    await runCli(['check'], cwd)
+    const sarifPath = resolve(cwd, 'dist', 'check.sarif.json')
+    const sarif = readJsonFile<SarifLog>(sarifPath)
+    const runs = sarif.runs ?? []
+    const rulesById = new Map<string, DesktopSarifRule>()
+    for (const run of runs) {
+      for (const rule of run.tool?.driver?.rules ?? []) {
+        if (rule.id && !rulesById.has(rule.id)) {
+          rulesById.set(rule.id, { id: rule.id, helpUri: rule.helpUri })
+        }
+      }
+    }
+
+    const results: DesktopSarifResult[] = []
+    for (const run of runs) {
+      for (const item of run.results ?? []) {
+        results.push(mapSarifResult(item, rulesById))
+      }
+    }
+
+    let errorCount = 0
+    let warningCount = 0
+    let noteCount = 0
+    for (const item of results) {
+      if (item.level === 'error') {
+        errorCount += 1
+      } else if (item.level === 'warning') {
+        warningCount += 1
+      } else {
+        noteCount += 1
+      }
+    }
+
+    return ok({
+      sarifPath,
+      summary: {
+        error: errorCount,
+        warning: warningCount,
+        note: noteCount,
+        total: results.length,
+      },
+      results,
     })
   } catch (error) {
     return err(error)

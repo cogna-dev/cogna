@@ -62,7 +62,7 @@ async function prepareWorkspace(repoRoot: string): Promise<{ workspaceDir: strin
   await fs.mkdir(openapiDir, { recursive: true })
   await fs.mkdir(distDir, { recursive: true })
   await fs.copyFile(
-    path.join(repoRoot, "examples/openapi-spec/full/repo/openapi/payment.yaml"),
+    path.join(repoRoot, "e2e/repos/openapi-spec/openapi/payment.yaml"),
     path.join(openapiDir, "payment.yaml"),
   )
   await writeWorkspaceConfig(workspaceDir)

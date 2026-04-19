@@ -3,7 +3,7 @@
     {
       "id": "terraform-local-example",
       "extractor": "terraform",
-      "path": "./e2e/examples/terraform-module/full/repo"
+      "path": "./e2e/repos/terraform-module"
     }
   ]
 }
