@@ -1,5 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "files": {
+    "ignore": [
+      "dist/**",
+      "src/generated/**",
+      "src/runtime/sdk.runtime.js",
+      "src/runtime/sdk.js.map"
+    ]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space"

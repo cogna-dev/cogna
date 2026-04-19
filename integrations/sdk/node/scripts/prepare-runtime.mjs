@@ -1,7 +1,13 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { execSync, spawnSync } from 'node:child_process'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execSync, spawnSync } from 'node:child_process'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(__dirname, '..')
@@ -25,7 +31,9 @@ function commandExists(command) {
 }
 
 function shouldSkipBufGenerate(errorMessage) {
-  return errorMessage.includes('symbol "xaclabs.cogna.v1.SourceLocation" already defined')
+  return errorMessage.includes(
+    'symbol "xaclabs.cogna.v1.SourceLocation" already defined',
+  )
 }
 
 function tryBufGenerate() {
@@ -76,12 +84,7 @@ if (moonAvailable) {
   console.warn('moon is not installed; using checked-in SDK runtime artifact.')
 }
 
-const runtimeSource = resolve(
-  repoRoot,
-  'dist',
-  'runtime',
-  'sdk.runtime.js',
-)
+const runtimeSource = resolve(repoRoot, 'dist', 'runtime', 'sdk.runtime.js')
 if (moonAvailable && !existsSync(runtimeSource)) {
   throw new Error(`MoonBit JS runtime not found at ${runtimeSource}`)
 }
@@ -90,7 +93,10 @@ if (existsSync(runtimeSource)) {
   mkdirSync(dirname(runtimeTarget), { recursive: true })
   copyFileSync(runtimeSource, runtimeTarget)
   const runtimeText = readFileSync(runtimeTarget, 'utf-8')
-  const strippedRuntimeText = runtimeText.replace(/\/\/# sourceMappingURL=.*$/m, '')
+  const strippedRuntimeText = runtimeText.replace(
+    /\/\/# sourceMappingURL=.*$/m,
+    '',
+  )
   if (runtimeText !== strippedRuntimeText) {
     writeFileSync(runtimeTarget, strippedRuntimeText)
   }

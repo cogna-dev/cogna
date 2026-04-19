@@ -376,8 +376,8 @@ pub fn declaration_relations_v2(
 ///|
 pub fn make_declaration(
   profile : String,
-  _server : String,
-  _language : String,
+  server : String,
+  language : String,
   path : String,
   line_no : Int,
   kind : String,
@@ -386,13 +386,29 @@ pub fn make_declaration(
   docs : String,
 ) -> Json {
   let symbol = canonical_name(profile, path, name)
+  let shape = declaration_shape(kind, signature)
+  let relations = declaration_relations_v2(profile, path, kind, name, signature)
   {
     "id": "decl:\{profile}:\{symbol}",
+    "profile": profile,
+    "server": server,
+    "language": language,
+    "path": path,
     "kind": kind,
+    "name": name,
     "symbol": symbol,
     "signature": signature,
     "docs": docs,
     "deprecated": false,
+    "shape": shape,
+    "relations": relations,
+    "language_specific": {
+      "profile": { "profile": profile, "server": server },
+      "go": {},
+      "rust": {},
+      "terraform": {},
+      "openapi": {},
+    },
     "location": { "uri": path, "startLine": line_no, "endLine": line_no },
   }
 }

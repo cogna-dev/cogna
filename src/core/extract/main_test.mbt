@@ -11,7 +11,7 @@ test "extract make_declaration adds canonical relations" {
   inspect(shape_string(record, "form"), content="callable")
   inspect(
     language_specific_profile_string(record, "profile", "server"),
-    content="",
+    content="gopls",
   )
 }
 

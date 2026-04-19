@@ -1,8 +1,4 @@
-import {
-  fetch_packages,
-  query_outlines,
-  query,
-} from './runtime/sdk.runtime.js'
+import { fetch_packages, query, query_outlines } from './runtime/sdk.runtime.js'
 
 import {
   parseFetchPackagesResponse,
@@ -12,11 +8,11 @@ import {
   serializeQueryRequest,
 } from './generated/query.js'
 import type {
+  FetchPackagesResponse,
   QueryOutlinesRequest,
   QueryOutlinesResponse,
   QueryRequest,
   QueryResponse,
-  FetchPackagesResponse,
 } from './generated/query.js'
 
 type RawSdk = {
@@ -35,14 +31,16 @@ export function fetchPackages(): FetchPackagesResponse | undefined {
   return parseFetchPackagesResponse(rawSdk.fetch_packages(undefined))
 }
 
-export function queryOutlines(req: QueryOutlinesRequest): QueryOutlinesResponse | undefined {
-  return parseQueryOutlinesResponse(rawSdk.query_outlines(serializeQueryOutlinesRequest(req)))
+export function queryOutlines(
+  req: QueryOutlinesRequest,
+): QueryOutlinesResponse | undefined {
+  return parseQueryOutlinesResponse(
+    rawSdk.query_outlines(serializeQueryOutlinesRequest(req)),
+  )
 }
 
 export function querySdk(req: QueryRequest): QueryResponse | undefined {
   return parseQueryResponse(rawSdk.query(serializeQueryRequest(req)))
 }
 
-export {
-  querySdk as query,
-}
+export { querySdk as query }

@@ -10,7 +10,7 @@
   "artifacts": [
     {
       "path": "declarations.ndjson",
-      "sha256": "79ac36533ef665700dd8775a12ab50ff1eef45f2ac4334564c4e41af3eebeef2",
+      "sha256": "7d7f8f83d7b239326a4743e14f057611bbffb603c441087e5967fa09cf468185",
       "compression": "none"
     }
   ]

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   parseFetchPackagesRequest,
@@ -12,7 +12,7 @@ import {
   parseQueryResponse,
   serializeQueryRequest,
 } from './generated/query.js'
-import { fetchPackages, queryOutlines, query } from './moonbit.js'
+import { fetchPackages, query, queryOutlines } from './moonbit.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(__dirname, '../../../..')
@@ -67,8 +67,15 @@ function writeRuntimeProjectFiles(): void {
     'utf-8',
   )
 
-  const declarationsText = readFileSync(join(fixturesDir, 'declarations.ndjson'), 'utf-8')
-  writeFileSync(join(runtimeProjectDir, 'dist', 'declarations.ndjson'), declarationsText, 'utf-8')
+  const declarationsText = readFileSync(
+    join(fixturesDir, 'declarations.ndjson'),
+    'utf-8',
+  )
+  writeFileSync(
+    join(runtimeProjectDir, 'dist', 'declarations.ndjson'),
+    declarationsText,
+    'utf-8',
+  )
 
   writeFileSync(
     join(runtimeProjectDir, '.cogna', 'sbom.spdx.json'),
@@ -143,7 +150,10 @@ describe('FetchPackages', () => {
   })
 
   it('parses FetchPackagesResponse with nested children', () => {
-    const res = must(parseFetchPackagesResponse(fixture.output), 'expected fetch packages response')
+    const res = must(
+      parseFetchPackagesResponse(fixture.output),
+      'expected fetch packages response',
+    )
     expect(res.root.name).toBe('example/sdkacceptance')
     expect(res.root.relation).toBe('root')
     expect(res.root.children).toHaveLength(2)
@@ -163,12 +173,18 @@ describe('QueryOutlines', () => {
   const fixture = loadFixture('query-outlines.json')
 
   it('parses QueryOutlinesRequest from fixture input', () => {
-    const req = must(parseQueryOutlinesRequest(fixture.input), 'expected query outlines request')
+    const req = must(
+      parseQueryOutlinesRequest(fixture.input),
+      'expected query outlines request',
+    )
     expect(req.package).toBe('example/sdkacceptance')
   })
 
   it('parses QueryOutlinesResponse with locations', () => {
-    const res = must(parseQueryOutlinesResponse(fixture.output), 'expected query outlines response')
+    const res = must(
+      parseQueryOutlinesResponse(fixture.output),
+      'expected query outlines response',
+    )
     expect(res.outlines).toHaveLength(4)
     const first = res.outlines[0]
     expect(first?.id).toBe('decl:go:example/sdkacceptance.Greeter')
@@ -185,26 +201,43 @@ describe('Query request/response parsing', () => {
   const fuzzyFixture = loadFixture('query-fuzzy-text.json')
 
   it('parses and serializes exact-id requests', () => {
-    const req = must(parseQueryRequest(exactIdFixture.input), 'expected exact-id request')
+    const req = must(
+      parseQueryRequest(exactIdFixture.input),
+      'expected exact-id request',
+    )
     expect(req.exactId).toBe('decl:go:example/sdkacceptance.Greeter')
     expect(req.exactSymbol).toBeUndefined()
-    expect(serializeQueryRequest(req)).toHaveProperty('exact_id', 'decl:go:example/sdkacceptance.Greeter')
+    expect(serializeQueryRequest(req)).toHaveProperty(
+      'exact_id',
+      'decl:go:example/sdkacceptance.Greeter',
+    )
   })
 
   it('parses exact-symbol responses', () => {
-    const res = must(parseQueryResponse(exactSymbolFixture.output), 'expected exact-symbol response')
+    const res = must(
+      parseQueryResponse(exactSymbolFixture.output),
+      'expected exact-symbol response',
+    )
     expect(res.mode).toBe('exact-symbol')
     expect(res.matches[0]?.kind).toBe('method')
   })
 
   it('parses fuzzy-text response scores and locations', () => {
-    const res = must(parseQueryResponse(fuzzyFixture.output), 'expected fuzzy-text response')
+    const res = must(
+      parseQueryResponse(fuzzyFixture.output),
+      'expected fuzzy-text response',
+    )
     expect(res.mode).toBe('fuzzy-text')
     expect(res.matches).toHaveLength(2)
     expect(res.matches[0]?.score).toBeCloseTo(0.94)
-    const firstLocation = must(res.matches[0]?.location, 'expected first fuzzy match location')
+    const firstLocation = must(
+      res.matches[0]?.location,
+      'expected first fuzzy match location',
+    )
     expect(firstLocation.startLine).toBeGreaterThan(0)
-    expect(firstLocation.endLine).toBeGreaterThanOrEqual(firstLocation.startLine)
+    expect(firstLocation.endLine).toBeGreaterThanOrEqual(
+      firstLocation.startLine,
+    )
   })
 })
 
@@ -233,7 +266,10 @@ describe('Real ndjson data', () => {
       location: record.location,
     }))
     const res = must(
-      parseQueryOutlinesResponse({ package: 'example/sdkacceptance', outlines }),
+      parseQueryOutlinesResponse({
+        package: 'example/sdkacceptance',
+        outlines,
+      }),
       'expected outlines response from ndjson',
     )
     expect(res.outlines).toHaveLength(4)
@@ -243,14 +279,31 @@ describe('Real ndjson data', () => {
   })
 
   it('parses exact-id and fuzzy-text matches from ndjson-derived objects', () => {
-    const greeter = must(records.find((record) => record.id === 'decl:go:example/sdkacceptance.Greeter'), 'expected Greeter record')
-    const buildLabels = must(records.find((record) => record.name === 'BuildLabels'), 'expected BuildLabels record')
+    const greeter = must(
+      records.find(
+        (record) => record.id === 'decl:go:example/sdkacceptance.Greeter',
+      ),
+      'expected Greeter record',
+    )
+    const buildLabels = must(
+      records.find((record) => record.name === 'BuildLabels'),
+      'expected BuildLabels record',
+    )
 
     const exactId = must(
       parseQueryResponse({
         package: 'example/sdkacceptance',
         mode: 'exact-id',
-        matches: [{ id: greeter.id, symbol: greeter.canonical_name, kind: greeter.kind, summary: greeter.docs, location: greeter.location, score: 1.0 }],
+        matches: [
+          {
+            id: greeter.id,
+            symbol: greeter.canonical_name,
+            kind: greeter.kind,
+            summary: greeter.docs,
+            location: greeter.location,
+            score: 1.0,
+          },
+        ],
       }),
       'expected exact-id response',
     )
@@ -260,7 +313,16 @@ describe('Real ndjson data', () => {
       parseQueryResponse({
         package: 'example/sdkacceptance',
         mode: 'fuzzy-text',
-        matches: [{ id: buildLabels.id, symbol: buildLabels.canonical_name, kind: buildLabels.kind, summary: buildLabels.docs, location: buildLabels.location, score: 0.87 }],
+        matches: [
+          {
+            id: buildLabels.id,
+            symbol: buildLabels.canonical_name,
+            kind: buildLabels.kind,
+            summary: buildLabels.docs,
+            location: buildLabels.location,
+            score: 0.87,
+          },
+        ],
       }),
       'expected fuzzy-text response',
     )
@@ -296,30 +358,49 @@ describe('Direct MoonBit readonly facade', () => {
 
   it('queryOutlines returns typed outlines from the compiled MoonBit runtime', () => {
     writeRuntimeProjectFiles()
-    const req = must(parseQueryOutlinesRequest(queryOutlinesFixture.input), 'expected queryOutlines request')
+    const req = must(
+      parseQueryOutlinesRequest(queryOutlinesFixture.input),
+      'expected queryOutlines request',
+    )
     const res = must(queryOutlines(req), 'expected queryOutlines result')
     expect(res.package).toBe('example/sdkacceptance')
     expect(res.outlines).toHaveLength(4)
     expect(res.outlines[0]?.id).toBe(queryOutlinesFixture.output.outlines[0].id)
-    expect(res.outlines[0]?.symbol).toBe(queryOutlinesFixture.output.outlines[0].symbol)
-    expect(res.outlines[0]?.location?.startLine).toBe(queryOutlinesFixture.output.outlines[0].location.start_line)
+    expect(res.outlines[0]?.symbol).toBe(
+      queryOutlinesFixture.output.outlines[0].symbol,
+    )
+    expect(res.outlines[0]?.location?.startLine).toBe(
+      queryOutlinesFixture.output.outlines[0].location.start_line,
+    )
   })
 
   it('query supports exact-id through the direct facade', () => {
     writeRuntimeProjectFiles()
-    const req = must(parseQueryRequest(queryExactIdFixture.input), 'expected exact-id request')
+    const req = must(
+      parseQueryRequest(queryExactIdFixture.input),
+      'expected exact-id request',
+    )
     const res = must(query(req), 'expected exact-id result')
     expect(res.mode).toBe('exact-id')
     expect(res.matches.length).toBeGreaterThan(0)
-    expect(res.matches.some((match) => match.id === queryExactIdFixture.output.matches[0].id)).toBe(true)
+    expect(
+      res.matches.some(
+        (match) => match.id === queryExactIdFixture.output.matches[0].id,
+      ),
+    ).toBe(true)
   })
 
   it('query supports exact-symbol through the direct facade', () => {
     writeRuntimeProjectFiles()
-    const req = must(parseQueryRequest(queryExactSymbolFixture.input), 'expected exact-symbol request')
+    const req = must(
+      parseQueryRequest(queryExactSymbolFixture.input),
+      'expected exact-symbol request',
+    )
     const res = must(query(req), 'expected exact-symbol result')
     expect(res.mode).toBe('exact-symbol')
-    expect(res.matches[0]?.symbol).toBe(queryExactSymbolFixture.output.matches[0].symbol)
+    expect(res.matches[0]?.symbol).toBe(
+      queryExactSymbolFixture.output.matches[0].symbol,
+    )
   })
 
   it('query supports fuzzy-text through the direct facade', () => {
