@@ -5,7 +5,7 @@
   "scripts": {
     "sync:policy-docs": "node ./scripts/sync-policy-readme.mjs",
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "npx playwright install --with-deps && astro build",
     "preview": "astro preview",
     "predev": "pnpm run sync:policy-docs",
     "prebuild": "pnpm run sync:policy-docs",
